@@ -17,3 +17,18 @@ oracle exceptions of the closed categories in R16.
 
 `go-bench.txt` is the baseline for the performance work in later phases.
 Run-to-run noise on this machine is a few percent.
+
+## Reproducing the gate
+
+Run from the repository root with `gocyclo` installed (`make tools`). The
+counts hold for any commit whose Go sources equal commit `c589227`
+(`git diff c589227 HEAD -- '*.go'` prints nothing).
+
+```
+make check cover cyclo bench   # vet, test, baseline; 100.0% coverage; no gocyclo output
+make conformance-report        # exits 1 by design: 485 pass, 1510 fail, 16 skip (of 2011)
+make ratchet                   # ratchet: 485 passing, 485 in baseline (0 new)
+```
+
+`make bench` rewrites `go-bench.txt`; ns/op varies by a few percent from run
+to run, but the set of Benchmark functions and their PASS result does not.
