@@ -56,11 +56,19 @@ type Plan struct {
 	// whether set windows-shell and set windows-powershell apply. Empty means
 	// the one the program runs on.
 	OS     string
-	Stdin  io.Reader   // nil means no input
-	Stdout io.Writer   // nil discards
-	Stderr io.Writer   // nil discards; receives echoed commands and failure messages
-	Quiet  bool        // overrides set quiet when true; also silences the failure message
-	Exec   sys.Process // nil uses the OS implementation from internal/sys
+	Stdin  io.Reader // nil means no input
+	Stdout io.Writer // nil discards
+	Stderr io.Writer // nil discards; receives echoed commands and failure messages
+	// Prompt receives the `[confirm]` prompts. Nil means Stderr. Upstream
+	// writes them to its standard error even when it is quiet, which silences
+	// everything else it writes there, so a host that is quiet gives the
+	// real one here.
+	Prompt io.Writer
+	Quiet  bool // overrides set quiet when true; also silences the failure message
+	// Yes answers every `[confirm]` prompt with yes without asking, as
+	// upstream's --yes does.
+	Yes  bool
+	Exec sys.Process // nil uses the OS implementation from internal/sys
 	// Shell and ShellArgs override the justfile's set shell for every line,
 	// as upstream's --shell and --shell-arg: Shell alone keeps the default
 	// arguments (-cu), ShellArgs alone keeps the default shell (sh). Empty
@@ -95,6 +103,14 @@ type step struct {
 	// environment: those exported with `export`, `$` or set export. It is nil
 	// when there are none.
 	env map[string]string
+	// workdir is the value of the recipe's `[working-directory]` attribute,
+	// nil when it has none.
+	workdir *string
+	// ask is true for a step that asks whether to run the recipe, with the
+	// prompt text, instead of running it. A `[confirm]` recipe has one before
+	// its dependencies.
+	ask    bool
+	prompt string
 }
 
 // prepared is the outcome of prepare: the steps in run order and the
@@ -122,7 +138,7 @@ func Run(ctx context.Context, plan Plan) (Result, error) {
 	}
 	inv := newInvocation(ctx, plan, pre.set)
 	for _, s := range pre.steps {
-		code, err := inv.recipe(s)
+		code, err := inv.step(s)
 		if err != nil || code != 0 {
 			return Result{ExitCode: code}, err
 		}
@@ -181,7 +197,12 @@ func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 		if len(recipes) == 0 {
 			return nil, usage("justfile contains no recipes")
 		}
-		return []Call{{Recipe: recipes[0].Name, Args: args}}, nil
+		r := defaultRecipe(recipes)
+		if min := requiredParams(r); min > 0 && len(args) == 0 {
+			return nil, usage("recipe `%s` cannot be used as default recipe since it requires at least %s",
+				r.Name, count(min, "argument"))
+		}
+		return []Call{{Recipe: r.Name, Args: args}}, nil
 	}
 	if len(args) > 0 && len(names) > 1 {
 		return nil, usage("positional arguments need exactly one requested recipe, but %d were requested", len(names))
@@ -192,6 +213,17 @@ func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 	}
 	calls[0].Args = args
 	return calls, nil
+}
+
+// defaultRecipe is the recipe that runs when none is named: the one with
+// `[default]`, else the first. recipes is not empty. It is pure.
+func defaultRecipe(recipes []ast.Recipe) *ast.Recipe {
+	for i := range recipes {
+		if recipes[i].Attribute(ast.AttrDefault) != nil {
+			return &recipes[i]
+		}
+	}
+	return &recipes[0]
 }
 
 // findRecipe returns the recipe of jf named name, or nil. Of recipes that
@@ -309,11 +341,18 @@ func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]bool) erro
 	if err != nil {
 		return err
 	}
+	if err := o.confirmation(r, scope); err != nil {
+		return err
+	}
+	workdir, err := o.workingDirectory(r, scope)
+	if err != nil {
+		return err
+	}
 	if err := o.dependencies(r, r.Deps, scope, ran); err != nil {
 		return err
 	}
 	o.steps = append(o.steps, step{
-		recipe: r, scope: scope, positional: positional,
+		recipe: r, scope: scope, positional: positional, workdir: workdir,
 		env: exportedEnv(o.jf, r, o.exported, o.globals, scope),
 	})
 	return o.dependencies(r, r.Subsequents, scope, make(map[string]bool, len(r.Subsequents)))
@@ -380,16 +419,22 @@ func bindParams(jf *ast.Justfile, r *ast.Recipe, args []string, globals eval.Sco
 	return scope, values, nil
 }
 
+// requiredParams counts the parameters of r that have no default. It is pure.
+func requiredParams(r *ast.Recipe) int {
+	n := 0
+	for _, p := range r.Params {
+		if p.Default == nil {
+			n++
+		}
+	}
+	return n
+}
+
 // checkArgCount reports a usage error, worded as upstream's
 // PositionalArgumentCountMismatch, when found arguments do not fit r's
 // parameters. It is pure.
 func checkArgCount(r *ast.Recipe, found int) error {
-	lo, hi := 0, len(r.Params)
-	for _, p := range r.Params {
-		if p.Default == nil {
-			lo++
-		}
-	}
+	lo, hi := requiredParams(r), len(r.Params)
 	if found >= lo && found <= hi {
 		return nil
 	}
@@ -487,22 +532,44 @@ func justfileShell(set ast.Settings, res settings.Resolved, goos string) []strin
 	return res.Shell
 }
 
-// workingDirectory is the directory the commands of a recipe run in. With set
-// no-cd it is the directory the command was run from; else it is the base
-// directory, with set working-directory joined to it, as upstream does, so
-// that an absolute setting replaces it. It is pure.
+// workingDirectory is the directory the commands of a recipe run in when it
+// has no attribute that says otherwise. With set no-cd it is the directory
+// the command was run from (see invocationDirectory); else it is the base
+// directory. It is pure.
 func workingDirectory(plan Plan, res settings.Resolved) string {
-	if plan.Justfile.Settings.NoCd && plan.InvocationDir != "" {
-		return plan.InvocationDir
+	if plan.Justfile.Settings.NoCd {
+		return invocationDirectory(plan)
 	}
+	return baseDirectory(plan, res)
+}
+
+// baseDirectory is the plan's directory with set working-directory joined to
+// it, as upstream does, so that an absolute setting replaces it. It is where
+// a recipe's `[working-directory]` is relative to. It is pure.
+func baseDirectory(plan Plan, res settings.Resolved) string {
 	if plan.Justfile.Settings.NoCd || res.WorkingDirectory == nil {
 		return plan.WorkDir
 	}
-	dir := *res.WorkingDirectory
-	if filepath.IsAbs(dir) {
-		return dir
+	return joinDirectory(plan.WorkDir, *res.WorkingDirectory)
+}
+
+// invocationDirectory is the directory the command was run from, which
+// recipes that do not change directory run in. Without one, it is the plan's
+// directory. It is pure.
+func invocationDirectory(plan Plan) string {
+	if plan.InvocationDir != "" {
+		return plan.InvocationDir
 	}
-	return filepath.Join(plan.WorkDir, dir)
+	return plan.WorkDir
+}
+
+// joinDirectory is dir followed by rel, or rel alone when it is absolute. It
+// is pure.
+func joinDirectory(dir, rel string) string {
+	if filepath.IsAbs(rel) {
+		return rel
+	}
+	return filepath.Join(dir, rel)
 }
 
 // exportedGlobals lists the assignments whose values every recipe's commands
@@ -632,10 +699,16 @@ type invocation struct {
 	plan   Plan
 	exec   sys.Process
 	stderr io.Writer
-	// shell is the shell the justfile asks for, nil for none, and dir the
-	// directory commands run in.
+	// prompt is where `[confirm]` prompts are written.
+	prompt io.Writer
+	// shell is the shell the justfile asks for, nil for none. dir is the
+	// directory the commands of a recipe run in, base the one a
+	// `[working-directory]` is relative to, and here the one a `[no-cd]`
+	// recipe runs in.
 	shell []string
 	dir   string
+	base  string
+	here  string
 }
 
 // newInvocation fills in the defaults for plan's optional fields and picks
@@ -649,6 +722,7 @@ func newInvocation(ctx context.Context, plan Plan, set settings.Resolved) *invoc
 	inv := &invocation{
 		ctx: ctx, plan: plan, exec: plan.Exec, stderr: plan.Stderr,
 		shell: justfileShell(plan.Justfile.Settings, set, goos), dir: workingDirectory(plan, set),
+		base: baseDirectory(plan, set), here: invocationDirectory(plan),
 	}
 	if inv.exec == nil {
 		inv.exec = sys.OSProcess{}
@@ -656,7 +730,22 @@ func newInvocation(ctx context.Context, plan Plan, set settings.Resolved) *invoc
 	if inv.stderr == nil {
 		inv.stderr = io.Discard
 	}
+	inv.prompt = plan.Prompt
+	if inv.prompt == nil {
+		inv.prompt = inv.stderr
+	}
 	return inv
+}
+
+// step runs s: it asks whether to run its recipe, or runs the recipe. It
+// returns the exit code of the invocation, which is non-zero when the step
+// failed or the recipe was not confirmed. Impure: it reads standard input and
+// runs commands.
+func (inv *invocation) step(s step) (int, error) {
+	if s.ask {
+		return inv.confirm(s)
+	}
+	return inv.recipe(s)
 }
 
 // recipe runs the lines of s in order. It returns the exit code of the
@@ -701,7 +790,7 @@ func (inv *invocation) line(s step, line ast.Line) (lineResult, error) {
 	if command == "" {
 		return lineResult{}, nil
 	}
-	if echoes(line.Prefix, inv.plan.Quiet || inv.plan.Justfile.Settings.Quiet) {
+	if echoes(line.Prefix, inv.plan.Quiet || settingQuiet(inv.plan.Justfile.Settings, s.recipe)) {
 		fmt.Fprintln(inv.stderr, command)
 	}
 	code, err := inv.execLine(s, command)
@@ -733,7 +822,7 @@ func (inv *invocation) guarded(r *ast.Recipe, line ast.Line, code int) (lineResu
 func (inv *invocation) outcome(r *ast.Recipe, line ast.Line, code int, err error) (int, error) {
 	var sig *sys.SignalError
 	if errors.As(err, &sig) {
-		return inv.signaled(r.Name, line, code, sig), nil
+		return inv.signaled(r, line, code, sig), nil
 	}
 	if err != nil {
 		return inv.startFailure(r, line, err)
@@ -741,7 +830,7 @@ func (inv *invocation) outcome(r *ast.Recipe, line ast.Line, code int, err error
 	if code == 0 || infallible(line.Prefix) {
 		return 0, nil
 	}
-	return inv.failed(r.Name, line.Line, code), nil
+	return inv.failed(r, line.Line, code), nil
 }
 
 // signaled is the outcome of a command that signals affected, in upstream's
@@ -749,15 +838,15 @@ func (inv *invocation) outcome(r *ast.Recipe, line ast.Line, code int, err error
 // terminated the command, then a fatal signal caught while it ran. A line
 // with `-` ignores all three, and the run goes on. Impure: it writes to
 // Stderr.
-func (inv *invocation) signaled(recipe string, line ast.Line, code int, sig *sys.SignalError) int {
+func (inv *invocation) signaled(r *ast.Recipe, line ast.Line, code int, sig *sys.SignalError) int {
 	if infallible(line.Prefix) {
 		return 0
 	}
 	switch {
 	case sig.Signal != 0:
-		return inv.reportExit(terminatedMessage(recipe, line.Line, sig.Signal), 128+sig.Signal)
+		return inv.reportExit(r, terminatedMessage(r.Name, line.Line, sig.Signal), 128+sig.Signal)
 	case code != 0:
-		return inv.failed(recipe, line.Line, code)
+		return inv.failed(r, line.Line, code)
 	}
 	return inv.report(fmt.Sprintf("error: interrupted by %s\n", sys.SignalName(sig.Caught)), 128+sig.Caught)
 }
@@ -768,17 +857,18 @@ func terminatedMessage(recipe string, line, signal int) string {
 	return fmt.Sprintf("error: recipe `%s` was terminated on line %d by signal %d\n", recipe, line, signal)
 }
 
-// failed writes the failure message for a command that exited with code,
+// failed writes the failure message for a command of r that exited with code,
 // unless the plan is quiet, and returns the invocation's exit code. Impure:
 // it writes to Stderr.
-func (inv *invocation) failed(recipe string, line, code int) int {
-	return inv.reportExit(failureMessage(recipe, line, code), exitCode(code))
+func (inv *invocation) failed(r *ast.Recipe, line, code int) int {
+	return inv.reportExit(r, failureMessage(r.Name, line, code), exitCode(code))
 }
 
-// reportExit is report for the message about a recipe's exit status, which
-// set no-exit-message also silences. Impure: it writes to Stderr.
-func (inv *invocation) reportExit(msg string, code int) int {
-	if inv.plan.Justfile.Settings.NoExitMessage {
+// reportExit is report for the message about the exit status of recipe r,
+// which set no-exit-message and the recipe's attributes also decide (see
+// printsExitMessage). Impure: it writes to Stderr.
+func (inv *invocation) reportExit(r *ast.Recipe, msg string, code int) int {
+	if !printsExitMessage(inv.plan.Justfile.Settings, r) {
 		return code
 	}
 	return inv.report(msg, code)
@@ -829,12 +919,12 @@ func shellFailure(recipe, shell string, err error) string {
 func (inv *invocation) execLine(s step, command string) (int, error) {
 	p := inv.plan
 	argv := shellArgv(inv.shell, p.Shell, p.ShellArgs, command)
-	if p.Justfile.Settings.PositionalArguments {
+	if takesPositional(p.Justfile.Settings, s.recipe) {
 		argv = append(append(argv, s.recipe.Name), s.positional...)
 	}
 	return inv.exec.Run(inv.ctx, sys.ProcessSpec{
 		Argv:   argv,
-		Dir:    inv.dir,
+		Dir:    inv.directory(s),
 		Env:    exactEnv(mergeEnv(p.Env, s.env)),
 		Stdin:  p.Stdin,
 		Stdout: p.Stdout,

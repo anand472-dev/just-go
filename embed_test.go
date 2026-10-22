@@ -413,3 +413,105 @@ func TestRunShellArgsOverrideSetShell(t *testing.T) {
 		})
 	}
 }
+
+// The attributes of a recipe reach the host as data.
+func TestRecipesReportsPrivateGroupsAndDoc(t *testing.T) {
+	src := "# comment\n[group('b'), group('a')]\nfoo:\n" +
+		"_bar:\n" +
+		"# hidden\n[private]\nbaz:\n" +
+		"# suppressed\n[doc]\nqux:\n" +
+		"prefix := 'hello '\n[doc(prefix + 'world ')]\nquux:\n" +
+		"# comment\n[doc('   ')]\nblank:\n"
+	var got []RecipeInfo
+	for _, r := range mustParse(t, src).Recipes() {
+		got = append(got, RecipeInfo{Name: r.Name, Doc: r.Doc, Private: r.Private, Groups: r.Groups})
+	}
+	want := []RecipeInfo{
+		{Name: "foo", Doc: "comment", Groups: []string{"a", "b"}},
+		{Name: "_bar", Private: true},
+		{Name: "baz", Doc: "hidden", Private: true},
+		{Name: "qux"},
+		{Name: "quux", Doc: "hello world"},
+		{Name: "blank"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Recipes =\n %+v\nwant\n %+v", got, want)
+	}
+}
+
+func TestRecipesGroupsAreFresh(t *testing.T) {
+	j := mustParse(t, "[group('a')]\nr:\n")
+	j.Recipes()[0].Groups[0] = "changed"
+	if got := j.Recipes()[0].Groups[0]; got != "a" {
+		t.Errorf("Groups[0] = %q after caller mutation, want a", got)
+	}
+}
+
+func TestRunDefaultAttributeIsTheDefaultRecipe(t *testing.T) {
+	j := mustParse(t, "foo:\n\techo foo\n[default]\nbar:\n\techo bar\n")
+	proc := &sysfake.FakeProcess{}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc}); err != nil {
+		t.Fatal(err)
+	}
+	if got := proc.Specs[0].Argv[len(proc.Specs[0].Argv)-1]; got != "echo bar" {
+		t.Errorf("ran %q, want echo bar", got)
+	}
+}
+
+func TestRunConfirmReadsOptionsStdinAndYesSkipsIt(t *testing.T) {
+	j := mustParse(t, "[confirm('Sure?')]\nfoo:\n\techo foo\n")
+	for _, tc := range []struct {
+		name  string
+		opts  Options
+		ran   int
+		stdin string
+		err   string
+	}{
+		{"yes on stdin", Options{Stdin: strings.NewReader("yes\n")}, 1, "Sure? ", ""},
+		{"no on stdin", Options{Stdin: strings.NewReader("no\n")}, 0, "Sure? ", "recipe `foo` was not confirmed"},
+		{"no stdin", Options{}, 0, "Sure? ", "recipe `foo` was not confirmed"},
+		{"the yes option", Options{Yes: true}, 1, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proc := &sysfake.FakeProcess{}
+			var stderr bytes.Buffer
+			tc.opts.WorkDir, tc.opts.Exec, tc.opts.Stderr = "/w", proc, &stderr
+			_, err := j.Run(context.Background(), tc.opts)
+			var d *diag.Error
+			switch {
+			case tc.err == "" && err != nil, tc.err != "" && (!errors.As(err, &d) || d.Msg != tc.err):
+				t.Errorf("err = %v, want %q", err, tc.err)
+			}
+			if len(proc.Specs) != tc.ran || !strings.HasPrefix(stderr.String(), tc.stdin) {
+				t.Errorf("ran %d, stderr %q; want %d, prefix %q", len(proc.Specs), &stderr, tc.ran, tc.stdin)
+			}
+		})
+	}
+}
+
+func TestRunConfirmPromptGoesToThePromptOption(t *testing.T) {
+	j := mustParse(t, "[confirm('Sure?')]\nfoo:\n\techo foo\n")
+	var stderr, prompt bytes.Buffer
+	opts := Options{WorkDir: "/w", Exec: &sysfake.FakeProcess{}, Stderr: &stderr, Prompt: &prompt, Stdin: strings.NewReader("y\n")}
+	if _, err := j.Run(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if prompt.String() != "Sure? " || strings.Contains(stderr.String(), "Sure?") {
+		t.Errorf("prompt %q, stderr %q", &prompt, &stderr)
+	}
+}
+
+func TestParseReportsAttributeErrors(t *testing.T) {
+	for src, msg := range map[string]string{
+		"[private('x')]\nfoo:\n":                    "attribute `private` got 1 argument but takes 0 arguments",
+		"[doc(nope)]\nfoo:\n":                       "variable `nope` not defined",
+		"[default]\nfoo:\n[default]\nbar:\n":        "recipe `bar` has duplicate `[default]` attribute, which may only appear once per module",
+		"[no-cd]\n[working-directory('x')]\nfoo:\n": "recipe `foo` has both `[no-cd]` and `[working-directory]` attributes",
+	} {
+		_, err := Parse("justfile", []byte(src))
+		var d *diag.Error
+		if !errors.As(err, &d) || d.Msg != msg || d.Source == "" {
+			t.Errorf("Parse(%q) = %+v, want %q with its source line", src, err, msg)
+		}
+	}
+}

@@ -19,7 +19,10 @@ The groups, in the order the rules are tried (the first that matches wins):
   dotenv             .env loading and the dotenv settings (which are parsed
                      and validated, but nothing loads a file yet)
   setting:<name>     a `set <name>` the parser does not implement
-  attribute          a recipe, module, or alias attribute
+  attribute          an attribute the parser does not implement (group A is
+                     implemented: private, group, doc, confirm, no-cd,
+                     no-exit-message, no-quiet, exit-message,
+                     positional-arguments, working-directory, default)
   shebang            a shebang recipe
   backtick           a backtick expression
   conditional        an `if` expression
@@ -136,7 +139,14 @@ IDENT = r"[A-Za-z_][A-Za-z0-9_-]*"
 CALL = re.compile(r"(?<![A-Za-z0-9_-])(" + IDENT + r")\s*\(")
 UDF = re.compile(r"^" + IDENT + r"\s*\([^)]*\)\s*:=", re.M)
 SETTING = re.compile(r"^set\s+(" + IDENT + r")", re.M)
-ATTRIBUTE = re.compile(r"^\[", re.M)
+# Attributes the parser implements (internal/parser attributeSpecs). A case
+# that uses only these is sorted by what else it uses; one that uses any other
+# is in the attribute group until the task that implements it.
+SUPPORTED_ATTRIBUTES = {
+    "confirm", "default", "doc", "exit-message", "group", "no-cd",
+    "no-exit-message", "no-quiet", "positional-arguments", "private",
+    "working-directory",
+}
 CACHE_ATTRIBUTE = re.compile(r"^\[[^\]]*\bcache\b", re.M)
 MODULE = re.compile(r"^(?:\[[^\]]*\]\s*)?(?:mod|import)\??\s", re.M)
 HEADER = re.compile(r"^@?(" + IDENT + r")([^:=]*?):(?![=])(.*)$")
@@ -312,11 +322,47 @@ def builtin_group(expressions):
     return None
 
 
+def attribute_names(source):
+    """The names of the attributes on the lines of source that start with
+    `[`, in order. Pure."""
+    names = []
+    for line in source.splitlines():
+        if not line.startswith("["):
+            continue
+        text = re.sub(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", "''", line)
+        depth, expect = 0, True
+        for match in re.finditer(r"[\[\](),:]|" + IDENT, text):
+            token = match.group(0)
+            if token in "([":
+                depth += 1
+            elif token in ")]":
+                depth -= 1
+            elif token == "," and depth == 1:
+                expect = True
+            elif token == ":" and depth == 1:
+                expect = False
+            elif expect and depth == 1 and token[0].isalpha():
+                names.append(token)
+                expect = False
+    return names
+
+
+def unsupported_attribute(source):
+    """The first attribute in source that the parser does not implement, or
+    None. Pure."""
+    for name in attribute_names(source):
+        if name not in SUPPORTED_ATTRIBUTES:
+            return name
+    return None
+
+
 def syntax_group(sources):
     """The group for a syntax feature the sources use, or None. Pure."""
     exprs = "\n".join(expression_text(s) for s in sources)
-    if any(ATTRIBUTE.search(s) for s in sources):
-        return "attribute", "uses an attribute"
+    for source in sources:
+        name = unsupported_attribute(source)
+        if name:
+            return "attribute", "uses the [" + name + "] attribute"
     if any(has_shebang(s) for s in sources):
         return "shebang", "has a shebang recipe"
     if "`" in exprs:

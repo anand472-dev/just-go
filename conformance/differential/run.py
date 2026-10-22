@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Differential check of settings behaviour: runs each case in cases*.json
-(Task 6 in cases.json, Task 7 in cases-unstable.json) against the oracle and
-against bin/just-go, and compares exit status, stdout and stderr (the
-temporary directory is masked as $D). A case may set "env", added to the
-environment of both.
+(Task 6 in cases.json, Task 7 in cases-unstable.json, Task 8 in
+cases-attributes.json) against the oracle and against bin/just-go, and
+compares exit status, stdout and stderr (the temporary directory is masked as
+$D). A case may set "env", added to the environment of both, "cwd", the
+directory under the temporary one to run in, and "stdin", the input of both.
 
 Usage: ORACLE=oracle/bin/just MINE=bin/just-go python3 conformance/differential/run.py
 Both default to the paths above, relative to the repository root. Exit status
@@ -35,7 +36,7 @@ def run(binary, case):
         os.makedirs(wd, exist_ok=True)
         r = subprocess.run(
             [binary, "--shell", "bash"] + case.get("args", []),
-            cwd=wd, capture_output=True, text=True,
+            cwd=wd, capture_output=True, text=True, input=case.get("stdin", ""),
             env={"PATH": "/usr/bin:/bin", "HOME": d, **case.get("env", {})},
         )
         return (r.returncode, r.stdout.replace(d, "$D"), r.stderr.replace(d, "$D"))

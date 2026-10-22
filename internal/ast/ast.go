@@ -8,6 +8,11 @@
 // in diag.Error. A name's width is its length, since names are ASCII.
 package ast
 
+import (
+	"sort"
+	"strings"
+)
+
 // Justfile is a parsed justfile. Assignments and Recipes are in source order.
 type Justfile struct {
 	File        string
@@ -183,8 +188,11 @@ type Assignment struct {
 	// value`, which `set lazy` evaluates even when nothing uses it.
 	Exported bool
 	Eager    bool
-	Line     int
-	Col      int
+	// Private is true for `[private] name := value`, which keeps the variable
+	// out of the listing of variables.
+	Private bool
+	Line    int
+	Col     int
 }
 
 // Recipe is a named recipe. A leading `@` on the recipe name is folded into
@@ -201,9 +209,77 @@ type Recipe struct {
 	// Subsequents are the dependencies written after `&&`. They run after
 	// the body, in order.
 	Subsequents []Dependency
-	Lines       []Line
-	Line        int
-	Col         int
+	// Attributes are the recipe's attributes in source order.
+	Attributes []Attribute
+	Lines      []Line
+	Line       int
+	Col        int
+}
+
+// Attribute names. The parser knows every attribute upstream has; these are
+// the ones with an effect that the runner, analyzer or host reads.
+const (
+	AttrConfirm             = "confirm"
+	AttrDefault             = "default"
+	AttrDoc                 = "doc"
+	AttrExitMessage         = "exit-message"
+	AttrGroup               = "group"
+	AttrNoCd                = "no-cd"
+	AttrNoExitMessage       = "no-exit-message"
+	AttrNoQuiet             = "no-quiet"
+	AttrPositionalArguments = "positional-arguments"
+	AttrPrivate             = "private"
+	AttrWorkingDirectory    = "working-directory"
+)
+
+// Attribute is one attribute of a recipe: `[name]`, `[name(args)]` or
+// `[name: arg]`. Line and Col locate the name, which is ASCII. An Attribute
+// cannot be compared with ==, because the arguments are a slice.
+type Attribute struct {
+	Name string
+	// Args are the arguments. An attribute that takes only string literals has
+	// ast.StringLit arguments; one that takes expressions may have any.
+	Args []Expr
+	Line int
+	Col  int
+}
+
+// Attribute returns the recipe's attribute called name, or nil. It is pure.
+func (r *Recipe) Attribute(name string) *Attribute {
+	for i := range r.Attributes {
+		if r.Attributes[i].Name == name {
+			return &r.Attributes[i]
+		}
+	}
+	return nil
+}
+
+// Private reports whether the recipe is left out of listings and suggestions:
+// its name starts with an underscore, or it has `[private]`. It is pure.
+func (r *Recipe) Private() bool {
+	return strings.HasPrefix(r.Name, "_") || r.Attribute(AttrPrivate) != nil
+}
+
+// Groups returns the values of the recipe's `[group]` attributes, in byte
+// order, as upstream's set of groups is. It is pure.
+func (r *Recipe) Groups() []string {
+	var groups []string
+	for _, a := range r.Attributes {
+		if v, ok := groupName(a); ok {
+			groups = append(groups, v)
+		}
+	}
+	sort.Strings(groups)
+	return groups
+}
+
+// groupName is the value of a `[group]` attribute. It is pure.
+func groupName(a Attribute) (string, bool) {
+	if a.Name != AttrGroup || len(a.Args) != 1 {
+		return "", false
+	}
+	lit, ok := a.Args[0].(StringLit)
+	return lit.Value, ok
 }
 
 // Dependency is a recipe named in a recipe header, with the arguments it is

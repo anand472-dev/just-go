@@ -996,7 +996,6 @@
   "files": {
    "justfile": "foo $ a:\n"
   },
-  "known": "default-recipe-needs-arguments message (report concern 4b)",
   "name": "e3"
  },
  {

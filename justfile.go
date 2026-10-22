@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"gitea.com/wimwian/just-go/internal/analyzer"
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -25,6 +26,7 @@ import (
 	"gitea.com/wimwian/just-go/internal/loader"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/runner"
+	"gitea.com/wimwian/just-go/internal/settings"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
@@ -37,16 +39,24 @@ type Options struct {
 	// InvocationDir is the directory the command was run from, where recipes
 	// run under set no-cd. Empty means WorkDir.
 	InvocationDir string
-	Env           []string    // exact environment, "KEY=VALUE"; nil means empty, never the process environment
-	Stdin         io.Reader   // nil means no input
-	Stdout        io.Writer   // nil discards
-	Stderr        io.Writer   // nil discards; receives echoed commands and failure messages
-	Recipes       []string    // recipes to run; empty means the first recipe in the file
-	Args          []string    // positional arguments for the single requested recipe
-	Calls         []Call      // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
-	Quiet         bool        // suppress command echo, as if `set quiet` held
-	FS            sys.FS      // nil uses the OS implementation from internal/sys
-	Exec          sys.Process // nil uses the OS implementation from internal/sys
+	Env           []string  // exact environment, "KEY=VALUE"; nil means empty, never the process environment
+	Stdin         io.Reader // nil means no input
+	Stdout        io.Writer // nil discards
+	Stderr        io.Writer // nil discards; receives echoed commands and failure messages
+	Recipes       []string  // recipes to run; empty means the first recipe in the file
+	Args          []string  // positional arguments for the single requested recipe
+	Calls         []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
+	Quiet         bool      // suppress command echo, as if `set quiet` held
+	// Yes answers yes to every `[confirm]` prompt without asking, as
+	// upstream's --yes does. Without it a prompt is written to Prompt and the
+	// answer is read, one line, from Stdin; no Stdin means no.
+	Yes bool
+	// Prompt receives the `[confirm]` prompts; nil means Stderr. A host that
+	// silences Stderr, as upstream's --quiet does, still shows the prompts by
+	// giving them a writer of their own.
+	Prompt io.Writer
+	FS     sys.FS      // nil uses the OS implementation from internal/sys
+	Exec   sys.Process // nil uses the OS implementation from internal/sys
 	// Shell and ShellArgs override the justfile's set shell for every recipe
 	// line of the run, as upstream's --shell and --shell-arg do. Shell alone
 	// runs Shell with the default arguments (-cu); ShellArgs alone runs the
@@ -78,13 +88,22 @@ type Result struct {
 
 // RecipeInfo describes one recipe as data, for hosts to render as they like.
 type RecipeInfo struct {
-	Name   string
-	Doc    string   // the doc comment above the recipe, without the leading "# "; empty when absent
+	Name string
+	// Doc is the comment above the recipe, without the leading "# ", or the
+	// value of its `[doc]` attribute, trimmed; `[doc]` alone gives none.
+	// Empty when absent.
+	Doc    string
 	Params []string // parameter names in declaration order; never nil
 	// Defaults is parallel to Params: each default as written in the justfile,
 	// quotes included ("'x'", `"x"`, "(a + 'b')"), or "" for a parameter with
 	// none. Never nil.
 	Defaults []string
+	// Private is true for a recipe whose name starts with an underscore or
+	// that has `[private]`: listings and suggestions leave it out.
+	Private bool
+	// Groups are the values of its `[group]` attributes, in byte order. Never
+	// shared with the Justfile; nil for a recipe in no group.
+	Groups []string
 }
 
 // Justfile is a parsed and analyzed justfile, ready to inspect or run. It is
@@ -158,9 +177,27 @@ func (j *Justfile) Recipes() []RecipeInfo {
 		for k, p := range r.Params {
 			params[k], defaults[k] = p.Name, p.DefaultText
 		}
-		infos[i] = RecipeInfo{Name: r.Name, Doc: r.Doc, Params: params, Defaults: defaults}
+		infos[i] = RecipeInfo{
+			Name: r.Name, Doc: j.doc(&recipes[i]), Params: params, Defaults: defaults,
+			Private: r.Private(), Groups: r.Groups(),
+		}
 	}
 	return infos
+}
+
+// doc is the doc of r: its `[doc]` attribute, evaluated and trimmed, nothing
+// for `[doc]` alone, or else the comment above it. The analyzer has already
+// shown that the attribute's expression evaluates. Pure.
+func (j *Justfile) doc(r *ast.Recipe) string {
+	a := r.Attribute(ast.AttrDoc)
+	if a == nil {
+		return r.Doc
+	}
+	if len(a.Args) == 0 {
+		return ""
+	}
+	value, _ := settings.ConstValue(j.tree, a.Args[0])
+	return strings.TrimSpace(value)
 }
 
 // DefaultList reports whether the justfile asks, with set default-list, for
@@ -208,6 +245,8 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		Stdout:        opts.Stdout,
 		Stderr:        opts.Stderr,
 		Quiet:         opts.Quiet,
+		Yes:           opts.Yes,
+		Prompt:        opts.Prompt,
 		Exec:          opts.Exec,
 		Shell:         opts.Shell,
 		ShellArgs:     opts.ShellArgs,

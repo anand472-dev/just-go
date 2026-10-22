@@ -5,7 +5,9 @@
 // names, uses of the features of `set lists` in a file that does not set it, recipe lines with extra leading whitespace, uses of undefined
 // variables, calls of undefined functions or with the wrong number of
 // arguments, circular variable definitions, and dependencies that name no
-// recipe, that form a cycle, or that are given too few or too many arguments.
+// recipe, that form a cycle, or that are given too few or too many arguments,
+// expressions in attributes that cannot be evaluated, and a second recipe with
+// `[default]`.
 //
 // The package is pure: every function reads the syntax tree it is given and
 // returns a value. None performs I/O, none mutates its input, and there is no
@@ -62,6 +64,9 @@ func Analyze(jf *ast.Justfile) error {
 		return err
 	}
 	if err := resolveRecipes(jf); err != nil {
+		return err
+	}
+	if err := duplicateDefault(jf); err != nil {
 		return err
 	}
 	return nil

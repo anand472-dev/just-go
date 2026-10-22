@@ -61,28 +61,34 @@ var unstableSettings = map[string]ast.UnstableFeature{
 
 // setting parses a `set` statement, through its line break, and records it in
 // jf.
-func (p *parser) setting(jf *ast.Justfile) error {
+func (p *parser) setting(jf *ast.Justfile, attrs attributeSet) error {
 	p.next() // set
 	name := p.next()
+	field, isBool := boolSettings[name.Text]
+	parse, isValue := valueSettings[name.Text]
+	if !isBool && !isValue {
+		return p.errAt(name, fmt.Sprintf("unknown setting `%s`", name.Text))
+	}
+	if err := p.checkItemAttributes(attrs, "setting", name, ""); err != nil {
+		return err
+	}
 	site := ast.SettingSite{Name: name.Text, Active: true, Line: name.Line, Col: name.Col}
 	if feature, ok := unstableSettings[name.Text]; ok {
 		jf.Use(feature)
 	}
-	if field, ok := boolSettings[name.Text]; ok {
+	if isBool {
 		value, err := p.setBool()
 		if err != nil {
 			return err
 		}
 		*field(&jf.Settings), site.Active = value, value
-	} else if parse, ok := valueSettings[name.Text]; ok {
+	} else {
 		if _, err := p.expect(lexer.Assign); err != nil {
 			return err
 		}
 		if err := parse(p, &jf.Settings, name); err != nil {
 			return err
 		}
-	} else {
-		return p.errAt(name, fmt.Sprintf("unknown setting `%s`", name.Text))
 	}
 	jf.Settings.Sites = append(jf.Settings.Sites, site)
 	return p.endLine()

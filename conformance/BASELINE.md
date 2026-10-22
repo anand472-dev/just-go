@@ -40,6 +40,7 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 5: dependency arguments and subsequents | 195 | 195 | 1800 | 16 |
 | Compat Task 6: settings, group A | 260 | 260 | 1735 | 16 |
 | Compat Task 7: settings, group B (dotenv, lists, unstable gate) | 273 | 273 | 1722 | 16 |
+| Compat Task 8: attributes, group A | 329 | 329 | 1666 | 16 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the

@@ -298,6 +298,7 @@ func TestParseArgs(t *testing.T) {
 		{"shell args repeat in order", []string{"--shell-arg", "-e", "--shell-arg=-c", "a"}, config{shellArgs: []string{"-e", "-c"}, words: []string{"a"}}},
 		{"shell with args", []string{"--shell-arg", "-c", "--shell", "zsh"}, config{shell: "zsh", shellGiven: true, shellArgs: []string{"-c"}}},
 		{"unstable", []string{"--unstable", "a"}, config{unstable: true, words: []string{"a"}}},
+		{"yes", []string{"--yes", "a"}, config{yes: true, words: []string{"a"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := parseArgs(tc.args)
@@ -473,7 +474,7 @@ func TestFormatList(t *testing.T) {
 			"Available recipes:\n    a Z=\"\\t z\"           # something else\n    hello a b='B\t' c='C' # this does a thing\n",
 		},
 		{"sorted by name", []just.RecipeInfo{{Name: "b"}, {Name: "a"}}, "Available recipes:\n    a\n    b\n"},
-		{"private hidden", []just.RecipeInfo{{Name: "_p"}, {Name: "a"}}, "Available recipes:\n    a\n"},
+		{"private hidden", []just.RecipeInfo{{Name: "_p", Private: true}, {Name: "a"}}, "Available recipes:\n    a\n"},
 		{
 			"doc column aligned (misc::list_alignment#1)",
 			[]just.RecipeInfo{
@@ -575,6 +576,22 @@ func BenchmarkFormatList(b *testing.B) {
 			Name:   "recipe-" + strings.Repeat("x", i%40),
 			Doc:    "does a thing",
 			Params: []string{"a", "b"},
+		}
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		formatList(infos)
+	}
+}
+
+func BenchmarkFormatListGroups(b *testing.B) {
+	infos := make([]just.RecipeInfo, 200)
+	for i := range infos {
+		infos[i] = just.RecipeInfo{
+			Name:   "recipe-" + strings.Repeat("x", i%40),
+			Doc:    "does a thing",
+			Params: []string{"a", "b"},
+			Groups: []string{fmt.Sprintf("group-%d", i%9)},
 		}
 	}
 	b.ReportAllocs()
@@ -763,5 +780,137 @@ func TestRunNoCdRunsInTheDirectoryItWasRunFrom(t *testing.T) {
 	got := runFake(t, map[string]string{"/justfile": "set no-cd\nfoo:\n  @echo\n"}, nil)
 	if got.code != 0 || len(got.proc.Specs) != 1 || got.proc.Specs[0].Dir != "/w" {
 		t.Errorf("run = %d, specs %+v; want one in /w", got.code, got.proc.Specs)
+	}
+}
+
+// The cases below are the corpus's groups, private and attributes groups.
+func TestFormatListGroups(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		infos []just.RecipeInfo
+		want  string
+	}{
+		{
+			"groups::list_with_groups#1",
+			[]just.RecipeInfo{
+				{Name: "a", Groups: []string{"alpha"}},
+				{Name: "b", Doc: "Doc comment", Groups: []string{"alpha", "beta"}},
+				{Name: "c"},
+				{Name: "d", Groups: []string{"multi word group"}},
+				{Name: "e", Groups: []string{"alpha"}},
+				{Name: "f", Groups: []string{"alpha", "beta"}},
+			},
+			"Available recipes:\n    c\n\n    [alpha]\n    a\n    b # Doc comment\n    e\n    f\n\n" +
+				"    [beta]\n    b # Doc comment\n    f\n\n    [multi word group]\n    d\n",
+		},
+		{"only a group has a heading", []just.RecipeInfo{{Name: "a", Groups: []string{"x"}}}, "Available recipes:\n    [x]\n    a\n"},
+		{"no groups, no headings", []just.RecipeInfo{{Name: "b"}, {Name: "a"}}, "Available recipes:\n    a\n    b\n"},
+		{
+			"a private recipe's group is not listed",
+			[]just.RecipeInfo{{Name: "p", Private: true, Groups: []string{"hidden"}}, {Name: "a", Groups: []string{"shown"}}},
+			"Available recipes:\n    [shown]\n    a\n",
+		},
+		{
+			"the docs of every group line up",
+			[]just.RecipeInfo{
+				{Name: "a", Doc: "first", Groups: []string{"x"}},
+				{Name: "bbbbbb", Doc: "second", Groups: []string{"y"}},
+			},
+			"Available recipes:\n    [x]\n    a      # first\n\n    [y]\n    bbbbbb # second\n",
+		},
+		{"an empty group name", []just.RecipeInfo{{Name: "a", Groups: []string{""}}}, "Available recipes:\n    []\n    a\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatList(tc.infos); got != tc.want {
+				t.Errorf("formatList =\n%q\nwant\n%q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunListShowsAttributes(t *testing.T) {
+	for _, tc := range []struct {
+		id, src, want string
+	}{
+		{"attributes::doc_attribute#1", "# Non-document comment\n[doc('The real docstring')]\nfoo:\n  echo foo\n",
+			"Available recipes:\n    foo # The real docstring\n"},
+		{"attributes::doc_attribute_suppress#1", "# Non-document comment\n[doc]\nfoo:\n  echo foo\n", "Available recipes:\n    foo\n"},
+		{"attributes::doc_attribute_may_be_expression#1", "prefix := 'hello '\n[doc(prefix + 'world')]\nfoo:\n",
+			"Available recipes:\n    foo # hello world\n"},
+		{"attributes::doc_attribute_may_reference_variable_transitively#1", "a := b\nb := 'bar'\n[doc(a)]\nfoo:\n",
+			"Available recipes:\n    foo # bar\n"},
+		{"attributes::doc_multiline#1", "[doc('multiline\ncomment')]\nfoo:\n", "Available recipes:\n    # multiline\n    # comment\n    foo\n"},
+		{"list::empty_doc_attributes_are_ignored#1", "[doc(' ')]\nfoo bar:\n", "Available recipes:\n    foo bar\n"},
+		{"no_exit_message::recipe_has_doc_comment#1", "# This is a doc comment\n[no-exit-message]\nhello:\n  @exit 100\n",
+			"Available recipes:\n    hello # This is a doc comment\n"},
+		{"private::private_attribute_for_recipe#1", "[private]\nfoo:\n\nbar:\n", "Available recipes:\n    bar\n"},
+		{"groups::list_with_groups#1",
+			"[group('alpha')]\na:\n# Doc comment\n[group('alpha')]\n[group('beta')]\nb:\nc:\n[group('multi word group')]\nd:\n" +
+				"[group('alpha')]\ne:\n[group('beta')]\n[group('alpha')]\nf:\n",
+			"Available recipes:\n    c\n\n    [alpha]\n    a\n    b # Doc comment\n    e\n    f\n\n" +
+				"    [beta]\n    b # Doc comment\n    f\n\n    [multi word group]\n    d\n"},
+	} {
+		t.Run(tc.id, func(t *testing.T) {
+			got := runFake(t, map[string]string{"/w/justfile": tc.src}, nil, "--list")
+			if got.code != 0 || got.stdout != tc.want || got.stderr != "" {
+				t.Errorf("run --list = %d, %q, %q; want 0, %q, empty", got.code, got.stdout, got.stderr, tc.want)
+			}
+		})
+	}
+}
+
+// A private recipe is never suggested, as upstream's (misc::private_recipes_are_not_suggested#1).
+func TestRunUnknownRecipeDoesNotSuggestAPrivateRecipe(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "[private]\nhello:\n"}, nil, "hell")
+	if want := "error: justfile does not contain recipe `hell`\n"; got.code != 1 || got.stderr != want {
+		t.Errorf("run = %d, %q; want 1, %q", got.code, got.stderr, want)
+	}
+}
+
+func TestRunDefaultAttributeRunsInsteadOfTheFirstRecipe(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "foo:\n  @echo FOO\n\n[default]\nbar:\n  @echo BAR\n"}, nil)
+	if got.code != 0 || len(got.proc.Specs) != 1 || got.proc.Specs[0].Argv[len(got.proc.Specs[0].Argv)-1] != "echo BAR" {
+		t.Errorf("run = %d, %+v", got.code, got.proc.Specs)
+	}
+}
+
+// A quiet run still shows the prompt, as upstream's does, and the refusal is
+// not reported.
+func TestRunQuietConfirmShowsThePrompt(t *testing.T) {
+	code, stderr, proc := confirmRun("[confirm]\n@foo:\n  echo FOO\n", "n\n", "--quiet")
+	if code != 1 || stderr != "Run recipe `foo`? " || len(proc.Specs) != 0 {
+		t.Errorf("run = %d, %q, ran %d", code, stderr, len(proc.Specs))
+	}
+}
+
+// confirmRun runs src with the given standard input.
+func confirmRun(src, stdin string, args ...string) (int, string, *sysfake.FakeProcess) {
+	var stdout, stderr bytes.Buffer
+	proc := &sysfake.FakeProcess{}
+	files := sysfake.FakeFS{"/w/justfile": src}
+	code := run(args, nil, "/w", strings.NewReader(stdin), &stdout, &stderr, files, proc)
+	return code, stderr.String(), proc
+}
+
+// The cases below are the corpus's confirm group.
+func TestRunConfirm(t *testing.T) {
+	src := "[confirm]\n@foo:\n  echo FOO\n"
+	for _, tc := range []struct {
+		name, stdin string
+		args        []string
+		code, ran   int
+		stderr      string
+	}{
+		{"confirm::confirm_recipe#1", "y\n", nil, 0, 1, "Run recipe `foo`? "},
+		{"confirm::do_not_confirm_recipe#1", "", nil, 1, 0, "Run recipe `foo`? error: recipe `foo` was not confirmed\n"},
+		{"confirm::confirm_recipe_arg#1", "", []string{"--yes"}, 0, 1, ""},
+		{"a refusal", "n\n", nil, 1, 0, "Run recipe `foo`? error: recipe `foo` was not confirmed\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, stderr, proc := confirmRun(src, tc.stdin, tc.args...)
+			if code != tc.code || len(proc.Specs) != tc.ran || stderr != tc.stderr {
+				t.Errorf("run = %d, ran %d, stderr %q; want %d, %d, %q", code, len(proc.Specs), stderr, tc.code, tc.ran, tc.stderr)
+			}
+		})
 	}
 }

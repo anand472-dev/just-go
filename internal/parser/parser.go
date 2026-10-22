@@ -5,16 +5,21 @@
 // The subset is: `set` statements (see settings.go), assignments
 // (also written `export` or `eager`), and recipes with parameters (also
 // written `$name`), defaults, dependencies (with arguments, and after `&&`)
-// and a body. Expressions include list literals, which belong to the unstable
-// `lists` setting: the parser records where they and the list-only functions
-// are used (ast.ListUses), and the analyzer refuses them. Two settings change how a body is read, `ignore-comments` and
-// `guards`; since a setting may follow the recipes it changes, Parse reads the
-// file again once it knows them. A recipe body is every
-// following line that starts with indentation. Blank lines belong to the body
-// only when more indented lines follow them, and they are dropped. The first
-// body line fixes the recipe's indentation; each later line must start with it,
-// and any extra whitespace becomes part of the line's text. A line whose text
-// ends in a backslash continues on the next line, as upstream's does.
+// and a body. Each may be preceded by attributes (see attributes.go): a
+// recipe takes any, an assignment `[private]`, a setting none.
+//
+// Expressions include list literals, which belong to the unstable `lists`
+// setting: the parser records where they and the list-only functions are used
+// (ast.ListUses), and the analyzer refuses them.
+//
+// Two settings change how a body is read, `ignore-comments` and `guards`;
+// since a setting may follow the recipes it changes, Parse reads the file
+// again once it knows them. A recipe body is every following line that starts
+// with indentation. Blank lines belong to the body only when more indented
+// lines follow them, and they are dropped. The first body line fixes the
+// recipe's indentation; each later line must start with it, and any extra
+// whitespace becomes part of the line's text. A line whose text ends in a
+// backslash continues on the next line, as upstream's does.
 package parser
 
 import (
@@ -170,7 +175,20 @@ func tokenWidth(t lexer.Token) int {
 // of token the grammar looked for since the last one it consumed.
 func (p *parser) unexpected() error {
 	t := p.peek()
-	return p.errAt(t, fmt.Sprintf("expected %s, but found %s", expectedList(p.expected), found(t)))
+	return p.errAt(p.reported(t), fmt.Sprintf("expected %s, but found %s", expectedList(p.expected), found(t)))
+}
+
+// reported returns t as upstream locates it in an error. The end of a file
+// that ends in a line break is just past that break, on the line it ends,
+// not at the start of a line after it. Pure.
+func (p *parser) reported(t lexer.Token) lexer.Token {
+	if t.Kind != lexer.EOF || p.pos == 0 {
+		return t
+	}
+	if prev := p.toks[p.pos-1]; prev.Kind == lexer.Newline && prev.Text != "" {
+		t.Line, t.Col = prev.Line, prev.Col+utf8.RuneCountInString(prev.Text)
+	}
+	return t
 }
 
 // expectedList names the kinds in set in upstream's order, joined as
@@ -230,10 +248,21 @@ func (p *parser) useList(feature ast.ListFeature, at lexer.Token) {
 	})
 }
 
-// item parses one top-level item into jf. Attributes, which start with `[`,
-// are not part of the subset, but upstream looks for them first.
+// item parses one top-level item into jf, with the attributes before it,
+// which start with `[`. Attributes that no item takes are an error, reported
+// when the item is done, as upstream does.
 func (p *parser) item(jf *ast.Justfile) error {
 	p.expected |= itemStart
+	attrs, err := p.attributes()
+	if err != nil {
+		return err
+	}
+	p.expected |= itemStart
+	if len(attrs.attrs) > 0 && !p.atImpliedEnd() {
+		// Upstream looked for the end of the file before it consumed the line
+		// break of the last attribute, and has forgotten that.
+		p.expected &^= kinds(lexer.EOF)
+	}
 	t := p.peek()
 	switch t.Kind {
 	case lexer.Newline:
@@ -243,26 +272,33 @@ func (p *parser) item(jf *ast.Justfile) error {
 		p.next()
 		p.doc, p.docLine = strings.TrimSpace(t.Text), t.Line
 	case lexer.At, lexer.Ident:
-		return p.statement(jf)
+		return p.statement(jf, attrs)
 	default:
 		return p.unexpected()
 	}
-	return nil
+	return p.extraneous(attrs)
 }
 
-// statement parses a setting, an assignment or a recipe.
-func (p *parser) statement(jf *ast.Justfile) error {
+// atImpliedEnd reports whether the last token consumed is the line break the
+// lexer adds at the end of a file that does not end in one. Upstream consumes
+// no token there, so what it had looked for stays expected. Pure.
+func (p *parser) atImpliedEnd() bool {
+	return p.pos > 0 && p.toks[p.pos-1].Kind == lexer.Newline && p.toks[p.pos-1].Text == ""
+}
+
+// statement parses a setting, an assignment or a recipe, which take attrs.
+func (p *parser) statement(jf *ast.Justfile, attrs attributeSet) error {
 	t := p.peek()
 	switch {
 	case t.Kind == lexer.Ident && t.Text == "set" && p.isSetting():
-		return p.setting(jf)
+		return p.setting(jf, attrs)
 	case t.Kind == lexer.Ident && p.peekAt(1).Kind == lexer.Assign:
-		return p.assignment(jf, "")
+		return p.assignment(jf, attrs, "")
 	case p.isKeywordAssignment():
 		p.next()
-		return p.assignment(jf, t.Text)
+		return p.assignment(jf, attrs, t.Text)
 	}
-	return p.recipe(jf)
+	return p.recipe(jf, attrs)
 }
 
 // isKeywordAssignment reports whether the current token is the `export` or
@@ -297,17 +333,21 @@ func (p *parser) endLine() error {
 }
 
 // assignment parses `name := value`, through its line break. keyword is the
-// `export` or `eager` that came before the name, already consumed, or "".
-func (p *parser) assignment(jf *ast.Justfile, keyword string) error {
+// `export` or `eager` that came before the name, already consumed, or "". The
+// only attribute an assignment can have is `[private]`.
+func (p *parser) assignment(jf *ast.Justfile, attrs attributeSet, keyword string) error {
 	name := p.next()
 	p.next() // :=
 	value, err := p.expr()
 	if err != nil {
 		return err
 	}
+	if err := p.checkItemAttributes(attrs, "assignment", name, ast.AttrPrivate); err != nil {
+		return err
+	}
 	jf.Assignments = append(jf.Assignments, ast.Assignment{
 		Name: name.Text, Value: value, Exported: keyword == "export", Eager: keyword == "eager",
-		Line: name.Line, Col: name.Col,
+		Private: attrs.find(ast.AttrPrivate) != nil, Line: name.Line, Col: name.Col,
 	})
 	return p.endLine()
 }
@@ -450,21 +490,26 @@ func (p *parser) group() (ast.Expr, error) {
 	return e, nil
 }
 
-func (p *parser) recipe(jf *ast.Justfile) error {
+// recipe parses a recipe and its body. The comment on the line above it, or
+// above its attributes, is its doc, unless it has a `[doc]` attribute.
+func (p *parser) recipe(jf *ast.Justfile, attrs attributeSet) error {
 	start := p.peek()
+	if len(attrs.attrs) > 0 {
+		start = attrs.first
+	}
 	quiet := p.accept(lexer.At)
 	name, err := p.expect(lexer.Ident)
 	if err != nil {
 		return err
 	}
-	r := ast.Recipe{Name: name.Text, Line: name.Line, Col: name.Col}
-	if p.docLine == start.Line-1 && !p.docShebang {
-		r.Doc = p.doc
-	}
+	r := ast.Recipe{Name: name.Text, Attributes: attrs.attrs, Doc: p.docFor(start, attrs), Line: name.Line, Col: name.Col}
 	if err := p.header(&r); err != nil {
 		return err
 	}
 	if r.Lines, err = p.body(); err != nil {
+		return err
+	}
+	if err := p.checkRecipeAttributes(attrs, name); err != nil {
 		return err
 	}
 	if quiet {
@@ -472,6 +517,16 @@ func (p *parser) recipe(jf *ast.Justfile) error {
 	}
 	jf.Recipes = append(jf.Recipes, r)
 	return nil
+}
+
+// docFor is the doc comment of the recipe that starts at start, which is the
+// first of its attributes if it has any: the comment on the line above, unless
+// it is a shebang line or the recipe has `[doc]`. It is "" for none. Pure.
+func (p *parser) docFor(start lexer.Token, attrs attributeSet) string {
+	if p.docLine != start.Line-1 || p.docShebang || attrs.find(ast.AttrDoc) != nil {
+		return ""
+	}
+	return p.doc
 }
 
 // header parses parameters, the colon, and dependencies, through the line

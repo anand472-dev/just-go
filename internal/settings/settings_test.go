@@ -218,3 +218,31 @@ func BenchmarkResolve(b *testing.B) {
 		}
 	}
 }
+
+// ConstValue is the evaluation upstream applies to a `[doc]` attribute.
+func TestConstValue(t *testing.T) {
+	jf := parse(t, "a := b + 'x'\nb := 'y'\nc := uppercase('z')\nd := c\n")
+	for _, tc := range []struct {
+		src  string
+		want string
+	}{{"a", "yx"}, {"'p' + a", "pyx"}, {"''", ""}} {
+		e := parse(t, "x := "+tc.src+"\n"+"a := b + 'x'\nb := 'y'\n").Assignments[0].Value
+		got, err := ConstValue(jf, e)
+		if err != nil || got != tc.want {
+			t.Errorf("ConstValue(%s) = %q, %v, want %q", tc.src, got, err, tc.want)
+		}
+	}
+	for _, tc := range []struct{ src, msg string }{
+		{"c", "cannot access non-const variable `c` in const context"},
+		{"d", "cannot access non-const variable `d` in const context"},
+		{"uppercase('a')", "cannot call functions in const context"},
+		{"nope", "variable `nope` not defined"},
+	} {
+		e := parse(t, "x := "+tc.src+"\n").Assignments[0].Value
+		_, err := ConstValue(jf, e)
+		var de *diag.Error
+		if !errors.As(err, &de) || de.Msg != tc.msg {
+			t.Errorf("ConstValue(%s) error = %v, want %q", tc.src, err, tc.msg)
+		}
+	}
+}

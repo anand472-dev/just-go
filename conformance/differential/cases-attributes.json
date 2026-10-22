@@ -1,0 +1,1416 @@
+[
+ {
+  "name": "syntax: bare",
+  "files": {
+   "justfile": "[private]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: empty parentheses",
+  "files": {
+   "justfile": "[private()]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: colon",
+  "files": {
+   "justfile": "[group: 'a']\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: double quoted group",
+  "files": {
+   "justfile": "[group(\"a\\tb\")]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: one line",
+  "files": {
+   "justfile": "[no-cd, private]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: several lines",
+  "files": {
+   "justfile": "[no-cd]\n[private]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: trailing comma in arguments",
+  "files": {
+   "justfile": "[confirm('a',)]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: comment after bracket",
+  "files": {
+   "justfile": "[private] # c\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: split lines",
+  "files": {
+   "justfile": "[group(\n  'a',\n)]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: two groups",
+  "files": {
+   "justfile": "[group('b'), group('a')]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: indented string group",
+  "files": {
+   "justfile": "[group('''x''')]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "syntax: private on assignment",
+  "files": {
+   "justfile": "[private]\nx := 'a'\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "error: duplicate",
+  "files": {
+   "justfile": "[no-exit-message]\n[no-exit-message]\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "error: duplicate confirm",
+  "files": {
+   "justfile": "[confirm: 'yes']\n[confirm: 'no']\nbaz:\n"
+  }
+ },
+ {
+  "name": "error: duplicate wd",
+  "files": {
+   "justfile": "[working-directory('bar')]\n[working-directory('baz')]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: duplicate group",
+  "files": {
+   "justfile": "[group('a')]\n[group('a')]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: duplicate group one bracket",
+  "files": {
+   "justfile": "[group('a'), group(\"a\")]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: duplicate group quote styles",
+  "files": {
+   "justfile": "[group('a')]\n[group('''a''')]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: argument to private",
+  "files": {
+   "justfile": "[private('foo')]\nfoo:\n  exit 1\n"
+  }
+ },
+ {
+  "name": "error: two confirm args",
+  "files": {
+   "justfile": "[confirm('A', 'B')]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: no wd arg",
+  "files": {
+   "justfile": "[working-directory]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: two group args",
+  "files": {
+   "justfile": "[group('a', 'b')]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: unknown",
+  "files": {
+   "justfile": "# c\n[unknown-attribute]\nhello:\n  @exit 100\n"
+  }
+ },
+ {
+  "name": "error: empty",
+  "files": {
+   "justfile": "# c\n[]\nhello:\n  @exit 100\n"
+  }
+ },
+ {
+  "name": "error: trailing comma",
+  "files": {
+   "justfile": "[private,]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: missing separator",
+  "files": {
+   "justfile": "[private foo]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: nothing after colon",
+  "files": {
+   "justfile": "[doc: ]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: unclosed paren",
+  "files": {
+   "justfile": "[doc(]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: comma only",
+  "files": {
+   "justfile": "[doc(,)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: name as group",
+  "files": {
+   "justfile": "[group(x)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: sum as group",
+  "files": {
+   "justfile": "[group('a' + 'b')]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: group in parens",
+  "files": {
+   "justfile": "[group(('a'))]\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: extraneous before comment",
+  "files": {
+   "justfile": "[no-exit-message]\n# c\nhello:\n  @exit 100\n"
+  }
+ },
+ {
+  "name": "error: extraneous before blank",
+  "files": {
+   "justfile": "[no-exit-message]\n\nhello:\n  @exit 100\n"
+  }
+ },
+ {
+  "name": "error: extraneous two",
+  "files": {
+   "justfile": "[private]\n[no-cd, group('a')]\n\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: extraneous at end",
+  "files": {
+   "justfile": "[confirm]\n"
+  }
+ },
+ {
+  "name": "error: extraneous at end no newline",
+  "files": {
+   "justfile": "[confirm]"
+  }
+ },
+ {
+  "name": "error: extraneous after recipe",
+  "files": {
+   "justfile": "foo:\n  echo\n[confirm]\n"
+  }
+ },
+ {
+  "name": "error: exit message conflict",
+  "files": {
+   "justfile": "[exit-message, no-exit-message]\nbar:\n"
+  }
+ },
+ {
+  "name": "error: no-cd and wd",
+  "files": {
+   "justfile": "[working-directory('foo')]\n[no-cd]\nbar:\n"
+  }
+ },
+ {
+  "name": "error: no-cd and wd reversed",
+  "files": {
+   "justfile": "[no-cd]\n[working-directory('foo')]\nbar:\n"
+  }
+ },
+ {
+  "name": "error: setting attr",
+  "files": {
+   "justfile": "[doc('bar')]\nset quiet\n"
+  }
+ },
+ {
+  "name": "error: unknown setting attr",
+  "files": {
+   "justfile": "[doc]\nset nonsense\n"
+  }
+ },
+ {
+  "name": "error: assignment attr",
+  "files": {
+   "justfile": "[doc]\nx := 'a'\n"
+  }
+ },
+ {
+  "name": "error: assignment attr rank",
+  "files": {
+   "justfile": "[private, no-cd, doc]\nx := 'a'\n"
+  }
+ },
+ {
+  "name": "error: assignment attr after bad value",
+  "files": {
+   "justfile": "[doc]\nx := (\n"
+  }
+ },
+ {
+  "name": "error: exported assignment attr",
+  "files": {
+   "justfile": "[doc]\nexport x := 'a'\nfoo:\n"
+  }
+ },
+ {
+  "name": "error: attribute then bad recipe",
+  "files": {
+   "justfile": "[private]\nfoo bar=:\n"
+  }
+ },
+ {
+  "name": "error: attribute before recipe with error body",
+  "files": {
+   "justfile": "[private]\nfoo:\n  echo {{\n"
+  }
+ },
+ {
+  "name": "error: two defaults",
+  "files": {
+   "justfile": "[default]\nfoo:\n\n[default]\nbar:\n"
+  }
+ },
+ {
+  "name": "error: two defaults reversed names",
+  "files": {
+   "justfile": "[default]\nzed:\n\n[default]\nabc:\n"
+  }
+ },
+ {
+  "name": "error: three defaults",
+  "files": {
+   "justfile": "[default]\nb:\n[default]\na:\n[default]\nc:\n"
+  }
+ },
+ {
+  "name": "error: defaults allowed duplicates",
+  "files": {
+   "justfile": "set allow-duplicate-recipes\n[default]\nfoo:\n[default]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: confirm undefined",
+  "files": {
+   "justfile": "[confirm(x)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: wd undefined",
+  "files": {
+   "justfile": "[working-directory(x)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: doc undefined",
+  "files": {
+   "justfile": "[doc(undefined)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: confirm undefined function",
+  "files": {
+   "justfile": "[confirm(foo())]\nbar:\n"
+  }
+ },
+ {
+  "name": "analyze: doc sees no parameters",
+  "files": {
+   "justfile": "[doc(x)]\nfoo x:\n"
+  }
+ },
+ {
+  "name": "analyze: doc const",
+  "files": {
+   "justfile": "bar := uppercase('a')\n[doc(bar)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: doc call",
+  "files": {
+   "justfile": "[doc(uppercase('a'))]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: arity",
+  "files": {
+   "justfile": "[confirm(uppercase())]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: sum",
+  "files": {
+   "justfile": "a := 'x'\n[working-directory(a + b)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: defaults before attrs",
+  "files": {
+   "justfile": "[doc(a)]\nfoo x=y:\n"
+  }
+ },
+ {
+  "name": "analyze: dep args before attrs",
+  "files": {
+   "justfile": "[doc(a)]\nfoo: (bar y)\nbar x:\n"
+  }
+ },
+ {
+  "name": "analyze: attrs before body",
+  "files": {
+   "justfile": "[confirm(a)]\nfoo:\n  echo {{b}}\n"
+  }
+ },
+ {
+  "name": "analyze: confirm before doc",
+  "files": {
+   "justfile": "[doc(a)]\n[confirm(b)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: doc before wd",
+  "files": {
+   "justfile": "[working-directory(a)]\n[doc(b)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "analyze: later recipe",
+  "files": {
+   "justfile": "[default]\nfoo:\n[confirm(b)]\nbar:\n"
+  }
+ },
+ {
+  "name": "analyze: alphabetical resolution",
+  "files": {
+   "justfile": "[doc(z)]\nzed:\n[doc(a)]\nabc:\n"
+  }
+ },
+ {
+  "name": "analyze: param visible to confirm",
+  "files": {
+   "justfile": "[confirm(x)]\nfoo x:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "analyze: param visible to wd",
+  "files": {
+   "justfile": "[working-directory(x)]\nfoo x:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "list: doc attr",
+  "files": {
+   "justfile": "# Non-document comment\n[doc('The real docstring')]\nfoo:\n  echo foo\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc suppress",
+  "files": {
+   "justfile": "# Non-document comment\n[doc]\nfoo:\n  echo foo\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc expression",
+  "files": {
+   "justfile": "prefix := 'hello '\n[doc(prefix + 'world')]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc transitive",
+  "files": {
+   "justfile": "a := b\nb := 'bar'\n[doc(a)]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc multiline",
+  "files": {
+   "justfile": "[doc('multiline\ncomment')]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc blank",
+  "files": {
+   "justfile": "[doc(' ')]\nfoo bar:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc padded",
+  "files": {
+   "justfile": "[doc('  padded  ')]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: doc empty string",
+  "files": {
+   "justfile": "# comment\n[doc('')]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: comment above attributes",
+  "files": {
+   "justfile": "# comment\n[no-cd]\n[group('x')]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: comment separated",
+  "files": {
+   "justfile": "# comment\n\n[no-cd]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: private",
+  "files": {
+   "justfile": "[private]\nfoo:\n\nbar:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: private all",
+  "files": {
+   "justfile": "[private]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: groups",
+  "files": {
+   "justfile": "[group('alpha')]\na:\n# Doc comment\n[group('alpha')]\n[group('beta')]\nb:\nc:\n[group('multi word group')]\nd:\n[group('alpha')]\ne:\n[group('beta')]\n[group('alpha')]\nf:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: groups only",
+  "files": {
+   "justfile": "[group('x')]\na:\n[group('x')]\nbb:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: groups align",
+  "files": {
+   "justfile": "[group('x')]\na: \n# first\n[group('y')]\nbbbbbb:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: groups private hidden",
+  "files": {
+   "justfile": "[private, group('h')]\na:\n[group('s')]\nb:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: groups with params",
+  "files": {
+   "justfile": "[group('x')]\na b='c' d='e':\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: group empty name",
+  "files": {
+   "justfile": "[group('')]\na:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: underscore",
+  "files": {
+   "justfile": "_a:\nb:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "list: suggest private",
+  "files": {
+   "justfile": "[private]\nhello:\n"
+  },
+  "args": [
+   "hell"
+  ]
+ },
+ {
+  "name": "list: suggest underscore",
+  "files": {
+   "justfile": "_hello:\n"
+  },
+  "args": [
+   "hell"
+  ]
+ },
+ {
+  "name": "list: suggest public",
+  "files": {
+   "justfile": "hello:\n[private]\nhelp:\n"
+  },
+  "args": [
+   "hell"
+  ]
+ },
+ {
+  "name": "list: run a private recipe",
+  "files": {
+   "justfile": "[private]\nfoo:\n  @echo foo\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "default: attribute",
+  "files": {
+   "justfile": "foo:\n  @echo FOO\n\n[default]\nbar:\n  @echo BAR\n"
+  }
+ },
+ {
+  "name": "default: first without",
+  "files": {
+   "justfile": "foo:\n  @echo FOO\n\nbar:\n  @echo BAR\n"
+  }
+ },
+ {
+  "name": "default: named wins",
+  "files": {
+   "justfile": "[default]\nfoo:\n  @echo FOO\nbar:\n  @echo BAR\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "default: with other attrs",
+  "files": {
+   "justfile": "foo:\n  @echo FOO\n\n[private, default]\nbar:\n  @echo BAR\n"
+  }
+ },
+ {
+  "name": "default: with deps",
+  "files": {
+   "justfile": "foo:\n  @echo FOO\n\n[default]\nbar: foo\n  @echo BAR\n"
+  }
+ },
+ {
+  "name": "default: needs args",
+  "files": {
+   "justfile": "[default]\nbar x:\n  @echo BAR\n"
+  }
+ },
+ {
+  "name": "default: default-list",
+  "files": {
+   "justfile": "set default-list\nfoo:\n[default]\nbar:\n"
+  }
+ },
+ {
+  "name": "confirm: y",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: Y",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "Y\n"
+ },
+ {
+  "name": "confirm: yes",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "yes\n"
+ },
+ {
+  "name": "confirm: YeS padded",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "  YeS  \n"
+ },
+ {
+  "name": "confirm: no newline",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y"
+ },
+ {
+  "name": "confirm: n",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "n\n"
+ },
+ {
+  "name": "confirm: empty",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": ""
+ },
+ {
+  "name": "confirm: blank line then y",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "\ny\n"
+ },
+ {
+  "name": "confirm: yess",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "yess\n"
+ },
+ {
+  "name": "confirm: ye",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "ye\n"
+ },
+ {
+  "name": "confirm: tab y crlf",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "\ty\r\n"
+ },
+ {
+  "name": "confirm: yes please",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "yes please\n"
+ },
+ {
+  "name": "confirm: y then more",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\nmore\n"
+ },
+ {
+  "name": "confirm: yes flag",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "args": [
+   "--yes"
+  ],
+  "stdin": ""
+ },
+ {
+  "name": "confirm: yes flag with n",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "args": [
+   "--yes"
+  ],
+  "stdin": "n\n"
+ },
+ {
+  "name": "confirm: prompt",
+  "files": {
+   "justfile": "[confirm('Sure?')]\n@foo:\n    echo FOO\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: expression",
+  "files": {
+   "justfile": "target := 'production'\n\n[confirm('Deploy to ' + target + '?')]\ndeploy:\n    echo deployed\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: parameter",
+  "files": {
+   "justfile": "[confirm('Deploy to ' + target + '?')]\ndeploy target:\n    echo 'deployed to {{target}}'\n"
+  },
+  "args": [
+   "deploy",
+   "staging"
+  ],
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: parameter default",
+  "files": {
+   "justfile": "[confirm('Deploy to ' + target + '?')]\ndeploy target='dev':\n    echo 'deployed to {{target}}'\n"
+  },
+  "args": [
+   "deploy"
+  ],
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: dependency",
+  "files": {
+   "justfile": "@bar: foo\n  echo BAR\n\n[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: dependency refused",
+  "files": {
+   "justfile": "bar: foo\n  echo BAR\n\n[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": ""
+ },
+ {
+  "name": "confirm: prompt before dependencies",
+  "files": {
+   "justfile": "[confirm]\n@bar: foo\n  echo BAR\n\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: prompt before dependencies refused",
+  "files": {
+   "justfile": "[confirm]\n@bar: foo\n  echo BAR\n\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "n\n"
+ },
+ {
+  "name": "confirm: both asked",
+  "files": {
+   "justfile": "[confirm]\n@bar: foo\n  echo BAR\n\n[confirm('Foo?')]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\ny\n"
+ },
+ {
+  "name": "confirm: second refused",
+  "files": {
+   "justfile": "[confirm]\n@bar: foo\n  echo BAR\n\n[confirm('Foo?')]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\nn\n"
+ },
+ {
+  "name": "confirm: dependency twice",
+  "files": {
+   "justfile": "@bar: foo foo\n\n[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: subsequent",
+  "files": {
+   "justfile": "@bar: && foo\n  echo BAR\n\n[confirm]\n@foo:\n  echo FOO\n"
+  },
+  "stdin": "n\n"
+ },
+ {
+  "name": "confirm: dependency args",
+  "files": {
+   "justfile": "@bar: (foo 'a') (foo 'b')\n\n[confirm('Go {{x}}?')]\n@foo x:\n  echo FOO {{x}}\n"
+  },
+  "stdin": "y\ny\n"
+ },
+ {
+  "name": "confirm: two recipes on the command line",
+  "files": {
+   "justfile": "[confirm]\n@foo:\n  echo FOO\n@bar:\n  echo BAR\n"
+  },
+  "args": [
+   "foo",
+   "bar"
+  ],
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: reads one line only",
+  "files": {
+   "justfile": "[confirm]\nfoo:\n  @cat\n"
+  },
+  "known": "upstream's buffered standard input swallows what follows the answer; ours leaves it to the recipe",
+  "stdin": "y\nthe input of cat\n"
+ },
+ {
+  "name": "confirm: failing recipe",
+  "files": {
+   "justfile": "[confirm]\nfoo:\n  @exit 3\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: quiet flag",
+  "files": {
+   "justfile": "[confirm]\nfoo:\n  @echo FOO\n"
+  },
+  "args": [
+   "--quiet"
+  ],
+  "stdin": "y\n"
+ },
+ {
+  "name": "confirm: list",
+  "files": {
+   "justfile": "[confirm]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "exit message: no-exit-message",
+  "files": {
+   "justfile": "[no-exit-message]\n@hello:\n  echo 'Hello, World!'\n  exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: exit-message",
+  "files": {
+   "justfile": "[exit-message]\n@hello:\n  echo 'Hello, World!'\n  exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: exit-message beats setting",
+  "files": {
+   "justfile": "set no-exit-message\n\n[exit-message]\nfail:\n  @exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: setting alone",
+  "files": {
+   "justfile": "set no-exit-message\n@hello:\n  echo 'Hello, World!'\n  exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: neither",
+  "files": {
+   "justfile": "@hello:\n  echo 'Hello, World!'\n  exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: setting false and attribute",
+  "files": {
+   "justfile": "set no-exit-message := false\n[no-exit-message]\n@hello:\n  echo 'Hello, World!'\n  exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: signal",
+  "files": {
+   "justfile": "[no-exit-message]\ndefault:\n  @kill -TERM $$\n"
+  }
+ },
+ {
+  "name": "exit message: signal shown",
+  "files": {
+   "justfile": "default:\n  @kill -TERM $$\n"
+  }
+ },
+ {
+  "name": "exit message: signal exit-message beats setting",
+  "files": {
+   "justfile": "set no-exit-message\n[exit-message]\ndefault:\n  @kill -TERM $$\n"
+  }
+ },
+ {
+  "name": "exit message: dependency",
+  "files": {
+   "justfile": "[no-exit-message]\na: b\n  @echo a\nb:\n  @exit 5\n"
+  }
+ },
+ {
+  "name": "exit message: dependency recipe attr",
+  "files": {
+   "justfile": "a: b\n  @echo a\n[no-exit-message]\nb:\n  @exit 5\n"
+  }
+ },
+ {
+  "name": "exit message: doc comment",
+  "files": {
+   "justfile": "# This is a doc comment\n[no-exit-message]\nhello:\n  @exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: silent recipe",
+  "files": {
+   "justfile": "# c\n[no-exit-message]\n@hello:\n  echo 'Hello, World!'\n  exit 100\n"
+  }
+ },
+ {
+  "name": "exit message: infallible line",
+  "files": {
+   "justfile": "[no-exit-message]\nhello:\n  -exit 3\n  @echo ok\n"
+  }
+ },
+ {
+  "name": "quiet: no-quiet",
+  "files": {
+   "justfile": "set quiet\n\n[no-quiet]\nfoo:\n  echo FOO\n"
+  }
+ },
+ {
+  "name": "quiet: no-quiet quiet line",
+  "files": {
+   "justfile": "set quiet\n\n[no-quiet]\nfoo:\n  @echo FOO\n"
+  }
+ },
+ {
+  "name": "quiet: no-quiet quiet recipe",
+  "files": {
+   "justfile": "set quiet\n\n[no-quiet]\n@foo:\n  echo FOO\n"
+  }
+ },
+ {
+  "name": "quiet: setting alone",
+  "files": {
+   "justfile": "set quiet\nfoo:\n  echo FOO\n"
+  }
+ },
+ {
+  "name": "quiet: attribute alone",
+  "files": {
+   "justfile": "[no-quiet]\nfoo:\n  echo FOO\n"
+  }
+ },
+ {
+  "name": "quiet: quiet flag wins",
+  "files": {
+   "justfile": "set quiet\n[no-quiet]\nfoo:\n  echo FOO\n"
+  },
+  "args": [
+   "--quiet"
+  ]
+ },
+ {
+  "name": "quiet: dependency",
+  "files": {
+   "justfile": "set quiet\nfoo: bar\n  echo FOO\n[no-quiet]\nbar:\n  echo BAR\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quiet: failure message kept",
+  "files": {
+   "justfile": "set quiet\n[no-quiet]\nfoo:\n  exit 3\n"
+  }
+ },
+ {
+  "name": "positional: attribute",
+  "files": {
+   "justfile": "[positional-arguments]\nfoo bar baz:\n  echo $0\n  echo $1\n  echo $2\n  echo \"$@\"\n"
+  },
+  "args": [
+   "foo",
+   "hello",
+   "goodbye"
+  ]
+ },
+ {
+  "name": "positional: only the recipe",
+  "files": {
+   "justfile": "[positional-arguments]\nfoo a:\n  @echo \"$@\"\nbar a:\n  @echo \"$@\"\n"
+  },
+  "args": [
+   "foo",
+   "x",
+   "bar",
+   "y"
+  ]
+ },
+ {
+  "name": "positional: default",
+  "files": {
+   "justfile": "[positional-arguments]\nfoo bar='baz':\n  @echo $1\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "positional: setting",
+  "files": {
+   "justfile": "set positional-arguments\nfoo bar baz:\n  @echo \"$0 $1 $2\"\n"
+  },
+  "args": [
+   "foo",
+   "hello",
+   "goodbye"
+  ]
+ },
+ {
+  "name": "positional: dependency",
+  "files": {
+   "justfile": "foo: (bar 'x')\n  @echo foo\n[positional-arguments]\nbar a:\n  @echo \"$0 $1\"\n"
+  }
+ },
+ {
+  "name": "wd: attribute",
+  "files": {
+   "justfile": "[working-directory('foo')]\n@qux:\n  echo baz > bar\n  cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: expression",
+  "files": {
+   "justfile": "dir := 'foo'\n\n[working-directory(dir + '-bar')]\n@baz:\n  cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: parameter",
+  "files": {
+   "justfile": "[working-directory(target)]\n@baz target:\n  cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  },
+  "args": [
+   "baz",
+   "foo"
+  ]
+ },
+ {
+  "name": "wd: setting and attribute",
+  "files": {
+   "justfile": "set working-directory := 'foo'\n\n[working-directory('bar')]\n@baz:\n  cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: overrides no-cd setting",
+  "files": {
+   "justfile": "set no-cd := true\n\n[working-directory('workspace')]\nfoo:\n  cat data.txt\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: absolute",
+  "files": {
+   "justfile": "[working-directory('/')]\n@foo:\n  pwd\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: missing directory",
+  "files": {
+   "justfile": "[working-directory('nope')]\n@foo:\n  pwd\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  },
+  "known": "the chdir failure is worded by Go, not by Rust (as Task 6's p61)"
+ },
+ {
+  "name": "wd: per recipe",
+  "files": {
+   "justfile": "a: b\n  @cat MARK\n[working-directory('foo')]\nb:\n  @cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: dotdot",
+  "files": {
+   "justfile": "[working-directory('foo/..')]\n@a:\n  cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: empty",
+  "files": {
+   "justfile": "[working-directory('')]\n@a:\n  cat MARK\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  }
+ },
+ {
+  "name": "wd: with positional",
+  "files": {
+   "justfile": "[working-directory('foo')]\n[positional-arguments]\n@a x:\n  cat MARK; echo $1\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  },
+  "args": [
+   "a",
+   "q"
+  ]
+ },
+ {
+  "name": "wd: dump-free list",
+  "files": {
+   "justfile": "[working-directory('foo')]\na:\n",
+   "MARK": "root",
+   "foo/MARK": "foo",
+   "foo-bar/MARK": "foo-bar",
+   "foo/bar/MARK": "foo/bar",
+   "bar/MARK": "bar",
+   "workspace/MARK": "workspace",
+   "workspace/data.txt": "WORKSPACE",
+   "w/MARK": "w"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "no-cd: attribute",
+  "files": {
+   "justfile": "[no-cd]\nfoo:\n  cat bar\n",
+   "foo/bar": "hello",
+   "bar": "root"
+  },
+  "cwd": "foo"
+ },
+ {
+  "name": "no-cd: attribute overrides wd setting",
+  "files": {
+   "justfile": "set working-directory := 'bar'\n\n[no-cd]\nfoo:\n  cat bar\n",
+   "foo/bar": "hello",
+   "bar/x": "set"
+  },
+  "cwd": "foo"
+ },
+ {
+  "name": "no-cd: setting off, attribute on",
+  "files": {
+   "justfile": "set no-cd := false\n[no-cd]\nfoo:\n  cat bar\n",
+   "foo/bar": "hello",
+   "bar": "root"
+  },
+  "cwd": "foo"
+ },
+ {
+  "name": "no-cd: setting",
+  "files": {
+   "justfile": "set no-cd := true\nfoo:\n  cat bar\n",
+   "bar": "root",
+   "child/bar": "child"
+  },
+  "cwd": "child"
+ },
+ {
+  "name": "no-cd: neither",
+  "files": {
+   "justfile": "foo:\n  cat bar\n",
+   "bar": "root",
+   "child/bar": "child"
+  },
+  "cwd": "child"
+ },
+ {
+  "name": "no-cd: mixed",
+  "files": {
+   "justfile": "set no-cd := true\nfoo: bar\n  @cat data\n\n[working-directory('w')]\nbar:\n  @cat data\n",
+   "data": "root",
+   "child/data": "child",
+   "w/data": "w"
+  },
+  "cwd": "child"
+ },
+ {
+  "name": "no-cd: per recipe",
+  "files": {
+   "justfile": "foo: bar\n  @cat data\n\n[no-cd]\nbar:\n  @cat data\n",
+   "data": "root",
+   "child/data": "child"
+  },
+  "cwd": "child"
+ },
+ {
+  "name": "doc: comment then attribute",
+  "files": {
+   "justfile": "# c\n[private]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "doc: comment, attribute, comment is extraneous",
+  "files": {
+   "justfile": "# c\n[private]\n# d\nfoo:\n"
+  }
+ },
+ {
+  "name": "doc: shebang-looking first line",
+  "files": {
+   "justfile": "#!/usr/bin/env just\n[no-cd]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "doc: doc attr overrides comment",
+  "files": {
+   "justfile": "# c\n[doc('d')]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "doc: doc attr alone with comment",
+  "files": {
+   "justfile": "# c\n[doc]\n[no-cd]\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "doc: two recipes",
+  "files": {
+   "justfile": "# one\n[no-cd]\nfoo:\n# two\n[no-cd]\nbar:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ }
+]

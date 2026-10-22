@@ -75,6 +75,8 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Stdout:        childOut,
 		Stderr:        childErr,
 		Quiet:         cfg.quiet,
+		Yes:           cfg.yes,
+		Prompt:        stderr,
 		Shell:         cfg.shell,
 		ShellArgs:     cfg.shellArgs,
 		FS:            fsys,
@@ -227,6 +229,7 @@ type config struct {
 	list     bool     // -l/--list
 	quiet    bool     // -q/--quiet
 	unstable bool     // --unstable
+	yes      bool     // --yes
 	words    []string // positional words: recipe names, then their arguments
 	// shell is --shell; shellGiven records that it appeared, since upstream
 	// rejects it a second time.
@@ -235,7 +238,7 @@ type config struct {
 	shellArgs  []string // --shell-arg, in order; it may repeat; nil when absent
 }
 
-// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable, --shell PATH,
+// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable, --yes, --shell PATH,
 // --shell-arg ARG (which may repeat) and positional words. Flags come before
 // the words: as upstream's argument parser takes its trailing positional
 // arguments, the first word and everything after it are words, even when
@@ -340,7 +343,7 @@ func valueName(long string) string {
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable":
+	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes":
 		return name, true
 	}
 	return "", false
@@ -378,6 +381,8 @@ func setSwitch(cfg *config, long string) {
 		cfg.quiet = true
 	case "unstable":
 		cfg.unstable = true
+	case "yes":
+		cfg.yes = true
 	}
 }
 
@@ -442,11 +447,11 @@ const maxSuggestionDistance = 3
 // suggest returns the public recipe whose name is closest to word by edit
 // distance, if one is closer than maxSuggestionDistance. On a tie the first
 // name in byte order wins, as upstream's search over its sorted recipes does.
-// A name that starts with an underscore is private and never suggested. Pure.
+// A private recipe is never suggested. Pure.
 func suggest(word string, infos []just.RecipeInfo) (string, bool) {
 	best, bestDistance := "", maxSuggestionDistance
 	for _, info := range infos {
-		if strings.HasPrefix(info.Name, "_") {
+		if info.Private {
 			continue
 		}
 		d := editDistance(word, info.Name)
@@ -490,21 +495,50 @@ type listEntry struct {
 	signature string // name and parameters, with their defaults
 	width     int    // display width of signature
 	doc       string
+	groups    []string
 }
 
-// formatList renders --list output in upstream's layout: a heading, then one
-// recipe per line sorted by name, indented four spaces. Names that start with
-// an underscore are private and left out. A doc comment follows the
-// signature as "# doc", with every "#" in one column; a signature wider than
-// 50 columns, or a multi-line doc, puts the doc on comment lines above it.
-// Pure.
+// listSection is the recipes of --list output under one heading: those in a
+// group, under its name, or those in none, under no heading.
+type listSection struct {
+	group   string
+	grouped bool
+	entries []listEntry
+}
+
+// anyGrouped reports whether any of entries is in a group. Pure.
+func anyGrouped(entries []listEntry) bool {
+	for _, e := range entries {
+		if len(e.groups) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// formatList renders --list output in upstream's layout: a heading, then the
+// recipes that are in no group, then a section for each group in byte order
+// under `[group]`, with a blank line between sections. A recipe is in the
+// section of each of its groups. Within a section the recipes are sorted by
+// name, one per line, indented four spaces, and private ones are left out. A
+// doc comment follows the signature as "# doc", with every "#" in one column
+// over all sections; a signature wider than 50 columns, or a multi-line doc,
+// puts the doc on comment lines above it. Pure.
 func formatList(infos []just.RecipeInfo) string {
 	entries := listEntries(infos)
 	column := alignWidth(entries)
 	var b strings.Builder
 	b.WriteString(listHeading)
-	for _, e := range entries {
-		writeEntry(&b, e, column)
+	for i, section := range listSections(entries) {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		if section.grouped {
+			b.WriteString(listIndent + "[" + section.group + "]\n")
+		}
+		for _, e := range section.entries {
+			writeEntry(&b, e, column)
+		}
 	}
 	return b.String()
 }
@@ -515,13 +549,48 @@ func listEntries(infos []just.RecipeInfo) []listEntry {
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 	entries := make([]listEntry, 0, len(sorted))
 	for _, info := range sorted {
-		if strings.HasPrefix(info.Name, "_") {
+		if info.Private {
 			continue
 		}
 		sig := signature(info)
-		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc})
+		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc, groups: info.Groups})
 	}
 	return entries
+}
+
+// listSections divides entries, which are in order, into the sections of the
+// listing: the entries in no group, if there are any, then one section for
+// each group in byte order. Pure.
+func listSections(entries []listEntry) []listSection {
+	if !anyGrouped(entries) {
+		if len(entries) == 0 {
+			return nil
+		}
+		return []listSection{{entries: entries}}
+	}
+	var sections []listSection
+	var ungrouped []listEntry
+	byGroup := make(map[string][]listEntry)
+	for _, e := range entries {
+		if len(e.groups) == 0 {
+			ungrouped = append(ungrouped, e)
+		}
+		for _, g := range e.groups {
+			byGroup[g] = append(byGroup[g], e)
+		}
+	}
+	if ungrouped != nil {
+		sections = append(sections, listSection{entries: ungrouped})
+	}
+	names := make([]string, 0, len(byGroup))
+	for g := range byGroup {
+		names = append(names, g)
+	}
+	sort.Strings(names)
+	for _, g := range names {
+		sections = append(sections, listSection{group: g, grouped: true, entries: byGroup[g]})
+	}
+	return sections
 }
 
 // signature is the recipe's name followed by its parameters, each with its

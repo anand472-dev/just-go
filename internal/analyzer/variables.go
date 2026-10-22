@@ -120,8 +120,8 @@ func (r *assignmentResolver) circular(a ast.Assignment) *diag.Error {
 }
 
 // undefinedInRecipe checks one recipe's parameter defaults, the arguments of
-// its dependencies and its body against the globals. A parameter default sees
-// the globals and the parameters before it. A dependency argument and a body
+// its dependencies, its attributes and its body against the globals. A
+// parameter default sees the globals and the parameters before it. A dependency argument and a body
 // line see the globals and every parameter. A call of an
 // unknown function, or with the wrong number of arguments, and a variable
 // that is not defined are each reported at the name concerned. It is pure.
@@ -137,6 +137,16 @@ func undefinedInRecipe(jf *ast.Justfile, r *ast.Recipe, globals map[string]struc
 	if err := dependencyArguments(r, check); err != nil {
 		return err
 	}
+	if err := attributeExpressions(jf, r, globals, params); err != nil {
+		return err
+	}
+	return bodyReferences(jf, r, check)
+}
+
+// bodyReferences checks the calls and variables in the interpolations of the
+// lines of r with check, skipping the comments that set ignore-comments
+// ignores. It is pure.
+func bodyReferences(jf *ast.Justfile, r *ast.Recipe, check func(ast.Expr) *diag.Error) *diag.Error {
 	for _, l := range r.Lines {
 		if jf.Settings.IgnoreComments && l.Comment {
 			continue

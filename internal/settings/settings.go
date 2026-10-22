@@ -92,6 +92,15 @@ func Resolve(jf *ast.Justfile) (Resolved, error) {
 	return out, nil
 }
 
+// ConstValue evaluates e in a const context of jf, as upstream evaluates the
+// `[doc]` attribute of a recipe: variables must be assignments that are
+// themselves const, and functions cannot be called. A failure is a
+// *diag.Error of KindAnalysis, located at the variable or call concerned,
+// or a *ListError. ConstValue is pure.
+func ConstValue(jf *ast.Justfile, e ast.Expr) (string, error) {
+	return newConst(jf).expr(e)
+}
+
 // consts evaluates expressions in a const context. memo holds the assignments
 // evaluated so far, by name.
 type consts struct {

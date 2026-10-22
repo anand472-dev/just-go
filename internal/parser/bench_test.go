@@ -52,3 +52,25 @@ func BenchmarkParseDependencyArguments(b *testing.B) {
 		}
 	}
 }
+
+// generateAttributes returns a justfile of n recipes that each carry several
+// attributes, some with expression arguments.
+func generateAttributes(n int) []byte {
+	var b strings.Builder
+	b.WriteString("prefix := 'p'\n")
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, "# recipe %d\n[group('g%d'), no-cd]\n[doc(prefix + 'doc')]\n[confirm('sure?')]\n@r%d x='a':\n  echo {{x}}\n", i, i%7, i)
+	}
+	return []byte(b.String())
+}
+
+func BenchmarkParseAttributes(b *testing.B) {
+	src := generateAttributes(500)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(src)))
+	for b.Loop() {
+		if _, err := parser.Parse("justfile", src); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
