@@ -1,0 +1,58 @@
+# Cases the pinned oracle (oracle/bin/just) fails under the conformance
+# harness, with the reason. TestConformance skips them.
+#
+# Format: one entry per line, "<case id> <reason>". Blank lines and lines
+# starting with "#" are comments.
+#
+# None of these is nondeterministic output. Each one depends on state that
+# scripts/recorder.patch does not capture (see conformance/corpus/README.md,
+# "What is not recorded" and "Cases that cannot be reproduced"):
+#   path-hash    a .justcache file named after the recorder's temporary path
+#   empty-dir    an empty directory the upstream test created
+#   symlink      a symbolic link the upstream test created
+#   mode         a file permission other than the *.exe convention
+#   fifo         a named pipe
+#   environment  a variable inherited from the recording machine
+# Fixing the recorder removes them; the harness cannot.
+
+cache::dangling_symlink_output_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::directory_input_is_an_error#1 empty-dir: input directory `foo` was empty and is not recorded
+cache::environment_variables_may_be_removed_from_cache_key#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::extra_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::hit_prints_verbose_message#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::hit_skips_execution#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::input_expression_evaluated_with_arguments#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::input_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::missing_output_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::multiple_outputs#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::output_directory_is_allowed#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::output_expression_evaluated_with_arguments#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::outputs_resolve_against_working_directory#1 empty-dir: working directory `sub` was empty and is not recorded
+cache::outputs_resolve_against_working_directory#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::outputs_resolve_against_working_directory#3 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::symlink_to_directory_is_an_error#1 symlink: input `link` is a symlink to a directory and is not recorded
+cache::symlink_to_file_is_followed#1 symlink: input `link` is a symlink to `foo` and is not recorded
+cache::symlink_to_file_is_followed#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::unexported_variable_does_not_invalidate_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::working_directory_invalidates_cache#1 empty-dir: working directory `a` was empty and is not recorded
+cache::working_directory_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+dotenv::fifo#1 fifo: `.env` is a FIFO fed by a thread in the upstream test; the corpus cannot record it
+format::write_error#1 mode: upstream chmods the justfile to 0400; file modes are not recorded
+functions::canonicalize#1 symlink: `foo` is a symlink to `justfile` and is not recorded
+functions::env_var_functions_unix#1 environment: expects the recording user's USER (`pancha`) inherited from the recorder's environment
+global_fallback_justfile::working_directory_is_project_root#1 empty-dir: the `.git` directory that marks the project root was empty and is not recorded
+init::justfile_name_from_search_directory#1 empty-dir: search directory `sub` was empty and is not recorded
+init::working_directory_without_justfile#1 empty-dir: working directory `foo` was empty and is not recorded
+init::write_error#1 empty-dir: `justfile` is an empty directory upstream and is not recorded
+search::justfile_symlink_parent#1 symlink: the justfile is reached through a symlink, which is not recorded
+search::single_downwards#1 empty-dir: directory `child` was empty and is not recorded
+shebang::powershell_shebang_on_unix_has_no_bom#1 symlink: `pwsh` is a symlink to cat and is not recorded
+which_function::ignores_nonexecutable_candidates#1 mode: `dummy/foo.exe` is not executable upstream; the corpus marks every *.exe executable
+working_directory::attribute#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::attribute_with_backtick#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::attribute_with_expression#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::attribute_with_recipe_parameter#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::false_no_cd_does_not_conflict_with_working_directory#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::setting#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::setting_and_attribute#1 empty-dir: a working directory the recipe uses was empty and is not recorded
+working_directory::working_directory_without_justfile#1 empty-dir: a working directory the recipe uses was empty and is not recorded

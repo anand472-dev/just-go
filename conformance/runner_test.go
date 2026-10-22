@@ -1,0 +1,610 @@
+package conformance
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"gitea.com/wimwian/just-go/internal/sys"
+	"gitea.com/wimwian/just-go/internal/sys/sysfake"
+)
+
+const (
+	baselinePath   = "baseline.txt"
+	exceptionsPath = "oracle-exceptions.txt"
+	// caseTimeout bounds one run of the binary under test, so a hung case
+	// fails instead of stalling the whole suite.
+	caseTimeout = 60 * time.Second
+	// tempDirName has the shape of upstream's temporary directories: the
+	// prefix "just-test-tempdir" and six characters (tests/tempdir.rs).
+	tempDirName = "just-test-tempdir000000"
+)
+
+// harness is what every case run shares: the binary under test, the PATH
+// inherited from the test process, and the impure boundary.
+type harness struct {
+	bin  string
+	path string
+	proc sys.Process
+	fsys sys.FS
+}
+
+// outcome is what one run of the binary produced.
+type outcome struct {
+	status         int
+	stdout, stderr string
+}
+
+// placeholders substitutes the machine-specific paths of one run into
+// recorded strings: as they are, regex-quoted, and JSON-string-escaped.
+type placeholders struct {
+	plain, regex, json *strings.Replacer
+}
+
+// newHarness returns the harness for JUST_GO_BIN, or skips the test when it
+// is unset. A relative JUST_GO_BIN is resolved against the module root,
+// because `go test` runs this package in conformance/. Impure: it reads the
+// test process environment.
+func newHarness(t *testing.T) harness {
+	t.Helper()
+	bin := os.Getenv("JUST_GO_BIN")
+	if bin == "" {
+		t.Skip("JUST_GO_BIN is not set; it names the binary under test")
+	}
+	if !filepath.IsAbs(bin) {
+		bin = filepath.Join("..", bin)
+	}
+	abs, err := filepath.Abs(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return harness{bin: abs, path: os.Getenv("PATH"), proc: sys.OSProcess{}, fsys: sys.OSFS{}}
+}
+
+func TestConformance(t *testing.T) {
+	h := newHarness(t)
+	cases := loadCorpus(t, h.fsys)
+	exceptions := loadExceptions(t, h.fsys)
+	for _, c := range cases {
+		t.Run(c.ID, func(t *testing.T) {
+			t.Parallel()
+			if reason, ok := exceptions[c.ID]; ok {
+				t.Skip("oracle exception: " + reason)
+			}
+			if err := h.check(t, c); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestBaseline(t *testing.T) {
+	h := newHarness(t)
+	byID := map[string]Case{}
+	for _, c := range loadCorpus(t, h.fsys) {
+		byID[c.ID] = c
+	}
+	data, err := h.fsys.ReadFile(baselinePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range strings.Fields(string(data)) {
+		t.Run(id, func(t *testing.T) {
+			t.Parallel()
+			c, ok := byID[id]
+			if !ok {
+				t.Fatalf("baseline id %q is not in the corpus", id)
+			}
+			if err := h.check(t, c); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+// loadCorpus reads the corpus through fsys or fails the test. Impure.
+func loadCorpus(t *testing.T, fsys sys.FS) []Case {
+	t.Helper()
+	cases, err := LoadCases(fsys, corpusPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cases
+}
+
+// loadExceptions reads oracle-exceptions.txt through fsys or fails the test.
+// Impure.
+func loadExceptions(t *testing.T, fsys sys.FS) map[string]string {
+	t.Helper()
+	data, err := fsys.ReadFile(exceptionsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exceptions, err := parseExceptions(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return exceptions
+}
+
+// parseExceptions maps case id to reason. Each entry line is an id, white
+// space, and the reason; blank lines and lines starting with "#" are
+// comments. An entry without a reason is an error. Pure.
+func parseExceptions(data string) (map[string]string, error) {
+	exceptions := map[string]string{}
+	for i, line := range strings.Split(data, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		id, reason, _ := strings.Cut(line, " ")
+		if reason = strings.TrimSpace(reason); reason == "" {
+			return nil, fmt.Errorf("%s:%d: exception %q has no reason", exceptionsPath, i+1, id)
+		}
+		exceptions[id] = reason
+	}
+	return exceptions, nil
+}
+
+// check runs one case by the comparison rules and returns every mismatch.
+// Impure: it writes the case's files, runs the binary, and reads files back.
+func (h harness) check(t *testing.T, c Case) error {
+	dir := materialize(t, c)
+	ph := newPlaceholders(dir, h.bin)
+	ctx, cancel := context.WithTimeout(context.Background(), caseTimeout)
+	defer cancel()
+	got, err := runCase(ctx, h.proc, h.bin, c, dir, buildEnv(c, dir, h.path, ph), ph)
+	if err != nil {
+		return err
+	}
+	return errors.Join(
+		compareStatus(*c.Status, got.status),
+		compareOutput("stdout", got.stdout, c.Stdout, c.StdoutRegex, ph),
+		compareOutput("stderr", got.stderr, c.Stderr, c.StderrRegex, ph),
+		compareResponse(got.stdout, c.Response, ph),
+		compareFiles(h.fsys, dir, c.ExpectedFiles, ph),
+	)
+}
+
+// materialize writes the case's files into a fresh temporary directory and
+// returns its path with symbolic links resolved. The directory is named
+// like upstream's (tempDirName), because some expectations match that name.
+// Files named "*.exe" are made executable. Impure: it writes the
+// filesystem. Writing is test scaffolding: sys.FS is read-only, and
+// t.TempDir owns the cleanup.
+func materialize(t *testing.T, c Case) string {
+	t.Helper()
+	parent, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(parent, tempDirName)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ph := newPlaceholders(dir, "")
+	for name, content := range c.Files {
+		if err := writeCaseFile(filepath.Join(dir, name), ph.plain.Replace(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(dir, c.Cwd), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// writeCaseFile writes one file of a case, creating its parent directories.
+// Impure.
+func writeCaseFile(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	mode := os.FileMode(0o644)
+	if strings.HasSuffix(path, ".exe") {
+		mode = 0o755
+	}
+	return os.WriteFile(path, []byte(content), mode)
+}
+
+// newPlaceholders builds the substitutions for a case run in dir against
+// bin. Pure.
+func newPlaceholders(dir, bin string) placeholders {
+	values := [][2]string{
+		{TempDirToken, dir},
+		{TempDirParentToken, filepath.Dir(dir)},
+		{JustExecutableToken, bin},
+	}
+	var plain, regex, js []string
+	for _, v := range values {
+		quoted, _ := json.Marshal(v[1])
+		plain = append(plain, v[0], v[1])
+		regex = append(regex, v[0], regexp.QuoteMeta(v[1]))
+		js = append(js, v[0], string(quoted[1:len(quoted)-1]))
+	}
+	return placeholders{
+		plain: strings.NewReplacer(plain...),
+		regex: strings.NewReplacer(regex...),
+		json:  strings.NewReplacer(js...),
+	}
+}
+
+// buildEnv returns the exact environment of a run: the case's env with
+// placeholders substituted, plus PATH. When path_extra is set, PATH is
+// those directories resolved against dir, ahead of the inherited PATH, so
+// they win every lookup. Otherwise PATH is the case's own PATH when env
+// sets one, or the inherited PATH. Nothing else is inherited. Pure.
+func buildEnv(c Case, dir, inheritedPath string, ph placeholders) []string {
+	env := make([]string, 0, len(c.Env)+1)
+	path := inheritedPath
+	for key, value := range c.Env {
+		value = ph.plain.Replace(value)
+		if key == "PATH" {
+			path = value
+			continue
+		}
+		env = append(env, key+"="+value)
+	}
+	if len(c.PathExtra) > 0 {
+		path = joinPathExtra(c.PathExtra, dir, inheritedPath)
+	}
+	env = append(env, "PATH="+path)
+	sort.Strings(env)
+	return env
+}
+
+// joinPathExtra resolves each entry against dir and prepends them to
+// inherited. Pure.
+func joinPathExtra(entries []string, dir, inherited string) string {
+	parts := make([]string, 0, len(entries)+1)
+	for _, entry := range entries {
+		parts = append(parts, filepath.Join(dir, entry))
+	}
+	if inherited != "" {
+		parts = append(parts, inherited)
+	}
+	return strings.Join(parts, string(os.PathListSeparator))
+}
+
+// runCase runs bin with the case's arguments and stdin in its working
+// directory under env. Impure: it runs a process through proc.
+func runCase(ctx context.Context, proc sys.Process, bin string, c Case, dir string, env []string, ph placeholders) (outcome, error) {
+	argv := []string{bin}
+	for _, arg := range c.Args {
+		argv = append(argv, ph.plain.Replace(arg))
+	}
+	var stdout, stderr bytes.Buffer
+	status, err := proc.Run(ctx, sys.ProcessSpec{
+		Argv:   argv,
+		Dir:    filepath.Join(dir, c.Cwd),
+		Env:    env,
+		Stdin:  strings.NewReader(ph.plain.Replace(c.Stdin)),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return outcome{}, fmt.Errorf("run %s: %w", bin, err)
+	}
+	return outcome{status: status, stdout: stdout.String(), stderr: stderr.String()}, nil
+}
+
+// compareStatus checks the exit status. Pure.
+func compareStatus(want, got int) error {
+	if want != got {
+		return fmt.Errorf("status: got %d, want %d", got, want)
+	}
+	return nil
+}
+
+// compareOutput checks one output stream: by regex when pattern is set,
+// otherwise exactly. Pure.
+func compareOutput(name, got string, exact, pattern *string, ph placeholders) error {
+	if pattern != nil {
+		re, err := regexp.Compile(ph.regex.Replace(*pattern))
+		if err != nil {
+			return fmt.Errorf("%s_regex: %w", name, err)
+		}
+		if !re.MatchString(got) {
+			return fmt.Errorf("%s: %q does not match /%s/", name, got, re)
+		}
+		return nil
+	}
+	if want := ph.plain.Replace(*exact); got != want {
+		return fmt.Errorf("%s:\n got: %q\nwant: %q", name, got, want)
+	}
+	return nil
+}
+
+// compareResponse decodes stdout as JSON and compares it with the expected
+// response, when the case has one. A JSON null response means none. Pure.
+func compareResponse(stdout string, response json.RawMessage, ph placeholders) error {
+	if len(response) == 0 || string(response) == "null" {
+		return nil
+	}
+	var want, got any
+	if err := json.Unmarshal([]byte(ph.json.Replace(string(response))), &want); err != nil {
+		return fmt.Errorf("response: expected value: %w", err)
+	}
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		return fmt.Errorf("response: stdout is not JSON: %w", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		return fmt.Errorf("response: got %v, want %v", got, want)
+	}
+	return nil
+}
+
+// compareFiles checks each expected file byte for byte. Impure: it reads
+// through fsys.
+func compareFiles(fsys sys.FS, dir string, expected map[string]string, ph placeholders) error {
+	var errs []error
+	for path, encoded := range expected {
+		want, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("expected file %s: %w", path, err))
+			continue
+		}
+		got, err := fsys.ReadFile(filepath.Join(dir, path))
+		if err != nil {
+			errs = append(errs, fmt.Errorf("expected file %s: %w", path, err))
+			continue
+		}
+		if wantText := ph.plain.Replace(string(want)); string(got) != wantText {
+			errs = append(errs, fmt.Errorf("file %s:\n got: %q\nwant: %q", path, got, wantText))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// The tests below check the harness itself, without JUST_GO_BIN.
+
+func ptr[T any](v T) *T { return &v }
+
+func TestOracleExceptionsNameCorpusCases(t *testing.T) {
+	fsys := sys.OSFS{}
+	exceptions := loadExceptions(t, fsys)
+	byID := map[string]bool{}
+	for _, c := range loadCorpus(t, fsys) {
+		byID[c.ID] = true
+	}
+	for id := range exceptions {
+		if !byID[id] {
+			t.Errorf("oracle exception %q is not a corpus case", id)
+		}
+	}
+}
+
+func TestParseExceptions(t *testing.T) {
+	got, err := parseExceptions("# comment\n\na#1 why  not\n  b#2   because \n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"a#1": "why  not", "b#2": "because"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if _, err := parseExceptions("a#1\n"); err == nil || !strings.Contains(err.Error(), ":1:") {
+		t.Fatalf("want error naming the line, got %v", err)
+	}
+}
+
+func TestNewPlaceholders(t *testing.T) {
+	ph := newPlaceholders(`/t/d"x.y`, "/b/just")
+	in := "@@TEMPDIR@@|@@TEMPDIR_PARENT@@|@@JUST_EXECUTABLE@@"
+	if got, want := ph.plain.Replace(in), `/t/d"x.y|/t|/b/just`; got != want {
+		t.Errorf("plain = %q, want %q", got, want)
+	}
+	if got, want := ph.regex.Replace(in), `/t/d"x\.y|/t|/b/just`; got != want {
+		t.Errorf("regex = %q, want %q", got, want)
+	}
+	if got, want := ph.json.Replace(in), `/t/d\"x.y|/t|/b/just`; got != want {
+		t.Errorf("json = %q, want %q", got, want)
+	}
+}
+
+func TestBuildEnv(t *testing.T) {
+	ph := newPlaceholders("/d", "/b")
+	sep := string(os.PathListSeparator)
+	for name, tc := range map[string]struct {
+		c    Case
+		want []string
+	}{
+		"inherits only PATH": {Case{Env: map[string]string{"K": "@@TEMPDIR@@/v"}}, []string{"K=/d/v", "PATH=/usr/bin"}},
+		"case PATH wins":     {Case{Env: map[string]string{"PATH": "@@TEMPDIR@@/bin"}}, []string{"PATH=/d/bin"}},
+		"path_extra first": {
+			Case{PathExtra: []string{".", "sub"}},
+			[]string{"PATH=/d" + sep + "/d/sub" + sep + "/usr/bin"},
+		},
+	} {
+		if got := buildEnv(tc.c, "/d", "/usr/bin", ph); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: got %v, want %v", name, got, tc.want)
+		}
+	}
+	if got := joinPathExtra([]string{"a"}, "/d", ""); got != "/d/a" {
+		t.Errorf("no inherited PATH: got %q", got)
+	}
+}
+
+func TestRunCase(t *testing.T) {
+	proc := &sysfake.FakeProcess{Codes: []int{3}}
+	c := Case{Args: []string{"--x", "@@TEMPDIR@@"}, Cwd: "sub", Stdin: "in @@JUST_EXECUTABLE@@"}
+	got, err := runCase(context.Background(), proc, "/b/just", c, "/d", []string{"A=1"}, newPlaceholders("/d", "/b/just"))
+	if err != nil || got.status != 3 {
+		t.Fatalf("runCase = %+v, %v", got, err)
+	}
+	spec := proc.Specs[0]
+	if !reflect.DeepEqual(spec.Argv, []string{"/b/just", "--x", "/d"}) || spec.Dir != "/d/sub" || !reflect.DeepEqual(spec.Env, []string{"A=1"}) {
+		t.Fatalf("spec = %+v", spec)
+	}
+	stdin, _ := io.ReadAll(spec.Stdin)
+	if string(stdin) != "in /b/just" {
+		t.Fatalf("stdin = %q", stdin)
+	}
+	_, err = runCase(context.Background(), &sysfake.FakeProcess{Err: errors.New("boom")}, "/b", c, "/d", nil, newPlaceholders("/d", "/b"))
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("want start error, got %v", err)
+	}
+}
+
+func TestCompareStatus(t *testing.T) {
+	if compareStatus(1, 1) != nil || compareStatus(0, 1) == nil {
+		t.Fatal("compareStatus")
+	}
+}
+
+func TestCompareOutput(t *testing.T) {
+	ph := newPlaceholders("/d.x", "/b")
+	for name, tc := range map[string]struct {
+		got            string
+		exact, pattern *string
+		ok             bool
+	}{
+		"exact match":        {"at /d.x\n", ptr("at @@TEMPDIR@@\n"), nil, true},
+		"exact mismatch":     {"at /d.x", ptr("at @@TEMPDIR@@\n"), nil, false},
+		"regex match":        {"at /d.x!", nil, ptr("^at @@TEMPDIR@@!$"), true},
+		"regex is quoted":    {"at /dyx!", nil, ptr("^at @@TEMPDIR@@!$"), false},
+		"regex mismatch":     {"nope", nil, ptr("^yes$"), false},
+		"regex does not com": {"", nil, ptr("("), false},
+	} {
+		if err := compareOutput("stdout", tc.got, tc.exact, tc.pattern, ph); (err == nil) != tc.ok {
+			t.Errorf("%s: err = %v, want ok=%v", name, err, tc.ok)
+		}
+	}
+}
+
+func TestCompareResponse(t *testing.T) {
+	ph := newPlaceholders("/d", "/b")
+	for name, tc := range map[string]struct {
+		stdout, response string
+		ok               bool
+	}{
+		"no response":      {"anything", "", true},
+		"null response":    {"anything", "null", true},
+		"equal":            {`{"a": ["/d", 1]}`, `{"a":["@@TEMPDIR@@",1]}`, true},
+		"different":        {`{"a": 2}`, `{"a":1}`, false},
+		"stdout not JSON":  {"x", `{"a":1}`, false},
+		"bad expectation":  {"{}", `{`, false},
+		"null field value": {`{"environment-variable":null}`, `{"environment-variable":null}`, true},
+	} {
+		if err := compareResponse(tc.stdout, json.RawMessage(tc.response), ph); (err == nil) != tc.ok {
+			t.Errorf("%s: err = %v, want ok=%v", name, err, tc.ok)
+		}
+	}
+}
+
+func TestCompareFiles(t *testing.T) {
+	ph := newPlaceholders("/d", "/b")
+	fsys := sysfake.FakeFS{"/d/ok": "path /d\n", "/d/bad": "other"}
+	enc := base64.StdEncoding.EncodeToString
+	if err := compareFiles(fsys, "/d", map[string]string{"ok": enc([]byte("path @@TEMPDIR@@\n"))}, ph); err != nil {
+		t.Fatal(err)
+	}
+	err := compareFiles(fsys, "/d", map[string]string{
+		"bad":     enc([]byte("want")),
+		"missing": enc([]byte("x")),
+		"undec":   "!",
+	}, ph)
+	for _, want := range []string{"file bad", "expected file missing", "expected file undec"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("error %v does not mention %q", err, want)
+		}
+	}
+}
+
+func TestMaterialize(t *testing.T) {
+	c := Case{Files: map[string]string{"a/b.txt": "in @@TEMPDIR@@", "x.exe": "#!/bin/sh\n"}, Cwd: "deep/cwd"}
+	dir := materialize(t, c)
+	if filepath.Base(dir) != tempDirName {
+		t.Fatalf("dir %q is not named %q", dir, tempDirName)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "a/b.txt"))
+	if err != nil || string(data) != "in "+dir {
+		t.Fatalf("a/b.txt = %q, %v", data, err)
+	}
+	assertExecutable(t, filepath.Join(dir, "a/b.txt"), false)
+	assertExecutable(t, filepath.Join(dir, "x.exe"), true)
+	if info, err := os.Stat(filepath.Join(dir, "deep/cwd")); err != nil || !info.IsDir() {
+		t.Fatalf("cwd not created: %v", err)
+	}
+	if err := writeCaseFile(filepath.Join(dir, "a/b.txt", "under-a-file"), ""); err == nil {
+		t.Fatal("want error writing below a file")
+	}
+}
+
+// assertExecutable checks whether path has any execute bit set.
+func assertExecutable(t *testing.T, path string, want bool) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode()&0o111 != 0; got != want {
+		t.Errorf("%s: mode %v, want executable=%v", path, info.Mode(), want)
+	}
+}
+
+// TestCheckDetectsMismatch runs the harness end to end against /bin/sh
+// standing in for just, so it needs no JUST_GO_BIN: a case whose
+// expectations match passes, and one that differs in every field fails on
+// each of them.
+func TestCheckDetectsMismatch(t *testing.T) {
+	h := harness{bin: "/bin/sh", path: os.Getenv("PATH"), proc: sys.OSProcess{}, fsys: sys.OSFS{}}
+	pass := Case{
+		Args:          []string{"-c", `cat; echo "$K" >&2; printf x > out`},
+		Env:           map[string]string{"K": "@@TEMPDIR@@"},
+		Stdin:         "hi\n",
+		Stdout:        ptr("hi\n"),
+		StderrRegex:   ptr("^@@TEMPDIR@@\n$"),
+		Status:        ptr(0),
+		ExpectedFiles: map[string]string{"out": "eA=="},
+		Response:      json.RawMessage("null"),
+	}
+	if err := h.check(t, pass); err != nil {
+		t.Fatalf("matching case failed: %v", err)
+	}
+	fail := pass
+	fail.Stdout, fail.StderrRegex, fail.Status = ptr("bye\n"), ptr("^nope$"), ptr(1)
+	fail.ExpectedFiles = map[string]string{"out": "eQ=="}
+	fail.Response = json.RawMessage(`{"a":1}`)
+	err := h.check(t, fail)
+	for _, want := range []string{"status", "stdout", "stderr", "response", "file out"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("error %v does not mention %s", err, want)
+		}
+	}
+	if err := (harness{bin: "/no/such/just", proc: sys.OSProcess{}, fsys: sys.OSFS{}}).check(t, pass); err == nil {
+		t.Error("want an error for a missing binary")
+	}
+}
+
+func BenchmarkNewPlaceholders(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		newPlaceholders("/private/var/folders/t/just-test-tempdir000000", "/usr/local/bin/just")
+	}
+}
+
+func BenchmarkCompareOutput(b *testing.B) {
+	ph := newPlaceholders("/private/var/folders/t/just-test-tempdir000000", "/usr/local/bin/just")
+	got := strings.Repeat("error: something at /private/var/folders/t/just-test-tempdir000000/justfile\n", 50)
+	exact := strings.Repeat("error: something at @@TEMPDIR@@/justfile\n", 50)
+	pattern := "(?s)^.*@@TEMPDIR@@/justfile\n$"
+	b.ReportAllocs()
+	for b.Loop() {
+		if compareOutput("stdout", got, &exact, nil, ph) != nil || compareOutput("stdout", got, nil, &pattern, ph) != nil {
+			b.Fatal("mismatch")
+		}
+	}
+}

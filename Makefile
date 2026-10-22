@@ -1,6 +1,6 @@
 GOCYCLO_VERSION := v0.6.0
 
-.PHONY: build test vet oracle corpus conformance cover cyclo bench check tools
+.PHONY: build test vet oracle corpus conformance ratchet cover cyclo bench check tools
 
 build:
 	go build -o bin/just-go ./cmd/just-go
@@ -19,6 +19,10 @@ corpus:
 
 conformance: build
 	JUST_GO_BIN=bin/just-go go test ./conformance/...
+
+# Adds the conformance cases bin/just-go passes now to conformance/baseline.txt.
+ratchet: build
+	JUST_GO_BIN=bin/just-go go run ./conformance/cmd/ratchet
 
 cover:
 	scripts/check-coverage.sh
