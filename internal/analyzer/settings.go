@@ -10,6 +10,11 @@ import (
 // with while it is on (upstream's Setting::conflicts). A setting that takes a
 // value is always on; a boolean one is on when it is true.
 var conflicts = map[string][]string{
+	"dotenv-command":    {"dotenv-filename", "dotenv-load", "dotenv-path", "dotenv-required"},
+	"dotenv-filename":   {"dotenv-command"},
+	"dotenv-load":       {"dotenv-command"},
+	"dotenv-path":       {"dotenv-command"},
+	"dotenv-required":   {"dotenv-command"},
 	"no-cd":             {"working-directory"},
 	"working-directory": {"no-cd"},
 }
@@ -73,4 +78,15 @@ func resolveSettings(jf *ast.Justfile) *diag.Error {
 		return err.(*diag.Error)
 	}
 	return nil
+}
+
+// checkListFeatures reports the first use of a feature of `set lists` unless
+// the justfile sets it, as upstream does once the settings are evaluated. The
+// uses are in the order the parser met them. It is pure.
+func checkListFeatures(jf *ast.Justfile) *diag.Error {
+	if jf.Settings.Lists || len(jf.ListUses) == 0 {
+		return nil
+	}
+	use := jf.ListUses[0]
+	return fail(jf, use.At, "%s", use.Feature)
 }

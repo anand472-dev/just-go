@@ -2,7 +2,7 @@
 //
 // It is pure: it holds data and performs no I/O. Expression nodes are value
 // types, so a consumer switches on ast.Text, ast.StringLit, ast.Var,
-// ast.Concat and ast.Call.
+// ast.Concat, ast.Call and ast.List.
 //
 // Positions are 1-based lines and rune columns of the token they describe, as
 // in diag.Error. A name's width is its length, since names are ASCII.
@@ -14,11 +14,109 @@ type Justfile struct {
 	Settings    Settings
 	Assignments []Assignment
 	Recipes     []Recipe
+	// Unstable lists the unstable features the file uses, each once, in the
+	// order upstream checks them (see UnstableFeature). Running the file
+	// needs them enabled, by `set unstable` or by the host.
+	Unstable []UnstableFeature
+	// ListUses lists, in the order the parser met them, the places that use a
+	// feature of `set lists`. Without that setting the first is an error.
+	ListUses []ListUse
+}
+
+// UnstableFeature is a feature upstream refuses to run unless unstable
+// features are enabled. The values are in the order upstream checks them: the
+// first a file uses is the one an error names.
+type UnstableFeature int
+
+// Unstable features.
+const (
+	// CachedRecipes is the `[cache]` attribute.
+	CachedRecipes UnstableFeature = iota + 1
+	// ListsSetting is `set lists`, in any form.
+	ListsSetting
+	// UserDefinedFunctions is `name() := ...`.
+	UserDefinedFunctions
+)
+
+// String is upstream's description of the feature, which begins the message
+// of the error for using it without enabling it. Pure.
+func (f UnstableFeature) String() string {
+	switch f {
+	case CachedRecipes:
+		return "cached recipes are currently unstable"
+	case ListsSetting:
+		return "the `lists` setting is currently unstable"
+	}
+	return "user-defined functions are currently unstable"
+}
+
+// Use records that j uses f, once, keeping Unstable in order. Pure apart from
+// updating j.
+func (j *Justfile) Use(f UnstableFeature) {
+	i := 0
+	for i < len(j.Unstable) && j.Unstable[i] < f {
+		i++
+	}
+	if i < len(j.Unstable) && j.Unstable[i] == f {
+		return
+	}
+	j.Unstable = append(j.Unstable, 0)
+	copy(j.Unstable[i+1:], j.Unstable[i:])
+	j.Unstable[i] = f
+}
+
+// ListFeature is a feature that needs `set lists`, which needs unstable
+// features enabled. Only those the parser can tell apart are listed.
+type ListFeature int
+
+// List features.
+const (
+	// ListLiteral is `[a, b]` in an expression.
+	ListLiteral ListFeature = iota + 1
+	// BoolFunction to WhichFunction are the builtin functions that exist
+	// only for lists.
+	BoolFunction
+	JoinListFunction
+	NumJobsFunction
+	ShowFunction
+	SplitFunction
+	WhichFunction
+)
+
+// String is upstream's message for using the feature without `set lists`.
+// Pure.
+func (f ListFeature) String() string {
+	switch f {
+	case ListLiteral:
+		return "list literals require `set lists`"
+	case BoolFunction:
+		return "the `bool()` function requires `set lists`"
+	case JoinListFunction:
+		return "the `join_list()` function requires `set lists`"
+	case NumJobsFunction:
+		return "the `num_jobs()` function requires `set lists`"
+	case ShowFunction:
+		return "the `show()` function requires `set lists`"
+	case SplitFunction:
+		return "the `split()` function requires `set lists`"
+	}
+	return "the `which()` function requires `set lists`"
+}
+
+// ListUse is one use of a list feature, and the span of source it is
+// reported at: the opening bracket of a list literal, or the name of a
+// function.
+type ListUse struct {
+	Feature ListFeature
+	At      Span
 }
 
 // Settings holds the values of `set` statements. A boolean setting that is
 // not set is false, as upstream's default is; an expression setting that is
 // not set is nil.
+//
+// Lists is `set lists`, which turns on the list features; Unstable is `set
+// unstable`, which enables the unstable features, `set lists` among them.
 //
 // The expression settings are kept as written. Upstream evaluates them in a
 // const context before anything runs (see package settings), so a setting can
@@ -28,15 +126,20 @@ type Settings struct {
 	AllowDuplicateVariables bool
 	DefaultList             bool
 	DefaultScript           bool
+	DotenvLoad              bool
+	DotenvOverride          bool
+	DotenvRequired          bool
 	Export                  bool
 	Fallback                bool
 	Guards                  bool
 	IgnoreComments          bool
 	Lazy                    bool
+	Lists                   bool
 	NoCd                    bool
 	NoExitMessage           bool
 	PositionalArguments     bool
 	Quiet                   bool
+	Unstable                bool
 	WindowsPowerShell       bool
 	// Shell, WindowsShell and ScriptInterpreter are the command and its
 	// arguments, each an expression. Nil means the setting is not set.
@@ -46,6 +149,11 @@ type Settings struct {
 	// Tempdir and WorkingDirectory are nil when not set.
 	Tempdir          Expr
 	WorkingDirectory Expr
+	// DotenvCommand, DotenvFilename and DotenvPath are nil when not set.
+	// Each may be a list, where upstream allows `set lists`.
+	DotenvCommand  Expr
+	DotenvFilename Expr
+	DotenvPath     Expr
 	// Indentation is the validated indentation string of `set indentation`,
 	// and MinimumVersion the validated version of `set minimum-version`.
 	// Both are empty when the setting is not set.
@@ -222,11 +330,15 @@ func Variables(e Expr, names []string) []string {
 		for _, arg := range e.Args {
 			names = Variables(arg, names)
 		}
+	case List:
+		for _, element := range e.Elements {
+			names = Variables(element, names)
+		}
 	}
 	return names
 }
 
-// Expr is an expression node: Text, StringLit, Var or Concat.
+// Expr is an expression node: Text, StringLit, Var, Concat, Call or List.
 type Expr interface{ exprNode() }
 
 // Text is literal source text of a recipe line, outside any interpolation.
@@ -257,6 +369,16 @@ type Call struct {
 	Col  int
 }
 
+// List is a list literal, `[Elements...]`. Line and Col locate the opening
+// bracket. Lists belong to `set lists`, which is unstable: the tree can hold
+// one so that it can be refused. An Expr that holds a List cannot be compared
+// with ==, because the elements are a slice.
+type List struct {
+	Elements []Expr
+	Line     int
+	Col      int
+}
+
 // The marker methods have a statement so that coverage can count them;
 // an empty function body is reported as 0% by the Go cover tool.
 func (Text) exprNode()      { return }
@@ -264,3 +386,4 @@ func (StringLit) exprNode() { return }
 func (Var) exprNode()       { return }
 func (Concat) exprNode()    { return }
 func (Call) exprNode()      { return }
+func (List) exprNode()      { return }

@@ -18,8 +18,9 @@ import (
 type Scope map[string]string
 
 // Evaluate returns the string value of e, looking variables up in scope. A
-// variable with no entry in scope, or an expression of a type the evaluator
-// does not know, is a *diag.Error of KindRuntime. An undefined variable is
+// variable with no entry in scope, a list (which belongs to the unstable
+// `lists` setting), or an expression of a type the evaluator does not know,
+// is a *diag.Error of KindRuntime. An undefined variable is
 // located at its name, as the syntax tree records it, but without a file,
 // which the caller fills in. Evaluate is pure.
 func Evaluate(e ast.Expr, scope Scope) (string, error) {
@@ -32,6 +33,8 @@ func Evaluate(e ast.Expr, scope Scope) (string, error) {
 		return lookup(x, scope)
 	case ast.Concat:
 		return concat(x, scope)
+	case ast.List:
+		return "", fail("list values are not supported")
 	default:
 		return "", fail("cannot evaluate expression of type %T", e)
 	}

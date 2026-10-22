@@ -37,6 +37,32 @@ func TestAnalyzeSettingErrorsMatchUpstream(t *testing.T) {
 			"cannot call functions in const context"},
 		{"settings::non_const_variable", "foo := arch()\n\nset working-directory := foo\n", 3, 26, 3,
 			"cannot access non-const variable `foo` in const context"},
+		{"dotenv::command_conflicts_with_dotenv_path_setting#1",
+			"set dotenv-command := 'true'\nset dotenv-path := 'foo'\n\nfoo:\n", 2, 5, 11,
+			"`dotenv-command` set on line 1 is incompatible with `dotenv-path`"},
+		{"dotenv::command_conflicts_with_dotenv_required_setting#1",
+			"set dotenv-required\nset dotenv-command := 'true'\n\nfoo:\n", 2, 5, 14,
+			"`dotenv-required` set on line 1 is incompatible with `dotenv-command`"},
+		{"dotenv-load on, then dotenv-command", "set dotenv-load := true\nset dotenv-command := 'x'\n", 2, 5, 14,
+			"`dotenv-load` set on line 1 is incompatible with `dotenv-command`"},
+		{"dotenv-command, then dotenv-load", "set dotenv-command := 'x'\nset dotenv-load\n", 2, 5, 11,
+			"`dotenv-command` set on line 1 is incompatible with `dotenv-load`"},
+		{"dotenv-command, then dotenv-filename", "set dotenv-command := 'x'\nset dotenv-filename := 'y'\n", 2, 5, 15,
+			"`dotenv-command` set on line 1 is incompatible with `dotenv-filename`"},
+		{"dotenv-filename, then dotenv-command", "set dotenv-filename := 'x'\nset dotenv-command := 'y'\n", 2, 5, 14,
+			"`dotenv-filename` set on line 1 is incompatible with `dotenv-command`"},
+		{"dotenv-path, then dotenv-command", "set dotenv-path := 'x'\nset dotenv-command := 'y'\n", 2, 5, 14,
+			"`dotenv-path` set on line 1 is incompatible with `dotenv-command`"},
+		{"dotenv-required twice", "set dotenv-required\nset dotenv-required := false\n", 2, 5, 15,
+			"setting `dotenv-required` first set on line 1 is redefined on line 2"},
+		{"settings::undefined_variable_in_dotenv_command#1", "set dotenv-command := foo\n", 1, 23, 3,
+			"variable `foo` not defined"},
+		{"settings::undefined_variable_in_dotenv_filename#1", "set dotenv-filename := foo\n", 1, 24, 3,
+			"variable `foo` not defined"},
+		{"settings::undefined_variable_in_dotenv_path#1", "set dotenv-path := foo\n", 1, 20, 3,
+			"variable `foo` not defined"},
+		{"a function in a dotenv setting", "set dotenv-path := arch()\n", 1, 20, 4,
+			"cannot call functions in const context"},
 		{"guards::guard_sigil_may_not_be_used_with_infallible_sigil#1",
 			"set guards\n\n@foo:\n  -?exit 2\n", 4, 3, 8,
 			"the guard `?` and infallible `-` sigils may not be used together"},
@@ -61,6 +87,12 @@ func TestAnalyzeAcceptsSettingsThatDoNotConflict(t *testing.T) {
 		"set working-directory := 'foo'\nset no-cd := false\n",
 		"set quiet\nset export\nset lazy\nset shell := ['sh', '-c']\nset tempdir := '.'\n",
 		"dir := 'a'\nset working-directory := dir + '-b'\nset windows-shell := [dir]\nset script-interpreter := [dir, '-x']\n",
+		// The conflict is with dotenv-command turned on, not with the name.
+		"set dotenv-load := false\nset dotenv-required := false\nset dotenv-command := 'x'\n",
+		"set dotenv-command := 'x'\nset dotenv-load := false\nset dotenv-required := false\nset dotenv-override\n",
+		"set dotenv-load\nset dotenv-override\nset dotenv-required\nset dotenv-filename := 'x'\nset dotenv-path := 'y'\n",
+		// dotenv::command_composes_with_dotenv_override_setting#1
+		"set dotenv-override := true\nset dotenv-command := 'echo KEY=command'\n\n@foo:\n  echo $KEY\n",
 	} {
 		if err := analyzer.Analyze(mustParse(t, src)); err != nil {
 			t.Errorf("Analyze(%q) = %v", src, err)
@@ -147,4 +179,83 @@ func BenchmarkAnalyzeSettings(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// A row named by a case id is that case of the corpus; the others are the same
+// rule in another place. The message and position are the oracle's. A use of a list feature is an error unless the
+// file says `set lists`, and the first one in the file is the one reported.
+func TestAnalyzeListFeaturesNeedTheListsSetting(t *testing.T) {
+	for _, tc := range []struct {
+		name, src        string
+		line, col, width int
+		msg              string
+	}{
+		{"booleans::bool_requires_lists_setting#1", "x := bool('true')", 1, 6, 4,
+			"the `bool()` function requires `set lists`"},
+		{"functions::num_jobs_requires_lists#1", "foo:\n  @echo {{ num_jobs() }}\n", 2, 12, 8,
+			"the `num_jobs()` function requires `set lists`"},
+		{"functions::show_requires_lists_setting#1", "x := show(\"foo\")", 1, 6, 4,
+			"the `show()` function requires `set lists`"},
+		{"lists::join_list_requires_lists_setting#1", "x := join_list(\"foo\")", 1, 6, 9,
+			"the `join_list()` function requires `set lists`"},
+		{"lists::split_requires_lists_setting#1", "x := split(\"foo\", \",\")", 1, 6, 5,
+			"the `split()` function requires `set lists`"},
+		{"which_function::requires_lists_setting#1", "p := which('hello.exe')", 1, 6, 5,
+			"the `which()` function requires `set lists`"},
+		{"dotenv::filename_list_requires_lists_setting#1", "set dotenv-filename := ['foo', 'bar']\n\nfoo:\n", 1, 24, 1,
+			"list literals require `set lists`"},
+		{"list_literals::list_literals_requires_lists_setting#1", "set lists := false\n\nx := []\n\nfoo:\n  @echo hi\n", 3, 6, 1,
+			"list literals require `set lists`"},
+		{"a list in a shell setting", "set shell := ['bash', ['-c']]\nfoo:\n", 1, 23, 1,
+			"list literals require `set lists`"},
+		{"a list in a parameter default", "foo x=['a']:\n", 1, 7, 1,
+			"list literals require `set lists`"},
+		{"a list in a recipe line", "foo:\n  @echo {{ ['a'] }}\n", 2, 12, 1,
+			"list literals require `set lists`"},
+		{"a call after its arguments", "x := show(bool('t'))\n", 1, 11, 4,
+			"the `bool()` function requires `set lists`"},
+		{"a list before its elements", "x := ['a', ['b']]\n", 1, 6, 1,
+			"list literals require `set lists`"},
+		{"the first of two", "x := bool('t') + ['a']\n", 1, 6, 4,
+			"the `bool()` function requires `set lists`"},
+		{"a list in a setting that is not a string", "set tempdir := ['a']\n", 1, 16, 1,
+			"list literals require `set lists`"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := analyze(t, tc.src)
+			if got.Line != tc.line || got.Col != tc.col || got.Width != tc.width || got.Msg != tc.msg {
+				t.Errorf("Analyze(%q) = %d:%d width %d %q, want %d:%d width %d %q",
+					tc.src, got.Line, got.Col, got.Width, got.Msg, tc.line, tc.col, tc.width, tc.msg)
+			}
+		})
+	}
+}
+
+func TestAnalyzeAcceptsListFeaturesUnderTheListsSetting(t *testing.T) {
+	for _, src := range []string{
+		"set lists\nx := ['a', 'b']\nfoo y=['c']:\n  @echo {{ y }} {{ x }}\n",
+		"set lists := true\nx := show(bool('t'))\nset shell := ['bash', ['-c']]\n",
+		"set lists\nset dotenv-filename := ['foo', 'bar']\nfoo:\n",
+		"set unstable\nset lists\nx := which('a') + join_list('b') + split('c', 'd') + num_jobs()\n",
+	} {
+		if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+			t.Errorf("Analyze(%q) = %v", src, err)
+		}
+	}
+}
+
+// What upstream finds before it looks at list features is reported first, and
+// what it finds after is reported after.
+func TestAnalyzeListFeatureCheckOrder(t *testing.T) {
+	// Settings and assignments are resolved before the list features.
+	wantError(t, "x := ['a'] + y\n", 1, "variable `y` not defined")
+	wantError(t, "x := bool()\n", 1, "function `bool` called with 0 arguments but takes 1")
+	wantError(t, "set tempdir := ['a', 'b']\nx := ['a']\n", 1, "list value [\"a\", \"b\"] assigned to `tempdir` setting")
+	wantError(t, "set lists\nx := ['a', nope]\n", 2, "variable `nope` not defined")
+	// Recipes are checked after the list features.
+	wantError(t, "x := ['a']\nfoo:\n  echo {{y}}\n", 1, "list literals require `set lists`")
+	wantError(t, "foo:\nfoo:\n  echo {{ show('a') }}\n", 3, "the `show()` function requires `set lists`")
+	wantError(t, "x := 'a'\nfoo: (bar [])\nbar a:\n", 2, "list literals require `set lists`")
+	// Items are checked first.
+	wantError(t, "set lists\nset lists\nx := ['a']\n", 2, "setting `lists` first set on line 1 is redefined on line 2")
 }

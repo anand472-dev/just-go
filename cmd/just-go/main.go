@@ -66,6 +66,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		childOut, childErr = io.Discard, io.Discard
 	}
 	opts := just.Options{
+		Unstable:      cfg.isUnstable(env),
 		Justfile:      resolve(workDir, cfg.justfile),
 		SearchFrom:    workDir,
 		Env:           env,
@@ -96,6 +97,30 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		return fail(stderr, cfg.quiet, err)
 	}
 	return res.ExitCode
+}
+
+// isUnstable reports whether unstable features are enabled by --unstable or by
+// JUST_UNSTABLE in env. Pure.
+func (c config) isUnstable(env []string) bool {
+	return c.unstable || envEnabled(env, "JUST_UNSTABLE")
+}
+
+// envEnabled reports whether the variable name is set in env to a value that
+// switches a flag on, as upstream reads JUST_UNSTABLE: any value but the empty
+// string and the false-like n, no, f, false, off and 0, in any case. When env
+// sets it more than once the last wins. Pure.
+func envEnabled(env []string, name string) bool {
+	value := ""
+	for _, entry := range env {
+		if v, ok := strings.CutPrefix(entry, name+"="); ok {
+			value = v
+		}
+	}
+	switch strings.ToLower(value) {
+	case "", "0", "f", "false", "n", "no", "off":
+		return false
+	}
+	return true
 }
 
 // Exit statuses of run besides a recipe's own: exitFailure for an error in
@@ -201,6 +226,7 @@ type config struct {
 	justfile string   // -f/--justfile; empty means search
 	list     bool     // -l/--list
 	quiet    bool     // -q/--quiet
+	unstable bool     // --unstable
 	words    []string // positional words: recipe names, then their arguments
 	// shell is --shell; shellGiven records that it appeared, since upstream
 	// rejects it a second time.
@@ -209,7 +235,7 @@ type config struct {
 	shellArgs  []string // --shell-arg, in order; it may repeat; nil when absent
 }
 
-// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --shell PATH,
+// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable, --shell PATH,
 // --shell-arg ARG (which may repeat) and positional words. Flags come before
 // the words: as upstream's argument parser takes its trailing positional
 // arguments, the first word and everything after it are words, even when
@@ -314,7 +340,7 @@ func valueName(long string) string {
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg":
+	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable":
 		return name, true
 	}
 	return "", false
@@ -350,6 +376,8 @@ func setSwitch(cfg *config, long string) {
 		cfg.list = true
 	case "quiet":
 		cfg.quiet = true
+	case "unstable":
+		cfg.unstable = true
 	}
 }
 

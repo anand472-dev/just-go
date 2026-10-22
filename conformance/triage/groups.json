@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 260,
-    "fail": 1735,
+    "pass": 277,
+    "fail": 1718,
     "skip": 16,
     "total": 2011
   },
@@ -21,7 +21,7 @@
     "cli:alias-style": 3,
     "cli:allow-missing": 5,
     "cli:ceiling": 8,
-    "cli:check": 1,
+    "cli:check": 2,
     "cli:choose": 17,
     "cli:clean": 1,
     "cli:color": 12,
@@ -63,7 +63,6 @@
     "cli:time": 1,
     "cli:timestamp": 5,
     "cli:unsorted": 10,
-    "cli:unstable": 1,
     "cli:usage": 14,
     "cli:variables": 2,
     "cli:verbose": 3,
@@ -71,14 +70,14 @@
     "cli:yes": 2,
     "completions": 40,
     "conditional": 17,
-    "dotenv": 30,
+    "dotenv": 21,
     "grammar": 69,
     "module": 157,
     "setting:default-script": 7,
     "setting:fallback": 6,
     "shebang": 21,
     "unstable:cached-recipes": 85,
-    "unstable:lists": 269,
+    "unstable:lists": 261,
     "unstable:user-defined-functions": 32
   },
   "groups": {
@@ -474,7 +473,8 @@
       "global_fallback_justfile::working_directory_is_project_root#1": "passes --ceiling"
     },
     "cli:check": {
-      "format::check_without_fmt#1": "passes --check"
+      "format::check_without_fmt#1": "passes --check",
+      "init::fmt_compatibility#2": "passes --check"
     },
     "cli:choose": {
       "choose::chooser#1": "passes --choose",
@@ -1169,9 +1169,6 @@
       "misc::list_unsorted#1": "passes --unsorted",
       "modules::group_attribute_on_module_unsorted#1": "passes --unsorted"
     },
-    "cli:unstable": {
-      "init::fmt_compatibility#2": "passes --unstable"
-    },
     "cli:usage": {
       "alias::module_alias_resolves_in_usage#1": "passes --usage",
       "arg_attribute::help_may_be_expression#1": "passes --usage",
@@ -1275,13 +1272,9 @@
       "dotenv::can_set_dotenv_filename_from_justfile#1": "has a .env file",
       "dotenv::can_set_dotenv_path_from_justfile#1": "has a .env file",
       "dotenv::command_composes_with_dotenv_override_setting#1": "sets dotenv-override",
-      "dotenv::command_conflicts_with_dotenv_path_setting#1": "sets dotenv-command",
-      "dotenv::command_conflicts_with_dotenv_required_setting#1": "sets dotenv-required",
-      "dotenv::command_does_not_override_environment#1": "sets dotenv-command",
       "dotenv::command_failure#1": "sets dotenv-command",
       "dotenv::command_setting#1": "sets dotenv-command",
       "dotenv::command_with_override#1": "sets dotenv-command",
-      "dotenv::directory_is_ignored#1": "sets dotenv-load",
       "dotenv::dotenv_command_exit_code_is_propagated#1": "sets dotenv-command",
       "dotenv::dotenv_env_var_override#1": "has a .env file",
       "dotenv::dotenv_env_var_override_no_load#1": "has a .env file",
@@ -1294,13 +1287,8 @@
       "dotenv::dotenv_variable_in_function_in_recipe#1": "has a .env file",
       "dotenv::dotenv_variable_in_recipe#1": "has a .env file",
       "dotenv::error_message#1": "has a .env file",
-      "dotenv::set_false#1": "has a .env file",
       "dotenv::set_implicit#1": "has a .env file",
       "dotenv::set_true#1": "has a .env file",
-      "parser::dont_run_duplicate_recipes#1": "sets dotenv-load",
-      "settings::undefined_variable_in_dotenv_command#1": "sets dotenv-command",
-      "settings::undefined_variable_in_dotenv_filename#1": "sets dotenv-filename",
-      "settings::undefined_variable_in_dotenv_path#1": "sets dotenv-path",
       "shell_expansion::shell_expanded_strings_can_be_used_in_settings#1": "has a .env file"
     },
     "grammar": {
@@ -1749,12 +1737,9 @@
       "conditional::if_without_else_requires_lists_setting#1": "expects the unstable gate: requires `set lists`",
       "dotenv::command_list_last_wins#1": "uses `set lists`",
       "dotenv::command_list_runs_each_and_merges#1": "uses `set lists`",
-      "dotenv::empty_filename_list_is_unset#1": "uses `set lists`",
       "dotenv::filename_argument_list#1": "uses `set lists`",
       "dotenv::filename_list_loads_all_in_directory#1": "uses `set lists`",
-      "dotenv::filename_list_requires_lists_setting#1": "expects the unstable gate: require `set lists`",
       "dotenv::filename_list_stops_at_first_directory#1": "uses `set lists`",
-      "dotenv::list_does_not_override_environment#1": "uses `set lists`",
       "dotenv::list_override#1": "uses `set lists`",
       "dotenv::multiple_arguments_require_lists_setting#1": "expects the unstable gate: require `set lists`",
       "dotenv::path_argument_list#1": "uses `set lists`",
@@ -1765,7 +1750,6 @@
       "format::assignment_if_without_else#1": "uses `set lists`",
       "format::assignment_list_concat_values#1": "uses `set lists`",
       "functions::num_jobs_falls_back_to_empty_list#1": "uses `set lists`",
-      "functions::num_jobs_requires_lists#1": "expects the unstable gate: requires `set lists`",
       "functions::num_jobs_returns_jobs#1": "uses `set lists`",
       "functions::show_empty_list#1": "uses `set lists`",
       "functions::show_escapes_contents#1": "uses `set lists`",
@@ -1780,7 +1764,6 @@
       "list_literals::list_literals_are_lists#1": "uses `set lists`",
       "list_literals::list_literals_flatten_elements#1": "uses `set lists`",
       "list_literals::list_literals_may_have_trailing_comma#1": "uses `set lists`",
-      "list_literals::list_literals_requires_lists_setting#1": "expects the unstable gate: require `set lists`",
       "list_literals::list_literals_round_trip_through_dump#1": "uses `set lists`",
       "lists::absolute_path_of_empty_list_is_empty#1": "uses `set lists`",
       "lists::absolute_path_resolves_each_element_of_a_list#1": "uses `set lists`",
@@ -1820,7 +1803,6 @@
       "lists::env_with_empty_key_list_uses_default#1": "uses `set lists`",
       "lists::evaluate_prints_lists#1": "uses `set lists`",
       "lists::fstring_interpolations_space_join_lists#1": "uses `set lists`",
-      "lists::interpreter_settings_flatten_lists#1": "uses `set lists`",
       "lists::join_broadcasts_string_over_list#1": "uses `set lists`",
       "lists::join_broadcasts_string_over_list#2": "uses `set lists`",
       "lists::join_combines_equal_length_lists_pairwise#1": "uses `set lists`",
@@ -1838,11 +1820,9 @@
       "lists::list_concatenation_requires_lists_setting#1": "expects the unstable gate: requires `set lists`",
       "lists::list_in_env_attribute_name_points_at_attribute_name#1": "uses `set lists`",
       "lists::list_in_function_argument_points_at_function_name#1": "uses `set lists`",
-      "lists::list_in_setting_value_points_at_setting_name#1": "uses `set lists`",
       "lists::list_in_working_directory_attribute_points_at_attribute_name#1": "uses `set lists`",
       "lists::lists_bind_to_singular_parameters#1": "uses `set lists`",
       "lists::lists_forwarded_to_module_without_lists_setting_are_joined#1": "uses `set lists`",
-      "lists::lists_setting_is_unstable#1": "expects the unstable gate: the `lists` setting is currently unstable",
       "lists::non_empty_list_export_sets_variable#1": "uses `set lists`",
       "lists::omitted_star_variadic_dependency_argument_is_empty_list#1": "uses `set lists`",
       "lists::prepend_prepends_to_each_element_of_a_list#1": "uses `set lists`",

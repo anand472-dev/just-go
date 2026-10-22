@@ -8,7 +8,7 @@ import (
 // TestExprNodes checks that every expression type is an Expr. The marker
 // methods have empty bodies, so calling them is the only way to cover them.
 func TestExprNodes(t *testing.T) {
-	for _, e := range []Expr{Text{Value: "t"}, StringLit{Value: "a"}, Var{Name: "x"}, Concat{Left: Var{Name: "x"}, Right: StringLit{}}, Call{Name: "f", Args: []Expr{Var{Name: "x"}}}} {
+	for _, e := range []Expr{Text{Value: "t"}, StringLit{Value: "a"}, Var{Name: "x"}, Concat{Left: Var{Name: "x"}, Right: StringLit{}}, Call{Name: "f", Args: []Expr{Var{Name: "x"}}}, List{Elements: []Expr{Var{Name: "x"}}}} {
 		e.exprNode()
 	}
 }
@@ -59,6 +59,53 @@ func TestVariablesListsEachInOrder(t *testing.T) {
 	}
 	if got := Variables(StringLit{Value: "x"}, nil); got != nil {
 		t.Errorf("Variables of a string = %v", got)
+	}
+}
+
+func TestVariablesLooksInsideLists(t *testing.T) {
+	e := List{Elements: []Expr{Var{Name: "a"}, StringLit{Value: "s"}, List{Elements: []Expr{Var{Name: "b"}}}, Call{Name: "f", Args: []Expr{Var{Name: "c"}}}}}
+	if got, want := Variables(e, nil), []string{"a", "b", "c"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Variables = %v, want %v", got, want)
+	}
+	if got := Variables(List{}, nil); got != nil {
+		t.Errorf("Variables of an empty list = %v", got)
+	}
+}
+
+func TestUseKeepsUnstableFeaturesOnceAndInOrder(t *testing.T) {
+	var j Justfile
+	for _, f := range []UnstableFeature{UserDefinedFunctions, ListsSetting, UserDefinedFunctions, CachedRecipes, ListsSetting, CachedRecipes} {
+		j.Use(f)
+	}
+	if want := []UnstableFeature{CachedRecipes, ListsSetting, UserDefinedFunctions}; !reflect.DeepEqual(j.Unstable, want) {
+		t.Errorf("Unstable = %v, want %v", j.Unstable, want)
+	}
+}
+
+// The messages are upstream's (oracle/src/unstable_feature.rs and
+// list_feature.rs).
+func TestFeatureMessagesAreUpstreams(t *testing.T) {
+	for f, want := range map[UnstableFeature]string{
+		CachedRecipes:        "cached recipes are currently unstable",
+		ListsSetting:         "the `lists` setting is currently unstable",
+		UserDefinedFunctions: "user-defined functions are currently unstable",
+	} {
+		if got := f.String(); got != want {
+			t.Errorf("%d: %q, want %q", f, got, want)
+		}
+	}
+	for f, want := range map[ListFeature]string{
+		ListLiteral:      "list literals require `set lists`",
+		BoolFunction:     "the `bool()` function requires `set lists`",
+		JoinListFunction: "the `join_list()` function requires `set lists`",
+		NumJobsFunction:  "the `num_jobs()` function requires `set lists`",
+		ShowFunction:     "the `show()` function requires `set lists`",
+		SplitFunction:    "the `split()` function requires `set lists`",
+		WhichFunction:    "the `which()` function requires `set lists`",
+	} {
+		if got := f.String(); got != want {
+			t.Errorf("%d: %q, want %q", f, got, want)
+		}
 	}
 }
 

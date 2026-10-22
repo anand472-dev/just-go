@@ -24,8 +24,9 @@ type argRange struct{ lo, hi int }
 //
 // Six entries (bool, join_list, num_jobs, show, split, which) are gated by
 // upstream behind `set lists`, which upstream refuses without `set unstable`.
-// That gate belongs to Task 7 (settings group B, R15) and is not applied here,
-// so these six pass analysis until it lands.
+// The parser records each call of them (ast.Justfile.ListUses) and
+// checkListFeatures refuses them without the setting; the unstable gate is
+// the library's (just.Options.Unstable).
 var arities = map[string]argRange{
 	"absolute_path":               {1, 1},
 	"append":                      {2, 2},

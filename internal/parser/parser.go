@@ -5,7 +5,9 @@
 // The subset is: `set` statements (see settings.go), assignments
 // (also written `export` or `eager`), and recipes with parameters (also
 // written `$name`), defaults, dependencies (with arguments, and after `&&`)
-// and a body. Two settings change how a body is read, `ignore-comments` and
+// and a body. Expressions include list literals, which belong to the unstable
+// `lists` setting: the parser records where they and the list-only functions
+// are used (ast.ListUses), and the analyzer refuses them. Two settings change how a body is read, `ignore-comments` and
 // `guards`; since a setting may follow the recipes it changes, Parse reads the
 // file again once it knows them. A recipe body is every
 // following line that starts with indentation. Blank lines belong to the body
@@ -72,6 +74,9 @@ type parser struct {
 	// the file finds them (see Parse).
 	ignoreComments bool
 	guards         bool
+	// listUses are the uses of list features met so far, in the order
+	// upstream records them.
+	listUses []ast.ListUse
 }
 
 // kinds returns the set of the given token kinds. Pure.
@@ -213,7 +218,16 @@ func (p *parser) justfile() (*ast.Justfile, error) {
 			return nil, err
 		}
 	}
+	jf.ListUses = p.listUses
 	return jf, nil
+}
+
+// useList records a use of a list feature at the token that names it.
+func (p *parser) useList(feature ast.ListFeature, at lexer.Token) {
+	p.listUses = append(p.listUses, ast.ListUse{
+		Feature: feature,
+		At:      ast.Span{Line: at.Line, Col: at.Col, Width: tokenWidth(at)},
+	})
 }
 
 // item parses one top-level item into jf. Attributes, which start with `[`,
@@ -357,8 +371,45 @@ func (p *parser) value() (ast.Expr, error) {
 	case lexer.LParen:
 		p.next()
 		return p.group()
+	case lexer.LBracket:
+		p.next()
+		return p.list(t)
 	}
 	return nil, p.unexpected()
+}
+
+// listFunctions maps the builtin functions that exist only for lists to the
+// feature that needs `set lists`.
+var listFunctions = map[string]ast.ListFeature{
+	"bool":      ast.BoolFunction,
+	"join_list": ast.JoinListFunction,
+	"num_jobs":  ast.NumJobsFunction,
+	"show":      ast.ShowFunction,
+	"split":     ast.SplitFunction,
+	"which":     ast.WhichFunction,
+}
+
+// list parses the rest of a list literal, as upstream's parse_list does:
+// expressions separated by commas, with a comma allowed after the last, up to
+// the closing bracket. open is the opening bracket, already consumed. Upstream
+// records the literal before its elements.
+func (p *parser) list(open lexer.Token) (ast.Expr, error) {
+	p.useList(ast.ListLiteral, open)
+	l := ast.List{Line: open.Line, Col: open.Col}
+	for !p.is(lexer.RBracket) {
+		element, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+		l.Elements = append(l.Elements, element)
+		if !p.accept(lexer.Comma) {
+			break
+		}
+	}
+	if _, err := p.expect(lexer.RBracket); err != nil {
+		return nil, err
+	}
+	return l, nil
 }
 
 // call parses the arguments of a call of name, as upstream's parse_sequence
@@ -379,6 +430,10 @@ func (p *parser) call(name lexer.Token) (ast.Expr, error) {
 	}
 	if _, err := p.expect(lexer.RParen); err != nil {
 		return nil, err
+	}
+	// Upstream records a call after its arguments.
+	if feature, ok := listFunctions[name.Text]; ok {
+		p.useList(feature, name)
 	}
 	return c, nil
 }

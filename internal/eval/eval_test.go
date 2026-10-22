@@ -94,6 +94,13 @@ func TestEvaluateUnknownExpression(t *testing.T) {
 	requireRuntime(t, err, "cannot evaluate expression of type eval.foreign")
 }
 
+// A list belongs to `set lists`, which is unstable and not implemented; the
+// error says so rather than naming a Go type.
+func TestEvaluateRefusesLists(t *testing.T) {
+	_, err := Evaluate(ast.List{Elements: []ast.Expr{ast.StringLit{Value: "a"}}}, nil)
+	requireRuntime(t, err, "list values are not supported")
+}
+
 func TestEvaluatePreservesMultibyteText(t *testing.T) {
 	const s = "héllo ✓ 日本"
 	got, err := Evaluate(ast.StringLit{Value: s}, nil)

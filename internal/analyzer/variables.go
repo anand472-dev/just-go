@@ -73,16 +73,22 @@ func references(e ast.Expr, visit func(ast.Expr) *diag.Error) *diag.Error {
 		if err := visit(e); err != nil {
 			return err
 		}
-		for _, arg := range e.Args {
-			if err := references(arg, visit); err != nil {
-				return err
-			}
-		}
+		return referencesAll(e.Args, visit)
 	case ast.Concat:
-		if err := references(e.Left, visit); err != nil {
+		return referencesAll([]ast.Expr{e.Left, e.Right}, visit)
+	case ast.List:
+		return referencesAll(e.Elements, visit)
+	}
+	return nil
+}
+
+// referencesAll is references for each of es in turn, stopping at the first
+// error. It is pure.
+func referencesAll(es []ast.Expr, visit func(ast.Expr) *diag.Error) *diag.Error {
+	for _, e := range es {
+		if err := references(e, visit); err != nil {
 			return err
 		}
-		return references(e.Right, visit)
 	}
 	return nil
 }

@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Differential check of Task 6 settings behaviour: runs each case in
-cases.json against the oracle and against bin/just-go, and compares exit
-status, stdout and stderr (the temporary directory is masked as $D).
+"""Differential check of settings behaviour: runs each case in cases*.json
+(Task 6 in cases.json, Task 7 in cases-unstable.json) against the oracle and
+against bin/just-go, and compares exit status, stdout and stderr (the
+temporary directory is masked as $D). A case may set "env", added to the
+environment of both.
 
 Usage: ORACLE=oracle/bin/just MINE=bin/just-go python3 conformance/differential/run.py
 Both default to the paths above, relative to the repository root. Exit status
 is 1 when a case differs that is not marked "known" in cases.json (a known
-case records a divergence the Task 6 report lists; it is printed, not failed). This is a developer check, not part of make check:
+case records a divergence a task report lists; it is printed, not failed). This is a developer check, not part of make check:
 it needs the oracle binary, which is built by scripts/build-oracle.sh.
 """
+import glob
 import json
 import os
 import subprocess
@@ -18,7 +21,7 @@ import tempfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ORACLE = os.path.abspath(os.environ.get("ORACLE", os.path.join(ROOT, "oracle/bin/just")))
 MINE = os.path.abspath(os.environ.get("MINE", os.path.join(ROOT, "bin/just-go")))
-CASES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cases.json")
+CASES = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cases*.json")))
 
 
 def run(binary, case):
@@ -33,14 +36,16 @@ def run(binary, case):
         r = subprocess.run(
             [binary, "--shell", "bash"] + case.get("args", []),
             cwd=wd, capture_output=True, text=True,
-            env={"PATH": "/usr/bin:/bin", "HOME": d},
+            env={"PATH": "/usr/bin:/bin", "HOME": d, **case.get("env", {})},
         )
         return (r.returncode, r.stdout.replace(d, "$D"), r.stderr.replace(d, "$D"))
 
 
 def main():
-    with open(CASES) as f:
-        cases = json.load(f)
+    cases = []
+    for path in CASES:
+        with open(path) as f:
+            cases += json.load(f)
     bad = known = 0
     for c in cases:
         a, b = run(ORACLE, c), run(MINE, c)

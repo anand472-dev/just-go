@@ -1,0 +1,1076 @@
+[
+ {
+  "files": {
+   "justfile": "set dotenv-load := true\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-load true"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load := false\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-load false"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-load bare"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load := 'x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-load bad value"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load := maybe\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-load bad ident"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-override\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-override"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-override := false\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-override false"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-required := false\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-required false"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-filename := '.env.x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-filename string"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path := 'sub/.env'\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-path string"
+ },
+ {
+  "files": {
+   "justfile": "d := '.env'\nset dotenv-filename := d + '.x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-filename concat"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-filename := nope\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-filename undefined"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path := nope\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-path undefined"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := nope\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-command undefined"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := arch()\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-command call"
+ },
+ {
+  "files": {
+   "justfile": "d := arch()\nset dotenv-path := d\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-path non const"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path := nope()\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-path undefined function"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path := uppercase()\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv-path wrong arity"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path :=\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv missing value"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv missing assign"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load\nset dotenv-load := false\nfoo:\n  @echo hi\n"
+  },
+  "name": "dotenv twice"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := 'true'\nset dotenv-filename := 'x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-command := 'true' | dotenv-filename := 'x'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := 'true'\nset dotenv-path := 'x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-command := 'true' | dotenv-path := 'x'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := 'true'\nset dotenv-load\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-command := 'true' | dotenv-load"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := 'true'\nset dotenv-required\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-command := 'true' | dotenv-required"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-filename := 'x'\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-filename := 'x' | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path := 'x'\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-path := 'x' | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-load | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-required\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-required | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load := true\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-load := true | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-required := true\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "name": "conflict dotenv-required := true | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-load := false\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "known": "dotenv-command is run by the oracle; loading is Task 23",
+  "name": "conflict dotenv-load := false | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-required := false\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "known": "dotenv-command is run by the oracle; loading is Task 23",
+  "name": "conflict dotenv-required := false | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-override\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
+  },
+  "known": "dotenv-command is run by the oracle; loading is Task 23",
+  "name": "conflict dotenv-override | dotenv-command := 'true'"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := 'true'\nset dotenv-override := true\nfoo:\n  @echo hi\n"
+  },
+  "known": "dotenv-command is run by the oracle; loading is Task 23",
+  "name": "conflict dotenv-command := 'true' | dotenv-override := true"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := 'true'\nset dotenv-load := false\nfoo:\n  @echo hi\n"
+  },
+  "known": "dotenv-command is run by the oracle; loading is Task 23",
+  "name": "conflict dotenv-command := 'true' | dotenv-load := false"
+ },
+ {
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists refused"
+ },
+ {
+  "files": {
+   "justfile": "set lists := false\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists false refused"
+ },
+ {
+  "files": {
+   "justfile": "set unstable\nset lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists with unstable"
+ },
+ {
+  "files": {
+   "justfile": "set lists\nset unstable\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists then unstable"
+ },
+ {
+  "files": {
+   "justfile": "set unstable := false\nset lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists with unstable false"
+ },
+ {
+  "files": {
+   "justfile": "set unstable := true\nfoo:\n  @echo hi\n"
+  },
+  "name": "unstable true alone"
+ },
+ {
+  "files": {
+   "justfile": "set unstable := 'x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "unstable bad value"
+ },
+ {
+  "args": [
+   "--unstable"
+  ],
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists flag"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 1"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "0"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 0"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": ""
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env ''"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "false"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'false'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "FALSE"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'FALSE'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "no"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'no'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "off"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'off'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "n"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'n'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "f"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'f'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "yes"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'yes'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "true"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'true'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "anything"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env 'anything'"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "2"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists env '2'"
+ },
+ {
+  "args": [
+   "--list"
+  ],
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists list refused"
+ },
+ {
+  "args": [
+   "--list",
+   "--unstable"
+  ],
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists list flag"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists named recipe"
+ },
+ {
+  "files": {
+   "justfile": "set lists\nset lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists twice"
+ },
+ {
+  "files": {
+   "justfile": "set lists := 'x'\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists bad value"
+ },
+ {
+  "files": {
+   "justfile": "set lists\nfoo: nope\n"
+  },
+  "name": "lists parse error wins"
+ },
+ {
+  "files": {
+   "justfile": "set lists\nx := y\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists analysis error wins"
+ },
+ {
+  "args": [
+   "bar"
+  ],
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists missing recipe"
+ },
+ {
+  "args": [
+   "bar"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo hi\n"
+  },
+  "name": "lists missing recipe unstable"
+ },
+ {
+  "files": {
+   "justfile": "x := bool('t')\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate bool"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := bool('t')\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate bool lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := show('a')\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate show"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := show('a')\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate show lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := join_list('a')\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate join_list"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := join_list('a')\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate join_list lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := split('a', ',')\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate split"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := split('a', ',')\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate split lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := num_jobs()\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate num_jobs"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := num_jobs()\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate num_jobs lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := which('a')\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate which"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := which('a')\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate which lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := show(bool('t'))\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate nested"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := show(bool('t'))\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate nested lists on"
+ },
+ {
+  "files": {
+   "justfile": "foo:\n  @echo {{ which('a') }}\n"
+  },
+  "name": "gate in body"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo {{ which('a') }}\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate in body lists on"
+ },
+ {
+  "files": {
+   "justfile": "foo x=split('a','b'):\n  @echo hi\n"
+  },
+  "name": "gate in default"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo x=split('a','b'):\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate in default lists on"
+ },
+ {
+  "files": {
+   "justfile": "foo: (bar bool('t'))\nbar a:\n"
+  },
+  "name": "gate in dependency arg"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo: (bar bool('t'))\nbar a:\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate in dependency arg lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := []\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate empty literal"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := []\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate empty literal lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a', ['b']]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate nested literal"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a', ['b']]\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate nested literal lists on"
+ },
+ {
+  "files": {
+   "justfile": "foo x=['a']:\n  @echo hi\n"
+  },
+  "name": "gate literal in default"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo x=['a']:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in default lists on"
+ },
+ {
+  "files": {
+   "justfile": "foo:\n  @echo {{ ['a'] }}\n"
+  },
+  "name": "gate literal in body"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo {{ ['a'] }}\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in body lists on"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-filename := ['a', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in dotenv-filename"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset dotenv-filename := ['a', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in dotenv-filename lists on"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-path := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in dotenv-path"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset dotenv-path := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in dotenv-path lists on"
+ },
+ {
+  "files": {
+   "justfile": "set dotenv-command := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in dotenv-command"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset dotenv-command := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in dotenv-command lists on"
+ },
+ {
+  "files": {
+   "justfile": "set shell := ['bash', ['-c']]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in shell"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset shell := ['bash', ['-c']]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in shell lists on"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in tempdir one"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset tempdir := ['a']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in tempdir one lists on"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := ['a', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in tempdir two"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset tempdir := ['a', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in tempdir two lists on"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := []\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in tempdir empty"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset tempdir := []\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in tempdir empty lists on"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := ['a', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in working-directory two"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset working-directory := ['a', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in working-directory two lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a', 'b']\nset tempdir := x\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal via variable"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a', 'b']\nset tempdir := x\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal via variable lists on"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := ['a\"\\\\\n\t', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal escapes"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset tempdir := ['a\"\\\\\n\t', 'b']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal escapes lists on"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := ['é✓', 'b\u0001']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal unicode"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nset tempdir := ['é✓', 'b\u0001']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal unicode lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a', nope]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal undefined variable"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a', nope]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal undefined variable lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := [uppercase()]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal wrong arity"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := [uppercase()]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal wrong arity lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a']\nfoo:\n  echo {{y}}\n"
+  },
+  "name": "gate literal then recipe error"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a']\nfoo:\n  echo {{y}}\n"
+  },
+  "name": "gate literal then recipe error lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a']\nfoo:\nfoo:\n"
+  },
+  "name": "gate literal then duplicate recipe"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a']\nfoo:\nfoo:\n"
+  },
+  "name": "gate literal then duplicate recipe lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := bool('t') + ['a']\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate function then literal"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := bool('t') + ['a']\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate function then literal lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := bool()\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate bool wrong arity"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := bool()\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate bool wrong arity lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := [\n"
+  },
+  "name": "gate literal missing bracket"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := [\n"
+  },
+  "name": "gate literal missing bracket lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a' 'b']\n"
+  },
+  "name": "gate literal missing comma"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a' 'b']\n"
+  },
+  "name": "gate literal missing comma lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := [,]\n"
+  },
+  "name": "gate literal leading comma"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := [,]\n"
+  },
+  "name": "gate literal leading comma lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a',,]\n"
+  },
+  "name": "gate literal double comma"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a',,]\n"
+  },
+  "name": "gate literal double comma lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := ['a', ]\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal trailing comma"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := ['a', ]\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal trailing comma lists on"
+ },
+ {
+  "files": {
+   "justfile": "x := (['a'])\nfoo:\n  @echo hi\n"
+  },
+  "name": "gate literal in group"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nx := (['a'])\nfoo:\n  @echo hi\n"
+  },
+  "known": "lists are unstable and not implemented (R15)",
+  "name": "gate literal in group lists on"
+ },
+ {
+  "files": {
+   "justfile": "foo:\n  echo {{ [ }}\n"
+  },
+  "name": "gate literal in body unclosed"
+ },
+ {
+  "env": {
+   "JUST_UNSTABLE": "1"
+  },
+  "files": {
+   "justfile": "set lists\nfoo:\n  echo {{ [ }}\n"
+  },
+  "name": "gate literal in body unclosed lists on"
+ }
+]

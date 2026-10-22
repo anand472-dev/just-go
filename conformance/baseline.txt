@@ -17,8 +17,16 @@ delimiters::interpolation_continuation#1
 delimiters::mismatched_delimiter#1
 delimiters::paren_continuation#1
 delimiters::unexpected_delimiter#1
+dotenv::command_conflicts_with_dotenv_path_setting#1
+dotenv::command_conflicts_with_dotenv_required_setting#1
+dotenv::command_does_not_override_environment#1
+dotenv::directory_is_ignored#1
 dotenv::dotenv_env_var_default_no_override#1
+dotenv::empty_filename_list_is_unset#1
+dotenv::filename_list_requires_lists_setting#1
+dotenv::list_does_not_override_environment#1
 dotenv::no_warning#1
+dotenv::set_false#1
 equals::alias_recipe#1
 equals::export_recipe#1
 error_messages::argument_count_mismatch#1
@@ -40,6 +48,7 @@ function_definitions::undefined_in_dependency_argument#1
 function_definitions::undefined_in_interpolation#1
 function_definitions::undefined_in_recipe_parameter_default#1
 function_definitions::undefined_in_setting#1
+functions::num_jobs_requires_lists#1
 guards::exit_codes_above_one_are_reserved#1
 guards::guard_lines_are_ignored_without_setting#1
 guards::guard_lines_halt_execution#1
@@ -71,6 +80,10 @@ line_prefixes::infallible_after_quiet#1
 line_prefixes::quiet_after_infallible#1
 list::doc_above_wide_signature#1
 list::empty_doc_comments_are_ignored#1
+list_literals::list_literals_requires_lists_setting#1
+lists::interpreter_settings_flatten_lists#1
+lists::list_in_setting_value_points_at_setting_name#1
+lists::lists_setting_is_unstable#1
 markdown::no_code_blocks#1
 minimum_version::minimum_version_invalid#1
 minimum_version::minimum_version_may_not_be_expression#1
@@ -172,6 +185,7 @@ os_attributes::none#1
 parameters::parameter_default_values_may_not_use_later_parameters#1
 parameters::parameter_default_values_may_use_earlier_parameters#1
 parser::backslash_eof#1
+parser::dont_run_duplicate_recipes#1
 positional_arguments::default_arguments#1
 positional_arguments::shell#1
 quiet::command_echoing#1
@@ -199,6 +213,9 @@ search::test_justfile_search#1
 settings::expression#1
 settings::function_call#1
 settings::no_cd_setting_conflicts_with_working_directory_setting#1
+settings::undefined_variable_in_dotenv_command#1
+settings::undefined_variable_in_dotenv_filename#1
+settings::undefined_variable_in_dotenv_path#1
 settings::undefined_variable_in_script_interpreter_argument#1
 settings::undefined_variable_in_script_interpreter_command#1
 settings::undefined_variable_in_shell_argument#1

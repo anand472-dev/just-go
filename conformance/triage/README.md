@@ -41,7 +41,7 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `completions` | Passes `--completions` or sets `JUST_COMPLETE`. |
 | `cli:<flag>` | Passes a flag the command does not implement, sets the `JUST_*` variable of one, or uses a command-line form the command does not implement: `cli:set` for `NAME=VALUE`, `cli:search-directory` for `dir/recipe`, `cli:justfile` for `--justfile -`, and `cli:list` for `--list <module>`. |
 | `module` | Uses `mod` or `import`, or names a `module::recipe` path. |
-| `dotenv` | Has a `.env` file or a `dotenv-*` setting. |
+| `dotenv` | Has a `.env` file or a `dotenv-*` setting. The settings are parsed and validated; the cases that remain need a file loaded or a command run (Phase 3). |
 | `setting:<name>` | Sets a setting that has no effect yet: `default-script` (needs script recipes, Task 11) and `fallback` (needs the search of parent justfiles, Phase 3). |
 | `attribute` | Uses an attribute (`[private]`, `[group]`, ...). |
 | `shebang` | Has a shebang recipe. |
@@ -54,20 +54,20 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 
 ## Current counts
 
-From the run recorded in `groups.json`: 260 pass, 1735 fail, 16 skip, of
+From the run recorded in `groups.json`: 277 pass, 1718 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
 |---|---|
 | `cli:*` | 657 |
-| `unstable:*` | 386 |
+| `unstable:*` | 378 |
 | `attribute` | 227 |
 | `module` | 157 |
 | `grammar` | 69 |
 | `builtin:*` | 61 |
 | `backtick` | 57 |
 | `completions` | 40 |
-| `dotenv` | 30 |
+| `dotenv` | 21 |
 | `setting:*` | 13 |
 | `conditional` | 17 |
 | `shebang` | 21 |

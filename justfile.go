@@ -55,6 +55,11 @@ type Options struct {
 	// shell gets no arguments before the command.
 	Shell     string
 	ShellArgs []string
+	// Unstable enables unstable features, as upstream's --unstable flag and
+	// JUST_UNSTABLE variable do. A justfile can enable them itself with
+	// `set unstable`. Load and Run refuse a justfile that uses one of them
+	// when neither does.
+	Unstable bool
 }
 
 // Call is one recipe to run with the positional arguments for its own
@@ -107,7 +112,11 @@ func Load(opts Options) (*Justfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Justfile{tree: tree, dir: filepath.Dir(path)}, nil
+	j := &Justfile{tree: tree, dir: filepath.Dir(path)}
+	if err := j.checkUnstable(opts.Unstable); err != nil {
+		return nil, err
+	}
+	return j, nil
 }
 
 // locate returns the path of the justfile opts names, searching for it when
@@ -124,7 +133,9 @@ func locate(fsys sys.FS, opts Options) (string, error) {
 
 // Parse parses and analyzes src as a justfile; name is used as the file name
 // in errors, and an error's Source quotes its line of src. A justfile parsed
-// from memory has no directory, so Run needs Options.WorkDir for it. Pure.
+// from memory has no directory, so Run needs Options.WorkDir for it. Parse
+// accepts a justfile that uses unstable features; Run refuses it unless they
+// are enabled. Pure.
 func Parse(name string, src []byte) (*Justfile, error) {
 	tree, err := parser.Parse(name, src)
 	if err != nil {
@@ -167,12 +178,17 @@ func (j *Justfile) Fallback() bool {
 }
 
 // Run runs opts.Recipes, or the first recipe when none are named, with their
-// dependencies. The children see exactly opts.Env and run in opts.WorkDir,
+// dependencies. A justfile that uses an unstable feature is refused, before
+// anything runs, unless opts.Unstable or `set unstable` enables them. The
+// children see exactly opts.Env and run in opts.WorkDir,
 // or in the justfile's directory when WorkDir is empty. A justfile from
 // Parse has no directory, so an empty WorkDir is a usage *diag.Error there.
 // Cancelling ctx kills the running child and Run returns ctx.Err(). Impure:
 // it runs processes through opts.Exec and writes to opts' streams.
 func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
+	if err := j.checkUnstable(opts.Unstable); err != nil {
+		return Result{}, err
+	}
 	dir := opts.WorkDir
 	if dir == "" {
 		dir = j.dir
@@ -197,6 +213,19 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		ShellArgs:     opts.ShellArgs,
 	})
 	return Result{ExitCode: res.ExitCode}, err
+}
+
+// checkUnstable returns upstream's error for the first unstable feature the
+// justfile uses, unless enabled or the justfile says `set unstable`. Pure.
+func (j *Justfile) checkUnstable(enabled bool) error {
+	if enabled || j.tree.Settings.Unstable || len(j.tree.Unstable) == 0 {
+		return nil
+	}
+	return &diag.Error{
+		Kind: diag.KindRuntime,
+		Msg: j.tree.Unstable[0].String() + ", invoke `just` with `--unstable`, set the `JUST_UNSTABLE` " +
+			"environment variable, or add `set unstable` to your `justfile` to enable unstable features",
+	}
 }
 
 // usage returns a usage diagnostic about the options themselves, which have

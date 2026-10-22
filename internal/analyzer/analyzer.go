@@ -2,7 +2,7 @@
 // reports before anything runs: settings set twice or together that cannot be,
 // settings that cannot be evaluated, misordered parameters, duplicate
 // parameter, recipe and variable
-// names, recipe lines with extra leading whitespace, uses of undefined
+// names, uses of the features of `set lists` in a file that does not set it, recipe lines with extra leading whitespace, uses of undefined
 // variables, calls of undefined functions or with the wrong number of
 // arguments, circular variable definitions, and dependencies that name no
 // recipe, that form a cycle, or that are given too few or too many arguments.
@@ -33,6 +33,7 @@ import (
 // order, each after the assignments it uses (undefined and circular
 // variables, undefined functions and argument counts, each call before its
 // arguments); then the expression settings, evaluated in a const context;
+// then the first use of a feature of `set lists`, unless the file sets it;
 // then, recipe by recipe in source order, a duplicate name (unless
 // allow-duplicate-recipes is set), guard and infallible sigils together, and
 // lines with extra leading whitespace; then the recipes, resolved in name
@@ -52,6 +53,9 @@ func Analyze(jf *ast.Justfile) error {
 		return err
 	}
 	if err := resolveSettings(jf); err != nil {
+		return err
+	}
+	if err := checkListFeatures(jf); err != nil {
 		return err
 	}
 	if err := checkRecipes(jf); err != nil {

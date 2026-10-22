@@ -20,21 +20,29 @@ var boolSettings = map[string]func(*ast.Settings) *bool{
 	"allow-duplicate-variables": func(s *ast.Settings) *bool { return &s.AllowDuplicateVariables },
 	"default-list":              func(s *ast.Settings) *bool { return &s.DefaultList },
 	"default-script":            func(s *ast.Settings) *bool { return &s.DefaultScript },
+	"dotenv-load":               func(s *ast.Settings) *bool { return &s.DotenvLoad },
+	"dotenv-override":           func(s *ast.Settings) *bool { return &s.DotenvOverride },
+	"dotenv-required":           func(s *ast.Settings) *bool { return &s.DotenvRequired },
 	"export":                    func(s *ast.Settings) *bool { return &s.Export },
 	"fallback":                  func(s *ast.Settings) *bool { return &s.Fallback },
 	"guards":                    func(s *ast.Settings) *bool { return &s.Guards },
 	"ignore-comments":           func(s *ast.Settings) *bool { return &s.IgnoreComments },
 	"lazy":                      func(s *ast.Settings) *bool { return &s.Lazy },
+	"lists":                     func(s *ast.Settings) *bool { return &s.Lists },
 	"no-cd":                     func(s *ast.Settings) *bool { return &s.NoCd },
 	"no-exit-message":           func(s *ast.Settings) *bool { return &s.NoExitMessage },
 	"positional-arguments":      func(s *ast.Settings) *bool { return &s.PositionalArguments },
 	"quiet":                     func(s *ast.Settings) *bool { return &s.Quiet },
+	"unstable":                  func(s *ast.Settings) *bool { return &s.Unstable },
 	"windows-powershell":        func(s *ast.Settings) *bool { return &s.WindowsPowerShell },
 }
 
 // valueSettings maps the name of each setting that takes a value after `:=`
 // to the function that parses that value. name is the setting's name token.
 var valueSettings = map[string]func(*parser, *ast.Settings, lexer.Token) error{
+	"dotenv-command":     (*parser).dotenvCommand,
+	"dotenv-filename":    (*parser).dotenvFilename,
+	"dotenv-path":        (*parser).dotenvPath,
 	"indentation":        (*parser).indentation,
 	"minimum-version":    (*parser).minimumVersion,
 	"script-interpreter": (*parser).scriptInterpreter,
@@ -44,12 +52,22 @@ var valueSettings = map[string]func(*parser, *ast.Settings, lexer.Token) error{
 	"working-directory":  (*parser).workingDirectory,
 }
 
+// unstableSettings maps the name of each setting that is itself an unstable
+// feature to that feature. Upstream notes the use before it reads the value,
+// so `set lists := false` is a use too.
+var unstableSettings = map[string]ast.UnstableFeature{
+	"lists": ast.ListsSetting,
+}
+
 // setting parses a `set` statement, through its line break, and records it in
 // jf.
 func (p *parser) setting(jf *ast.Justfile) error {
 	p.next() // set
 	name := p.next()
 	site := ast.SettingSite{Name: name.Text, Active: true, Line: name.Line, Col: name.Col}
+	if feature, ok := unstableSettings[name.Text]; ok {
+		jf.Use(feature)
+	}
 	if field, ok := boolSettings[name.Text]; ok {
 		value, err := p.setBool()
 		if err != nil {
@@ -101,6 +119,24 @@ func (p *parser) windowsShell(s *ast.Settings, _ lexer.Token) (err error) {
 // scriptInterpreter parses the value of `set script-interpreter`.
 func (p *parser) scriptInterpreter(s *ast.Settings, _ lexer.Token) (err error) {
 	s.ScriptInterpreter, err = p.interpreter()
+	return err
+}
+
+// dotenvCommand parses the value of `set dotenv-command`.
+func (p *parser) dotenvCommand(s *ast.Settings, _ lexer.Token) (err error) {
+	s.DotenvCommand, err = p.expr()
+	return err
+}
+
+// dotenvFilename parses the value of `set dotenv-filename`.
+func (p *parser) dotenvFilename(s *ast.Settings, _ lexer.Token) (err error) {
+	s.DotenvFilename, err = p.expr()
+	return err
+}
+
+// dotenvPath parses the value of `set dotenv-path`.
+func (p *parser) dotenvPath(s *ast.Settings, _ lexer.Token) (err error) {
+	s.DotenvPath, err = p.expr()
 	return err
 }
 

@@ -297,6 +297,7 @@ func TestParseArgs(t *testing.T) {
 		{"shell arg", []string{"--shell-arg", "-c"}, config{shellArgs: []string{"-c"}}},
 		{"shell args repeat in order", []string{"--shell-arg", "-e", "--shell-arg=-c", "a"}, config{shellArgs: []string{"-e", "-c"}, words: []string{"a"}}},
 		{"shell with args", []string{"--shell-arg", "-c", "--shell", "zsh"}, config{shell: "zsh", shellGiven: true, shellArgs: []string{"-c"}}},
+		{"unstable", []string{"--unstable", "a"}, config{unstable: true, words: []string{"a"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := parseArgs(tc.args)
@@ -328,6 +329,61 @@ func TestParseArgsErrors(t *testing.T) {
 		if !errors.As(err, &de) || de.Kind != diag.KindUsage || de.Msg != tc.want {
 			t.Errorf("parseArgs(%q) error = %v, want usage error %q", tc.args, err, tc.want)
 		}
+	}
+}
+
+// listsJustfile needs unstable features.
+const listsJustfile = "set lists\nfoo:\n  @echo hi\n"
+
+// TestRunRefusesUnstableFeaturesUnlessEnabled is upstream's gate: --unstable,
+// JUST_UNSTABLE (unless it is empty or false-like) and `set unstable` each
+// enable them. The environment values were checked against the oracle.
+func TestRunRefusesUnstableFeaturesUnlessEnabled(t *testing.T) {
+	const refused = "error: the `lists` setting is currently unstable, invoke `just` with `--unstable`, " +
+		"set the `JUST_UNSTABLE` environment variable, or add `set unstable` to your `justfile` to enable unstable features\n"
+	for _, tc := range []struct {
+		name string
+		src  string
+		args []string
+		env  []string
+		ok   bool
+	}{
+		{"nothing", listsJustfile, nil, nil, false},
+		{"the flag", listsJustfile, []string{"--unstable"}, nil, true},
+		{"the flag with a recipe", listsJustfile, []string{"--unstable", "foo"}, nil, true},
+		{"the setting", "set unstable\n" + listsJustfile, nil, nil, true},
+		{"the setting off", "set unstable := false\n" + listsJustfile, nil, nil, false},
+		{"the environment", listsJustfile, nil, []string{"JUST_UNSTABLE=1"}, true},
+		{"true", listsJustfile, nil, []string{"JUST_UNSTABLE=true"}, true},
+		{"yes", listsJustfile, nil, []string{"JUST_UNSTABLE=yes"}, true},
+		{"anything", listsJustfile, nil, []string{"JUST_UNSTABLE=anything"}, true},
+		{"the last of two", listsJustfile, nil, []string{"JUST_UNSTABLE=0", "JUST_UNSTABLE=1"}, true},
+		{"the last of two, off", listsJustfile, nil, []string{"JUST_UNSTABLE=1", "JUST_UNSTABLE=off"}, false},
+		{"empty", listsJustfile, nil, []string{"JUST_UNSTABLE="}, false},
+		{"0", listsJustfile, nil, []string{"JUST_UNSTABLE=0"}, false},
+		{"false", listsJustfile, nil, []string{"JUST_UNSTABLE=false"}, false},
+		{"FALSE", listsJustfile, nil, []string{"JUST_UNSTABLE=FALSE"}, false},
+		{"no", listsJustfile, nil, []string{"JUST_UNSTABLE=no"}, false},
+		{"off", listsJustfile, nil, []string{"JUST_UNSTABLE=off"}, false},
+		{"n", listsJustfile, nil, []string{"JUST_UNSTABLE=n"}, false},
+		{"f", listsJustfile, nil, []string{"JUST_UNSTABLE=f"}, false},
+		{"another variable", listsJustfile, nil, []string{"JUST_UNSTABLE_X=1", "XJUST_UNSTABLE=1"}, false},
+		{"the flag beats a false environment", listsJustfile, []string{"--unstable"}, []string{"JUST_UNSTABLE=0"}, true},
+		{"listing is refused too", listsJustfile, []string{"--list"}, nil, false},
+		{"listing with the flag", listsJustfile, []string{"--list", "--unstable"}, nil, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			proc := &sysfake.FakeProcess{}
+			code := run(tc.args, tc.env, "/w", strings.NewReader(""), &stdout, &stderr,
+				sysfake.FakeFS(map[string]string{"/w/justfile": tc.src}), proc)
+			if tc.ok && (code != 0 || stderr.Len() != 0) {
+				t.Errorf("run = %d, %q; want success", code, stderr.String())
+			}
+			if !tc.ok && (code != 1 || stderr.String() != refused || len(proc.Specs) != 0) {
+				t.Errorf("run = %d, %q; want the unstable error", code, stderr.String())
+			}
+		})
 	}
 }
 

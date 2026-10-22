@@ -16,7 +16,8 @@ The groups, in the order the rules are tried (the first that matches wins):
   cli:<flag>         passes a command-line flag (or JUST_* variable, or a
                      NAME=VALUE override) the command does not implement
   module             `mod` or `import`
-  dotenv             .env loading and the dotenv settings
+  dotenv             .env loading and the dotenv settings (which are parsed
+                     and validated, but nothing loads a file yet)
   setting:<name>     a `set <name>` the parser does not implement
   attribute          a recipe, module, or alias attribute
   shebang            a shebang recipe
@@ -45,7 +46,7 @@ GROUPS = os.path.join(ROOT, "conformance", "triage", "groups.json")
 SUBTEST = "TestConformance/"
 
 # Command-line flags the command implements (cmd/just-go longFlagName).
-SUPPORTED_FLAGS = {"justfile", "list", "quiet", "shell", "shell-arg"}
+SUPPORTED_FLAGS = {"justfile", "list", "quiet", "shell", "shell-arg", "unstable"}
 VALUE_FLAGS = {"justfile", "shell", "shell-arg"}
 # Upstream's one-letter flags (src/arguments.rs) by their long name.
 SHORT_FLAGS = {
@@ -66,10 +67,10 @@ FLAG_ALIASES = {"eval": "evaluate", "format": "fmt",
 # group.
 SUPPORTED_SETTINGS = {
     "allow-duplicate-recipes", "allow-duplicate-variables", "default-list",
-    "export", "guards", "ignore-comments", "indentation", "lazy",
+    "export", "guards", "ignore-comments", "indentation", "lazy", "lists",
     "minimum-version", "no-cd", "no-exit-message", "positional-arguments",
-    "quiet", "script-interpreter", "shell", "tempdir", "windows-powershell",
-    "windows-shell", "working-directory",
+    "quiet", "script-interpreter", "shell", "tempdir", "unstable",
+    "windows-powershell", "windows-shell", "working-directory",
 }
 DOTENV_SETTINGS = {"dotenv-command", "dotenv-filename", "dotenv-load",
                    "dotenv-override", "dotenv-path", "dotenv-required"}
