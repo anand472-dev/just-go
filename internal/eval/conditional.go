@@ -1,10 +1,9 @@
 package eval
 
 import (
-	"regexp"
-
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/rustre"
 )
 
 // errLists is the error of what needs `set lists`, which is unstable and not
@@ -98,9 +97,9 @@ func Compare(cmp ast.Comparison, left, right string) (bool, *diag.Error) {
 
 // match is Compare for the regular-expression operators. Pure.
 func match(cmp ast.Comparison, text, pattern string) (bool, *diag.Error) {
-	re, err := regexp.Compile(pattern)
+	re, err := rustre.Compile(pattern)
 	if err != nil {
-		bad := fail("%s", regexMessage(pattern, err))
+		bad := fail("%s", err)
 		bad.Line, bad.Col, bad.Width = cmp.Line, cmp.Col, len(cmp.Op)
 		return false, bad
 	}

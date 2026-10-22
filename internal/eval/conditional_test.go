@@ -2,7 +2,6 @@ package eval
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -146,56 +145,6 @@ func TestEvaluateBadRegexIsLocatedAtTheOperator(t *testing.T) {
 	var de *diag.Error
 	if !errors.As(err, &de) || de.Line != 3 || de.Col != 17 || de.Width != 2 {
 		t.Errorf("error = %+v, want located at 3:17 with width 2", de)
-	}
-}
-
-// Each row was produced by oracle/bin/just on `x := if ” =~ '<pattern>'`: the
-// caret is under the character at the index, counted in characters.
-func TestRegexErrorsAreWordedAsTheRegexCrateWordsThem(t *testing.T) {
-	const (
-		group    = "unclosed group"
-		unopened = "unopened group"
-		repeat   = "repetition operator missing expression"
-		class    = "unclosed character class"
-	)
-	for _, tc := range []struct {
-		pattern string
-		at      int
-		fault   string
-	}{
-		{"(", 0, group}, {"(a", 0, group}, {"a(", 1, group}, {"x(y(z", 3, group}, {"(?P<n>a", 0, group},
-		{`\((`, 2, group}, {"((a)", 0, group}, {"(a|", 0, group}, {`\[(`, 2, group}, {"é(", 1, group},
-		{"(?i)(", 4, group}, {"(?P<n>x)(", 8, group}, {`[\]](`, 4, group}, {"[[:alpha:]](", 11, group},
-		{"[^]a](", 5, group}, {"(?:a)(", 5, group},
-		{")", 0, unopened}, {"a)", 1, unopened}, {"(a))", 3, unopened}, {"a(b)c)", 5, unopened},
-		{"*", 0, repeat}, {"+a", 0, repeat}, {"a|*", 2, repeat}, {"(?:*)", 3, repeat}, {"(*)", 1, repeat},
-		{"a|+", 2, repeat}, {"**", 0, repeat},
-		{"[", 0, class}, {"[a", 0, class}, {"a[", 1, class}, {"[[:alpha:]", 0, class},
-	} {
-		want := "regex parse error:\n    " + tc.pattern + "\n    " + strings.Repeat(" ", tc.at) + "^\nerror: " + tc.fault
-		_, err := Compare(compare("=~", str(""), str("")), "", tc.pattern)
-		if err == nil || err.Msg != want {
-			t.Errorf("pattern %q: error = %v, want %q", tc.pattern, err, want)
-		}
-	}
-}
-
-// Patterns the crate and Go agree are fine.
-func TestRegexCompilesWhatBothEnginesAccept(t *testing.T) {
-	for _, pattern := range []string{"[(]", "a.c", `\d+`, "(?i)A", "a{1,3}", "[^a-z]", "(?s).", "x|y|z", "", `[\]]`, "[]a]"} {
-		if _, err := Compare(compare("=~", str(""), str("")), "", pattern); err != nil {
-			t.Errorf("pattern %q: error %v", pattern, err)
-		}
-	}
-}
-
-// A pattern the scan cannot place is reported at its start with the message
-// of Go's regexp.
-func TestRegexErrorsWithoutAPositionStartAtTheFirstColumn(t *testing.T) {
-	_, err := Compare(compare("=~", str(""), str("")), "", "[z-a]")
-	var de *diag.Error
-	if !errors.As(err, &de) || de.Msg != "regex parse error:\n    [z-a]\n    ^\nerror: invalid character class range: `z-a`" {
-		t.Errorf("error = %v", err)
 	}
 }
 

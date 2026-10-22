@@ -1,18 +1,34 @@
-package eval
+// Package rustre compiles regular expressions for the operators and builtins
+// that upstream implements with Rust's regex crate. It compiles with Go's
+// regexp, which accepts the same syntax in the cases the corpus covers, and
+// words a pattern that does not compile as the crate words its parse error.
+// It is pure.
+package rustre
 
 import (
 	"errors"
+	"regexp"
 	"regexp/syntax"
 	"strings"
 	"unicode/utf8"
 )
 
-// regexMessage words the failure err to compile pattern as Rust's regex crate
+// Compile returns the compiled pattern. A pattern that does not compile gives
+// an error whose text is the crate's parse error, without a location. Pure.
+func Compile(pattern string) (*regexp.Regexp, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, errors.New(message(pattern, err))
+	}
+	return re, nil
+}
+
+// message words the failure err to compile pattern as Rust's regex crate
 // words a parse error: the pattern, a caret under the place the fault is, and
 // the fault. Go's regexp finds the same four faults as the crate does, and the
 // scan places each as the crate does; for any other fault the caret is at the
 // start and the fault is Go's own words. Pure.
-func regexMessage(pattern string, err error) string {
+func message(pattern string, err error) string {
 	at, fault := 0, err.Error()
 	var syntaxErr *syntax.Error
 	if errors.As(err, &syntaxErr) {
