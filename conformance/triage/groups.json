@@ -1,17 +1,18 @@
 {
   "counts": {
-    "pass": 195,
-    "fail": 1800,
+    "pass": 260,
+    "fail": 1735,
     "skip": 16,
     "total": 2011
   },
   "group_sizes": {
-    "attribute": 220,
-    "backtick": 39,
+    "attribute": 227,
+    "backtick": 57,
     "builtin:case": 10,
-    "builtin:constants": 2,
+    "builtin:constants": 3,
     "builtin:env": 6,
-    "builtin:invocation": 12,
+    "builtin:external": 1,
+    "builtin:invocation": 13,
     "builtin:path": 12,
     "builtin:semver": 1,
     "builtin:string": 8,
@@ -69,29 +70,13 @@
     "cli:working-directory": 7,
     "cli:yes": 2,
     "completions": 40,
-    "conditional": 16,
+    "conditional": 17,
     "dotenv": 30,
-    "grammar": 71,
+    "grammar": 69,
     "module": 157,
-    "setting:allow-duplicate-recipes": 2,
-    "setting:allow-duplicate-variables": 1,
-    "setting:default-list": 4,
-    "setting:default-script": 8,
-    "setting:export": 7,
-    "setting:fallback": 7,
-    "setting:guards": 6,
-    "setting:ignore-comments": 9,
-    "setting:indentation": 4,
-    "setting:lazy": 16,
-    "setting:minimum-version": 6,
-    "setting:no-cd": 5,
-    "setting:no-exit-message": 4,
-    "setting:positional-arguments": 8,
-    "setting:script-interpreter": 3,
-    "setting:tempdir": 4,
-    "setting:windows-shell": 2,
-    "setting:working-directory": 16,
-    "shebang": 14,
+    "setting:default-script": 7,
+    "setting:fallback": 6,
+    "shebang": 21,
     "unstable:cached-recipes": 85,
     "unstable:lists": 269,
     "unstable:user-defined-functions": 32
@@ -206,9 +191,11 @@
       "misc::private_recipes_are_not_suggested#1": "uses an attribute",
       "no_cd::shebang#1": "uses an attribute",
       "no_cd::shell#1": "uses an attribute",
+      "no_cd::working_directory_attribute_overrides_setting#1": "uses an attribute",
       "no_exit_message::empty_attribute#1": "uses an attribute",
       "no_exit_message::exit_message#1": "uses an attribute",
       "no_exit_message::exit_message_and_no_exit_message_compile_forbidden#1": "uses an attribute",
+      "no_exit_message::exit_message_override_no_exit_setting#1": "uses an attribute",
       "no_exit_message::extraneous_attribute_before_comment#1": "uses an attribute",
       "no_exit_message::extraneous_attribute_before_empty_line#1": "uses an attribute",
       "no_exit_message::no_exit_message#1": "uses an attribute",
@@ -249,6 +236,7 @@
       "options::multiple_requires_long_or_short#1": "uses an attribute",
       "options::multiple_short_options_may_be_combined#1": "uses an attribute",
       "options::multiple_takes_no_value#1": "uses an attribute",
+      "options::options_arg_passed_as_positional_arguments#1": "uses an attribute",
       "options::options_require_value#1": "uses an attribute",
       "options::options_with_a_default_may_be_omitted#1": "uses an attribute",
       "options::parameters_may_be_passed_with_long_options#1": "uses an attribute",
@@ -298,6 +286,7 @@
       "script::allowed_with_shebang#1": "uses an attribute",
       "script::no_arguments#1": "uses an attribute",
       "script::no_arguments_with_default_script_interpreter#1": "uses an attribute",
+      "script::no_arguments_with_non_default_script_interpreter#1": "uses an attribute",
       "script::runs_with_command#1": "uses an attribute",
       "script::script_and_shell_attribute_forbidden#1": "uses an attribute",
       "script::script_line_numbers#1": "uses an attribute",
@@ -317,9 +306,13 @@
       "working_directory::attribute_with_backtick#1": "uses an attribute",
       "working_directory::attribute_with_expression#1": "uses an attribute",
       "working_directory::attribute_with_nocd_is_forbidden#1": "uses an attribute",
-      "working_directory::attribute_with_recipe_parameter#1": "uses an attribute"
+      "working_directory::attribute_with_recipe_parameter#1": "uses an attribute",
+      "working_directory::no_cd_overrides_setting#1": "uses an attribute",
+      "working_directory::setting#1": "uses an attribute",
+      "working_directory::setting_and_attribute#1": "uses an attribute"
     },
     "backtick": {
+      "assignment::non_const_variables_shadowing_constants_are_an_error_in_const_contexts#1": "uses a backtick",
       "conditional::complex_expressions#1": "uses a backtick",
       "conditional::otherwise_branch_unevaluated#1": "uses a backtick",
       "conditional::otherwise_branch_unevaluated_inverted#1": "uses a backtick",
@@ -327,7 +320,19 @@
       "conditional::then_branch_unevaluated_inverted#1": "uses a backtick",
       "export::parameter_not_visible_to_backtick#1": "uses a backtick",
       "export::recipe_backtick#1": "uses a backtick",
+      "export::setting_implicit#1": "uses a backtick",
+      "export::setting_true#1": "uses a backtick",
+      "lazy::assignment_in_body_interpolation_evaluated#1": "uses a backtick",
+      "lazy::assignment_used_in_dependency_argument_evaluated#1": "uses a backtick",
+      "lazy::assignment_used_in_dependency_evaluated#1": "uses a backtick",
+      "lazy::assignment_used_in_parameter_default_evaluated#1": "uses a backtick",
+      "lazy::assignment_used_in_transitive_dependency_evaluated#1": "uses a backtick",
+      "lazy::eager_assignments_are_evaluated#1": "uses a backtick",
+      "lazy::multiple_invocations_evaluate_union#1": "uses a backtick",
+      "lazy::transitively_used_assignment_evaluated#1": "uses a backtick",
+      "lazy::unused_assignment_not_evaluated#1": "uses a backtick",
       "lazy::unused_assignments_are_evaluated_without_lazy#1": "uses a backtick",
+      "lazy::used_assignment_evaluated#1": "uses a backtick",
       "markdown::extension_is_case_insensitive#1": "uses a backtick",
       "misc::assignment_backtick_failure#1": "uses a backtick",
       "misc::backtick_code_assignment#1": "uses a backtick",
@@ -352,13 +357,18 @@
       "misc::default_concatenation#1": "uses a backtick",
       "misc::dependency_argument_backtick#1": "uses a backtick",
       "misc::duplicate_dependency_argument#1": "uses a backtick",
+      "no_cd::evaluator_paths_ignore_setting#1": "uses a backtick",
       "quiet::assignment_backtick_stderr#1": "uses a backtick",
+      "settings::backtick#1": "uses a backtick",
+      "settings::non_const_variable#1": "uses a backtick",
+      "settings::unused_non_const_assignments#1": "uses a backtick",
       "shell::backtick_recipe_shell_not_found_error_message#1": "uses a backtick",
       "shell::set_shell#1": "uses a backtick",
       "string::indented_backtick_string_contents_indentation_removed#1": "uses a backtick",
       "string::indented_backtick_string_escapes#1": "uses a backtick",
       "string::multiline_backtick#1": "uses a backtick",
-      "string::shebang_backtick#1": "uses a backtick"
+      "string::shebang_backtick#1": "uses a backtick",
+      "working_directory::working_dir_applies_to_backticks#1": "uses a backtick"
     },
     "builtin:case": {
       "functions::capitalize#1": "calls capitalize()",
@@ -374,7 +384,8 @@
     },
     "builtin:constants": {
       "constants::constants_are_defined_in_recipe_bodies#1": "uses the constant HEX",
-      "constants::constants_are_defined_in_recipe_parameters#1": "uses the constant HEX"
+      "constants::constants_are_defined_in_recipe_parameters#1": "uses the constant HEX",
+      "settings::built_in_constant#1": "uses the constant HEX"
     },
     "builtin:env": {
       "functions::env_var_failure#1": "calls env_var()",
@@ -384,7 +395,11 @@
       "misc::env_function_as_env_var_or_default_with_existing_env_var#1": "calls env()",
       "misc::env_function_as_env_var_with_existing_env_var#1": "calls env()"
     },
+    "builtin:external": {
+      "working_directory::working_dir_applies_to_shell_function#1": "calls shell()"
+    },
     "builtin:invocation": {
+      "constants::constants_are_not_exported#1": "calls just_executable()",
       "functions::dir_abbreviations_are_accepted#1": "calls justfile_dir()",
       "functions::invocation_dir_native_abbreviation_is_accepted#1": "calls invocation_directory_native()",
       "functions::is_dependency#1": "calls is_dependency()",
@@ -1253,7 +1268,8 @@
       "regexes::bad_regex_fails_at_runtime#1": "uses an if expression",
       "regexes::match_fails_evaluates_to_second_branch#1": "uses an if expression",
       "regexes::match_succeeds_evaluates_to_first_branch#1": "uses an if expression",
-      "regexes::mismatch#1": "uses an if expression"
+      "regexes::mismatch#1": "uses an if expression",
+      "settings::bad_regex#1": "uses an if expression"
     },
     "dotenv": {
       "dotenv::can_set_dotenv_filename_from_justfile#1": "has a .env file",
@@ -1295,8 +1311,6 @@
       "assertions::assert_without_message_reports_condition#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/', but found '!='",
       "comparison::comparisons_are_not_associative#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '+', '++', or '/', b",
       "dependencies::dependency_submodule_missing#1": "just-go reports a parse error: expected '&&', '*', '::', comment, end of file, end of line, identifier, indent, or '(', but found '",
-      "export::parameter#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '$'",
-      "export::success#1": "uses `export`",
       "format_string::compound#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::conditional#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::empty#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
@@ -1311,6 +1325,7 @@
       "format_string::undefined_variable_error#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unmatched_close_is_ignored#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unterminated_format_string_error#1": "just-go reports a parse error: unterminated string",
+      "lazy::unused_assert_not_evaluated#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/', but found '=='",
       "lists::dependency_arguments_join_lists_without_lists_setting#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "markdown::code_blocks_are_concatenated#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
       "markdown::line_numbers_are_preserved#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
@@ -1347,14 +1362,13 @@
       "parameters::exported_variadic_parameter_is_joined_with_spaces#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '+'",
       "parameters::star_may_follow_default#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "parser::comment_after_unexport#1": "uses `unexport`",
-      "settings::undefined_variable_in_shell_argument#1": "just-go reports a parse error: expected backtick, '!', '[', ']', identifier, '(', '/', or string, but found identifier",
-      "settings::undefined_variable_in_shell_command#1": "just-go reports a parse error: expected backtick, '!', '[', identifier, '(', '/', or string, but found identifier",
-      "shadowing_parameters::exporting_shadowing_parameters_does_change_environment#1": "uses `export`",
-      "shadowing_parameters::shadowing_parameters_do_not_change_environment#1": "uses `export`",
+      "positional_arguments::empty_variadic_is_undefined#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
+      "positional_arguments::variadic_arguments_are_separate#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
+      "positional_arguments::variadic_shell#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
+      "settings::assert#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/', but found '=='",
       "slash_operator::default_parenthesized#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', '==', '=~', ')', '+', '++', or '/', but found '/'",
       "slash_operator::no_lhs_parenthesized#1": "just-go reports a parse error: expected backtick, '!', '[', identifier, '(', '/', or string, but found '/'",
       "slash_operator::no_rhs_once#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '+', '++', or '/', b",
-      "string::raw_string#1": "uses `export`",
       "unexport::duplicate_unexport_fails#1": "uses `unexport`",
       "unexport::export_unexport_conflict#1": "uses `unexport`",
       "unexport::unexport_doesnt_override_local_recipe_export#1": "uses `unexport`",
@@ -1519,160 +1533,35 @@
       "working_directory::working_dir_applies_to_shell_function_in_submodules#1": "uses mod or import",
       "working_directory::working_dir_in_submodule_is_relative_to_module_path#1": "uses mod or import"
     },
-    "setting:allow-duplicate-recipes": {
-      "allow_duplicate_recipes::allow_duplicate_recipes#1": "sets allow-duplicate-recipes",
-      "allow_duplicate_recipes::allow_duplicate_recipes_with_args#1": "sets allow-duplicate-recipes"
-    },
-    "setting:allow-duplicate-variables": {
-      "allow_duplicate_variables::allow_duplicate_variables#1": "sets allow-duplicate-variables"
-    },
-    "setting:default-list": {
-      "default::default_list_allows_default_recipe_with_arguments#1": "sets default-list",
-      "default::default_list_does_not_override_explicit_recipe#1": "sets default-list",
-      "default::default_list_false_runs_default_recipe#1": "sets default-list",
-      "default::default_list_lists_recipes#1": "sets default-list"
-    },
     "setting:default-script": {
       "ignore_comments::ignore_comments_evaluates_comments_in_default_script_recipes#1": "sets default-script",
       "script::default_script_allows_extra_leading_whitespace#1": "sets default-script",
-      "script::default_script_false_is_shell#1": "sets default-script",
       "script::default_script_makes_recipes_scripts#1": "sets default-script",
       "script::default_script_recipe_with_script_attribute#1": "sets default-script",
       "script::default_script_recipe_with_shebang_uses_shebang#1": "sets default-script",
       "script::default_script_uses_script_interpreter#1": "sets default-script",
       "script::shell_attribute_overrides_default_script#1": "sets default-script"
     },
-    "setting:export": {
-      "assignment::set_export_parse_error#1": "sets export",
-      "assignment::set_export_parse_error_eol#1": "sets export",
-      "constants::constants_are_not_exported#1": "sets export",
-      "export::setting_false#1": "sets export",
-      "export::setting_implicit#1": "sets export",
-      "export::setting_shebang#1": "sets export",
-      "export::setting_true#1": "sets export"
-    },
     "setting:fallback": {
       "fallback::multiple_levels_of_fallback_work#1": "sets fallback",
       "fallback::print_error_from_parent_if_recipe_not_found_in_current#1": "sets fallback",
-      "fallback::prints_correct_error_message_when_recipe_not_found#1": "sets fallback",
       "fallback::report_non_not_found_errors#1": "sets fallback",
       "fallback::runs_recipe_in_parent_if_not_found_in_current#1": "sets fallback",
       "fallback::setting_accepts_value#1": "sets fallback",
       "fallback::stop_fallback_when_fallback_is_false#1": "sets fallback"
     },
-    "setting:guards": {
-      "guards::exit_codes_above_one_are_reserved#1": "sets guards",
-      "guards::guard_lines_halt_execution#1": "sets guards",
-      "guards::guard_lines_have_no_effect_if_successful#1": "sets guards",
-      "guards::guard_sigil_may_not_be_used_with_infallible_sigil#1": "sets guards",
-      "guards::sigils_are_ignored_on_continuation_lines#1": "sets guards",
-      "guards::sigils_are_recognized_after_ignored_comments#1": "sets guards"
-    },
-    "setting:ignore-comments": {
-      "ignore_comments::comments_still_must_be_parsable_when_ignored#1": "sets ignore-comments",
-      "ignore_comments::continuations_with_echo_comments_false#1": "sets ignore-comments",
-      "ignore_comments::continuations_with_echo_comments_true#1": "sets ignore-comments",
-      "ignore_comments::dont_analyze_comments#1": "sets ignore-comments",
-      "ignore_comments::dont_evaluate_comments#1": "sets ignore-comments",
-      "ignore_comments::ignore_comments_evaluates_comments_in_scripts#1": "sets ignore-comments",
-      "ignore_comments::ignore_comments_evaluates_comments_on_continuation_lines#1": "sets ignore-comments",
-      "ignore_comments::ignore_comments_in_recipe#1": "sets ignore-comments",
-      "ignore_comments::ignore_recipe_comments_with_shell_setting#1": "sets ignore-comments"
-    },
-    "setting:indentation": {
-      "format::indentation_setting_invalid_values#1": "sets indentation",
-      "format::indentation_setting_invalid_values#2": "sets indentation",
-      "format::indentation_setting_invalid_values#3": "sets indentation",
-      "format::indentation_setting_must_be_string_literal#1": "sets indentation"
-    },
-    "setting:lazy": {
-      "lazy::assignment_in_body_interpolation_evaluated#1": "sets lazy",
-      "lazy::assignment_used_in_dependency_argument_evaluated#1": "sets lazy",
-      "lazy::assignment_used_in_dependency_evaluated#1": "sets lazy",
-      "lazy::assignment_used_in_parameter_default_evaluated#1": "sets lazy",
-      "lazy::assignment_used_in_transitive_dependency_evaluated#1": "sets lazy",
-      "lazy::assignment_with_set_export_is_evaluated#1": "sets lazy",
-      "lazy::eager_assignments_are_evaluated#1": "sets lazy",
-      "lazy::exported_assignment_is_evaluated#1": "sets lazy",
-      "lazy::multiple_invocations_evaluate_union#1": "sets lazy",
-      "lazy::transitively_used_assignment_evaluated#1": "sets lazy",
-      "lazy::unconditionally_evaluated_assignment_dependencies_are_evaluated#1": "sets lazy",
-      "lazy::unconditionally_evaluated_assignment_dependencies_are_evaluated#2": "sets lazy",
-      "lazy::unconditionally_evaluated_assignment_dependencies_are_evaluated#3": "sets lazy",
-      "lazy::unused_assert_not_evaluated#1": "sets lazy",
-      "lazy::unused_assignment_not_evaluated#1": "sets lazy",
-      "lazy::used_assignment_evaluated#1": "sets lazy"
-    },
-    "setting:minimum-version": {
-      "minimum_version::minimum_version_invalid#1": "sets minimum-version",
-      "minimum_version::minimum_version_may_not_be_expression#1": "sets minimum-version",
-      "minimum_version::minimum_version_may_not_be_indented_string#1": "sets minimum-version",
-      "minimum_version::minimum_version_may_not_be_shell_expanded_string#1": "sets minimum-version",
-      "minimum_version::minimum_version_satisfied#1": "sets minimum-version",
-      "minimum_version::minimum_version_too_low#1": "sets minimum-version"
-    },
-    "setting:no-cd": {
-      "no_cd::evaluator_paths_ignore_setting#1": "sets no-cd",
-      "no_cd::setting_applies_to_recipes#1": "sets no-cd",
-      "no_cd::working_directory_attribute_overrides_setting#1": "sets no-cd",
-      "settings::no_cd_setting_conflicts_with_working_directory_setting#1": "sets no-cd",
-      "working_directory::false_no_cd_does_not_conflict_with_working_directory#1": "sets no-cd"
-    },
-    "setting:no-exit-message": {
-      "no_exit_message::exit_message_override_no_exit_setting#1": "sets no-exit-message",
-      "no_exit_message::recipe_exit_message_setting_suppressed#1": "sets no-exit-message",
-      "no_exit_message::shebang_exit_message_setting_suppressed#1": "sets no-exit-message",
-      "no_exit_message::signal_exit_message_setting_suppressed#1": "sets no-exit-message"
-    },
-    "setting:positional-arguments": {
-      "options::options_arg_passed_as_positional_arguments#1": "sets positional-arguments",
-      "positional_arguments::default_arguments#1": "sets positional-arguments",
-      "positional_arguments::empty_variadic_is_undefined#1": "sets positional-arguments",
-      "positional_arguments::shebang#1": "sets positional-arguments",
-      "positional_arguments::shell#1": "sets positional-arguments",
-      "positional_arguments::variadic_arguments_are_separate#1": "sets positional-arguments",
-      "positional_arguments::variadic_shebang#1": "sets positional-arguments",
-      "positional_arguments::variadic_shell#1": "sets positional-arguments"
-    },
-    "setting:script-interpreter": {
-      "script::no_arguments_with_non_default_script_interpreter#1": "sets script-interpreter",
-      "settings::undefined_variable_in_script_interpreter_argument#1": "sets script-interpreter",
-      "settings::undefined_variable_in_script_interpreter_command#1": "sets script-interpreter"
-    },
-    "setting:tempdir": {
-      "assignment::non_const_variables_shadowing_constants_are_an_error_in_const_contexts#1": "sets tempdir",
-      "function_definitions::undefined_in_setting#1": "sets tempdir",
-      "settings::undefined_variable_in_tempdir#1": "sets tempdir",
-      "tempdir::setting#1": "sets tempdir"
-    },
-    "setting:windows-shell": {
-      "settings::undefined_variable_in_windows_shell_argument#1": "sets windows-shell",
-      "settings::undefined_variable_in_windows_shell_command#1": "sets windows-shell"
-    },
-    "setting:working-directory": {
-      "settings::assert#1": "sets working-directory",
-      "settings::backtick#1": "sets working-directory",
-      "settings::bad_regex#1": "sets working-directory",
-      "settings::built_in_constant#1": "sets working-directory",
-      "settings::expression#1": "sets working-directory",
-      "settings::function_call#1": "sets working-directory",
-      "settings::non_const_variable#1": "sets working-directory",
-      "settings::undefined_variable_in_working_directory#1": "sets working-directory",
-      "settings::unused_non_const_assignments#1": "sets working-directory",
-      "settings::variable#1": "sets working-directory",
-      "working_directory::no_cd_overrides_setting#1": "sets working-directory",
-      "working_directory::setting#1": "sets working-directory",
-      "working_directory::setting_and_attribute#1": "sets working-directory",
-      "working_directory::working_dir_applies_to_backticks#1": "sets working-directory",
-      "working_directory::working_dir_applies_to_shell_function#1": "sets working-directory",
-      "working_directory::working_directory_setting_conflicts_with_no_cd_setting#1": "sets working-directory"
-    },
     "shebang": {
+      "export::setting_shebang#1": "has a shebang recipe",
       "export::shebang#1": "has a shebang recipe",
+      "ignore_comments::ignore_comments_evaluates_comments_in_scripts#1": "has a shebang recipe",
       "interpolation::shebang_line_numbers_are_correct_with_multi_line_interpolations#1": "has a shebang recipe",
       "misc::quiet_shebang_recipe#1": "has a shebang recipe",
       "misc::shebang_backtick_failure#1": "has a shebang recipe",
+      "no_exit_message::shebang_exit_message_setting_suppressed#1": "has a shebang recipe",
       "no_exit_message::signal_exit_message_not_suppressed#1": "has a shebang recipe",
+      "no_exit_message::signal_exit_message_setting_suppressed#1": "has a shebang recipe",
+      "positional_arguments::shebang#1": "has a shebang recipe",
+      "positional_arguments::variadic_shebang#1": "has a shebang recipe",
       "script::multiline_shebang_line_numbers#1": "has a shebang recipe",
       "script::shebang_line_numbers#1": "has a shebang recipe",
       "script::shebang_line_numbers_with_multiline_constructs#1": "has a shebang recipe",
@@ -1681,6 +1570,7 @@
       "shebang::powershell_shebang_on_unix_has_no_bom#1": "has a shebang recipe",
       "shebang::run_shebang#1": "has a shebang recipe",
       "shebang::simple#1": "has a shebang recipe",
+      "tempdir::setting#1": "has a shebang recipe",
       "unexport::unexport_environment_variable_shebang#1": "has a shebang recipe"
     },
     "unstable:cached-recipes": {

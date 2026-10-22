@@ -2,9 +2,12 @@
 //
 // Parse is pure: it reads only its arguments and performs no I/O.
 //
-// The subset is: `set shell := [...]`, `set quiet`, assignments, and recipes
-// with parameters, defaults, dependencies (with arguments, and after `&&`)
-// and a body. A recipe body is every
+// The subset is: `set` statements (see settings.go), assignments
+// (also written `export` or `eager`), and recipes with parameters (also
+// written `$name`), defaults, dependencies (with arguments, and after `&&`)
+// and a body. Two settings change how a body is read, `ignore-comments` and
+// `guards`; since a setting may follow the recipes it changes, Parse reads the
+// file again once it knows them. A recipe body is every
 // following line that starts with indentation. Blank lines belong to the body
 // only when more indented lines follow them, and they are dropped. The first
 // body line fixes the recipe's indentation; each later line must start with it,
@@ -32,6 +35,17 @@ func Parse(file string, src []byte) (*ast.Justfile, error) {
 		return nil, err
 	}
 	p := &parser{file: file, toks: toks}
+	jf, err := p.justfile()
+	if err != nil {
+		return nil, err
+	}
+	// Two settings change how a recipe body is split into commands, and a
+	// setting may come after the recipes it affects, so the file is parsed
+	// again once they are known.
+	if jf.Settings.IgnoreComments == p.ignoreComments && jf.Settings.Guards == p.guards {
+		return jf, nil
+	}
+	p = &parser{file: file, toks: toks, ignoreComments: jf.Settings.IgnoreComments, guards: jf.Settings.Guards}
 	return p.justfile()
 }
 
@@ -53,6 +67,11 @@ type parser struct {
 	// depth is the number of expressions being parsed, each inside the
 	// last. Upstream refuses to go deeper than recursionLimit.
 	depth int
+	// ignoreComments and guards are the settings of the same names. They
+	// decide how a recipe body is split into commands, so a first pass over
+	// the file finds them (see Parse).
+	ignoreComments bool
+	guards         bool
 }
 
 // kinds returns the set of the given token kinds. Pure.
@@ -224,9 +243,20 @@ func (p *parser) statement(jf *ast.Justfile) error {
 	case t.Kind == lexer.Ident && t.Text == "set" && p.isSetting():
 		return p.setting(jf)
 	case t.Kind == lexer.Ident && p.peekAt(1).Kind == lexer.Assign:
-		return p.assignment(jf)
+		return p.assignment(jf, "")
+	case p.isKeywordAssignment():
+		p.next()
+		return p.assignment(jf, t.Text)
 	}
 	return p.recipe(jf)
+}
+
+// isKeywordAssignment reports whether the current token is the `export` or
+// `eager` of an assignment, as opposed to a name that happens to be one.
+func (p *parser) isKeywordAssignment() bool {
+	t := p.peek()
+	return t.Kind == lexer.Ident && (t.Text == "export" || t.Text == "eager") &&
+		p.peekAt(1).Kind == lexer.Ident && p.peekAt(2).Kind == lexer.Assign
 }
 
 // isSetting reports whether the `set` at the current position starts a
@@ -252,87 +282,19 @@ func (p *parser) endLine() error {
 	return err
 }
 
-func (p *parser) setting(jf *ast.Justfile) error {
-	p.next() // set
-	name := p.next()
-	var err error
-	switch name.Text {
-	case "quiet":
-		jf.Settings.Quiet, err = p.setBool()
-	case "shell":
-		jf.Settings.Shell, err = p.shell()
-	default:
-		return p.errAt(name, fmt.Sprintf("unknown setting `%s`", name.Text))
-	}
-	if err != nil {
-		return err
-	}
-	return p.endLine()
-}
-
-// setBool parses the optional `:= true` or `:= false` of a boolean setting,
-// after its name. Without one the setting is on.
-func (p *parser) setBool() (bool, error) {
-	if !p.accept(lexer.Assign) {
-		return true, nil
-	}
-	t, err := p.expect(lexer.Ident)
-	switch {
-	case err != nil:
-		return false, err
-	case t.Text == "true" || t.Text == "false":
-		return t.Text == "true", nil
-	}
-	return false, p.errAt(t, fmt.Sprintf("expected keyword `true` or `false` but found identifier `%s`", t.Text))
-}
-
-// shell parses `:= ["cmd", "arg", ...]`, after the setting name. A trailing
-// comma is allowed.
-func (p *parser) shell() ([]string, error) {
-	if _, err := p.expect(lexer.Assign); err != nil {
-		return nil, err
-	}
-	if _, err := p.expect(lexer.LBracket); err != nil {
-		return nil, err
-	}
-	var words []string
-	for {
-		word, err := p.shellWord()
-		if err != nil {
-			return nil, err
-		}
-		words = append(words, word)
-		if !p.accept(lexer.Comma) || p.is(lexer.RBracket) {
-			break
-		}
-	}
-	if _, err := p.expect(lexer.RBracket); err != nil {
-		return nil, err
-	}
-	return words, nil
-}
-
-// shellWord parses one word of a shell setting. Upstream takes any
-// expression there; the subset takes a string literal, and reports anything
-// else as upstream reports a token that starts no expression.
-func (p *parser) shellWord() (string, error) {
-	p.expected |= valueStart | kinds(lexer.Slash)
-	if p.peek().Kind != lexer.String {
-		return "", p.unexpected()
-	}
-	word, err := p.stringValue()
-	p.expected |= operandEnd | kinds(lexer.Plus) | exprEnd
-	return word, err
-}
-
-func (p *parser) assignment(jf *ast.Justfile) error {
+// assignment parses `name := value`, through its line break. keyword is the
+// `export` or `eager` that came before the name, already consumed, or "".
+func (p *parser) assignment(jf *ast.Justfile, keyword string) error {
 	name := p.next()
 	p.next() // :=
 	value, err := p.expr()
 	if err != nil {
 		return err
 	}
-	jf.Assignments = append(jf.Assignments, ast.Assignment{Name: name.Text, Value: value, Line: name.Line, Col: name.Col})
+	jf.Assignments = append(jf.Assignments, ast.Assignment{
+		Name: name.Text, Value: value, Exported: keyword == "export", Eager: keyword == "eager",
+		Line: name.Line, Col: name.Col,
+	})
 	return p.endLine()
 }
 
@@ -458,8 +420,8 @@ func (p *parser) recipe(jf *ast.Justfile) error {
 }
 
 // header parses parameters, the colon, and dependencies, through the line
-// break. Upstream also looks for exported (`$`) and variadic (`+`, `*`)
-// parameters, which the subset does not have.
+// break. Upstream also looks for variadic (`+`, `*`) parameters,
+// which the subset does not have.
 func (p *parser) header(r *ast.Recipe) error {
 	for p.isParam() {
 		param, err := p.param()
@@ -544,13 +506,18 @@ func (p *parser) dependencyName() ast.Dependency {
 // isParam reports whether a parameter starts at the current token.
 func (p *parser) isParam() bool {
 	param := p.is(lexer.Ident)
-	p.is(lexer.Dollar)
-	return param
+	return p.is(lexer.Dollar) || param
 }
 
+// param parses a parameter and its default: `name`, `$name` for one that is
+// exported, and `=` followed by a value.
 func (p *parser) param() (ast.Param, error) {
-	name := p.next()
-	param := ast.Param{Name: name.Text, Line: name.Line, Col: name.Col}
+	exported := p.accept(lexer.Dollar)
+	name, err := p.expect(lexer.Ident)
+	if err != nil {
+		return ast.Param{}, err
+	}
+	param := ast.Param{Name: name.Text, Exported: exported, Line: name.Line, Col: name.Col}
 	if !p.accept(lexer.Equals) {
 		return param, nil
 	}
@@ -629,11 +596,9 @@ func (p *parser) body() ([]ast.Line, error) {
 			return lines, nil
 		}
 		t := p.next()
-		if msg := indentError(indent, t.Text); msg != "" {
-			return nil, p.errAt(t, msg)
-		}
-		if indent == "" {
-			indent = t.Text
+		var err error
+		if indent, err = p.lineIndent(indent, t); err != nil {
+			return nil, err
 		}
 		phys, err := p.bodyLine(t, indent)
 		if err != nil {
@@ -642,10 +607,32 @@ func (p *parser) body() ([]ast.Line, error) {
 		if continued {
 			lines[len(lines)-1] = join(lines[len(lines)-1], phys)
 		} else {
-			lines = append(lines, command(phys))
+			lines = append(lines, p.command(phys))
 		}
-		continued = phys.continues
+		continued = phys.continues && !p.endsComment(phys, continued)
 	}
+}
+
+// lineIndent checks the indentation of the body line that starts with the
+// Indent token t against the recipe's indentation, which is empty until the
+// first line sets it. It returns the recipe's indentation.
+func (p *parser) lineIndent(indent string, t lexer.Token) (string, error) {
+	if msg := indentError(indent, t.Text); msg != "" {
+		return "", p.errAt(t, msg)
+	}
+	if indent == "" {
+		return t.Text, nil
+	}
+	return indent, nil
+}
+
+// endsComment reports whether phys is an ignored comment that starts a
+// command: under set ignore-comments such a command is the one physical line,
+// and a backslash at its end does not join the next line to it, as in
+// upstream. A comment on a continuation line is part of the command it
+// continues. wasContinuation says phys is a continuation line. Pure.
+func (p *parser) endsComment(phys physical, wasContinuation bool) bool {
+	return p.ignoreComments && !wasContinuation && isComment(phys.parts)
 }
 
 // physical is one physical body line: its parts, where it is, and whether it
@@ -653,6 +640,7 @@ func (p *parser) body() ([]ast.Line, error) {
 type physical struct {
 	parts     []ast.Expr
 	line      int
+	col       int      // the column where the line's text starts, after its indentation
 	extra     ast.Span // the line's text when it starts with extra whitespace
 	continues bool
 }
@@ -667,7 +655,7 @@ func (p *parser) bodyLine(t lexer.Token, indent string) (physical, error) {
 		return physical{}, err
 	}
 	p.next() // the line break: the lexer ends every body line with one
-	phys := physical{parts: parts, line: t.Line}
+	phys := physical{parts: parts, line: t.Line, col: t.Col + utf8.RuneCountInString(t.Text)}
 	if extra != "" {
 		phys.extra = ast.Span{Line: t.Line, Col: t.Col + utf8.RuneCountInString(indent), Width: width}
 	}
@@ -699,11 +687,28 @@ func cutContinuation(parts []ast.Expr) ([]ast.Expr, bool) {
 	return appendText(out, strings.TrimSuffix(last.Value, "\\")), true
 }
 
-// command starts a command with its first physical line: the prefix comes
-// off the front of its text. Pure.
-func command(phys physical) ast.Line {
-	prefix, parts := splitPrefix(phys.parts)
-	return ast.Line{Prefix: prefix, Parts: parts, Line: phys.line, ExtraIndent: phys.extra}
+// command starts a command with its first physical line: the sigils come off
+// the front of its text. A command with both the guard and the infallible
+// sigil is marked, for the analyzer to reject. It is pure.
+func (p *parser) command(phys physical) ast.Line {
+	first, _ := firstText(phys.parts) // splitSigils changes the part
+	comment := isComment(phys.parts)
+	sg, parts := splitSigils(phys.parts, p.guards)
+	line := ast.Line{
+		Prefix: sg.prefix(), Guard: sg.guard, Parts: parts, Line: phys.line,
+		Comment: comment, ExtraIndent: phys.extra,
+	}
+	if sg.guard && sg.dash {
+		line.GuardClash = ast.Span{Line: phys.line, Col: phys.col, Width: utf8.RuneCountInString(first)}
+	}
+	return line
+}
+
+// isComment reports whether a command's text starts with `#`, sigils and all,
+// as upstream's Line::is_comment does. Pure.
+func isComment(parts []ast.Expr) bool {
+	first, _ := firstText(parts)
+	return strings.HasPrefix(first, "#")
 }
 
 // join appends a continuation line to cmd. Its leading whitespace goes, as
@@ -771,51 +776,61 @@ func appendText(parts []ast.Expr, text string) []ast.Expr {
 	return append(parts, ast.Text{Value: text})
 }
 
-// splitPrefix removes a leading `@` and `-` (each at most once, in either
-// order) from the first part, when it is source text. An interpolation never
-// carries a prefix, even one that yields `@` (upstream's Line::sigils).
-func splitPrefix(parts []ast.Expr) (ast.Prefix, []ast.Expr) {
-	text, ok := firstText(parts)
-	if !ok {
-		return ast.PrefixNone, parts
-	}
-	prefix, rest := cutPrefix(text)
-	if rest != "" {
-		parts[0] = ast.Text{Value: rest}
-		return prefix, parts
-	}
-	if len(parts) == 1 {
-		return prefix, nil
-	}
-	return prefix, parts[1:]
-}
+// sigils is the set of sigils on the front of a command: `@`, `-` and, with
+// `set guards`, `?`.
+type sigils struct{ at, dash, guard bool }
 
-func cutPrefix(s string) (ast.Prefix, string) {
-	var at, dash bool
-	for s != "" {
-		switch {
-		case s[0] == '@' && !at:
-			at = true
-		case s[0] == '-' && !dash:
-			dash = true
-		default:
-			return makePrefix(at, dash), s
-		}
-		s = s[1:]
-	}
-	return makePrefix(at, dash), s
-}
-
-func makePrefix(at, dash bool) ast.Prefix {
+// prefix is the `@` and `-` of g as an ast.Prefix.
+func (g sigils) prefix() ast.Prefix {
 	switch {
-	case at && dash:
+	case g.at && g.dash:
 		return ast.PrefixAtDash
-	case at:
+	case g.at:
 		return ast.PrefixAt
-	case dash:
+	case g.dash:
 		return ast.PrefixDash
 	}
 	return ast.PrefixNone
+}
+
+// splitSigils removes the leading sigils (each at most once, in any order)
+// from the first part, when it is source text. An interpolation never carries
+// a sigil, even one that yields `@` (upstream's Line::sigils). guards says
+// whether `?` is a sigil.
+func splitSigils(parts []ast.Expr, guards bool) (sigils, []ast.Expr) {
+	text, ok := firstText(parts)
+	if !ok {
+		return sigils{}, parts
+	}
+	found, rest := cutSigils(text, guards)
+	if rest != "" {
+		parts[0] = ast.Text{Value: rest}
+		return found, parts
+	}
+	if len(parts) == 1 {
+		return found, nil
+	}
+	return found, parts[1:]
+}
+
+// cutSigils reads the sigils from the front of s, and returns them and the
+// rest of s. A repeated sigil ends them, as upstream's does. Pure.
+func cutSigils(s string, guards bool) (sigils, string) {
+	var found sigils
+	for s != "" {
+		switch {
+		case s[0] == '@' && !found.at:
+			found.at = true
+		case s[0] == '-' && !found.dash:
+			found.dash = true
+		case s[0] == '?' && guards && !found.guard:
+			found.guard = true
+		default:
+			return found, s
+		}
+		s = s[1:]
+	}
+	return found, s
 }
 
 // indentError checks a body line's leading whitespace ws against the

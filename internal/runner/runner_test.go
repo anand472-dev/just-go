@@ -736,15 +736,15 @@ func BenchmarkRenderLine(b *testing.B) {
 }
 
 func TestShellArgvOverrides(t *testing.T) {
-	set := ast.Settings{Shell: []string{"bash", "-c"}}
+	set := []string{"bash", "-c"}
 	for _, tc := range []struct {
 		name     string
-		settings ast.Settings
+		settings []string
 		shell    string
 		args     []string
 		want     []string
 	}{
-		{"default", ast.Settings{}, "", nil, []string{"sh", "-cu", "cmd"}},
+		{"default", nil, "", nil, []string{"sh", "-cu", "cmd"}},
 		{"set shell", set, "", nil, []string{"bash", "-c", "cmd"}},
 		{"shell keeps default args", set, "zsh", nil, []string{"zsh", "-cu", "cmd"}},
 		{"args use default shell", set, "", []string{"-e", "-c"}, []string{"sh", "-e", "-c", "cmd"}},
@@ -776,7 +776,7 @@ func TestRunPlanShellOverridesSetShell(t *testing.T) {
 }
 
 func BenchmarkShellArgv(b *testing.B) {
-	set := ast.Settings{Shell: []string{"bash", "-c"}}
+	set := []string{"bash", "-c"}
 	args := []string{"-e", "-c"}
 	for i := 0; i < b.N; i++ {
 		_ = shellArgv(set, "zsh", args, "echo hi")

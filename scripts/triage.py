@@ -57,8 +57,20 @@ SHORT_FLAGS = {
 }
 FLAG_ALIASES = {"eval": "evaluate", "format": "fmt",
                 "initialize": "init", "no-dependencies": "no-deps"}
-# Settings the parser implements (internal/parser setting).
-SUPPORTED_SETTINGS = {"quiet", "shell"}
+# Settings the parser implements (internal/parser setting) and the runner
+# applies. `default-script` and `fallback` are parsed and validated but have no
+# effect yet: the first needs script recipes (Task 11), the second the search
+# of parent justfiles (Phase 3), so a case that sets either stays in its
+# setting group. `script-interpreter` and `tempdir` are listed because the
+# cases that fail on them fail first on a script recipe, which has its own
+# group.
+SUPPORTED_SETTINGS = {
+    "allow-duplicate-recipes", "allow-duplicate-variables", "default-list",
+    "export", "guards", "ignore-comments", "indentation", "lazy",
+    "minimum-version", "no-cd", "no-exit-message", "positional-arguments",
+    "quiet", "script-interpreter", "shell", "tempdir", "windows-powershell",
+    "windows-shell", "working-directory",
+}
 DOTENV_SETTINGS = {"dotenv-command", "dotenv-filename", "dotenv-load",
                    "dotenv-override", "dotenv-path", "dotenv-required"}
 # Environment variables upstream reads in place of a flag (src/arguments.rs
@@ -128,7 +140,7 @@ CACHE_ATTRIBUTE = re.compile(r"^\[[^\]]*\bcache\b", re.M)
 MODULE = re.compile(r"^(?:\[[^\]]*\]\s*)?(?:mod|import)\??\s", re.M)
 HEADER = re.compile(r"^@?(" + IDENT + r")([^:=]*?):(?![=])(.*)$")
 INTERPOLATION = re.compile(r"\{\{(.*?)\}\}")
-GRAMMAR_KEYWORDS = re.compile(r"^(?:export|unexport|alias)\s", re.M)
+GRAMMAR_KEYWORDS = re.compile(r"^(?:unexport|alias)\s", re.M)
 PARSE_ERRORS = ("error: expected ", "error: unknown start of token",
                 "error: unknown setting", "error: unexpected closing delimiter",
                 "error: mismatched closing delimiter",

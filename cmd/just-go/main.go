@@ -66,23 +66,24 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		childOut, childErr = io.Discard, io.Discard
 	}
 	opts := just.Options{
-		Justfile:   resolve(workDir, cfg.justfile),
-		SearchFrom: workDir,
-		Env:        env,
-		Stdin:      stdin,
-		Stdout:     childOut,
-		Stderr:     childErr,
-		Quiet:      cfg.quiet,
-		Shell:      cfg.shell,
-		ShellArgs:  cfg.shellArgs,
-		FS:         fsys,
-		Exec:       exec,
+		Justfile:      resolve(workDir, cfg.justfile),
+		SearchFrom:    workDir,
+		Env:           env,
+		InvocationDir: workDir,
+		Stdin:         stdin,
+		Stdout:        childOut,
+		Stderr:        childErr,
+		Quiet:         cfg.quiet,
+		Shell:         cfg.shell,
+		ShellArgs:     cfg.shellArgs,
+		FS:            fsys,
+		Exec:          exec,
 	}
 	jf, err := just.Load(opts)
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
-	if cfg.list {
+	if cfg.list || (len(cfg.words) == 0 && jf.DefaultList()) {
 		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
 		return 0
 	}

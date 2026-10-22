@@ -1,8 +1,9 @@
 // Package runner runs the recipes of an analyzed justfile.
 //
 // Its helpers are split by purity. The pure ones (prepare, targets,
-// globalScope, resolveOrder, bindParams, renderLine, shellArgv and the small
-// formatting helpers) read only their arguments. The impure ones (Run, the
+// globalScope, resolveOrder, bindParams, renderLine, shellArgv, the choice of
+// shell and directory from the settings, the environment a recipe exports and
+// the small formatting helpers) read only their arguments. The impure ones (Run, the
 // invocation methods and execLine) write to the plan's streams and run
 // commands through the plan's sys.Process; none of them calls os/exec, reads
 // the environment, or touches the filesystem directly.
@@ -14,35 +15,52 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/eval"
+	"gitea.com/wimwian/just-go/internal/settings"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
 // Default shell and arguments, as in upstream settings.rs (DEFAULT_SHELL and
-// DEFAULT_SHELL_ARGS).
+// DEFAULT_SHELL_ARGS), and the shell `set windows-powershell` picks on
+// Windows (WINDOWS_POWERSHELL_SHELL and WINDOWS_POWERSHELL_ARGS).
 const (
 	defaultShell     = "sh"
 	defaultShellFlag = "-cu"
+	powershell       = "powershell.exe"
 )
+
+// powershellArgs are the arguments of the shell `set windows-powershell`
+// picks.
+func powershellArgs() []string { return []string{"-NoLogo", "-Command"} }
 
 // Plan is everything one invocation needs. The runner reads nothing from the
 // process: the environment, directory and streams all come from here.
 type Plan struct {
 	Justfile *ast.Justfile
-	Recipes  []string    // requested recipe names; empty means the first recipe in the file
-	Args     []string    // positional arguments for the single requested recipe's parameters
-	Calls    []Call      // requested recipes with their own arguments; when set, Recipes and Args are ignored
-	Env      []string    // exact environment for children, as "KEY=VALUE"; nil means empty
-	WorkDir  string      // working directory of every child
-	Stdin    io.Reader   // nil means no input
-	Stdout   io.Writer   // nil discards
-	Stderr   io.Writer   // nil discards; receives echoed commands and failure messages
-	Quiet    bool        // overrides set quiet when true; also silences the failure message
-	Exec     sys.Process // nil uses the OS implementation from internal/sys
+	Recipes  []string // requested recipe names; empty means the first recipe in the file
+	Args     []string // positional arguments for the single requested recipe's parameters
+	Calls    []Call   // requested recipes with their own arguments; when set, Recipes and Args are ignored
+	Env      []string // exact environment for children, as "KEY=VALUE"; nil means empty
+	WorkDir  string   // working directory of every child; set working-directory is relative to it
+	// InvocationDir is the directory the user ran the command from, where
+	// recipes run under set no-cd. Empty means WorkDir.
+	InvocationDir string
+	// OS is the operating system, as runtime.GOOS names it, that decides
+	// whether set windows-shell and set windows-powershell apply. Empty means
+	// the one the program runs on.
+	OS     string
+	Stdin  io.Reader   // nil means no input
+	Stdout io.Writer   // nil discards
+	Stderr io.Writer   // nil discards; receives echoed commands and failure messages
+	Quiet  bool        // overrides set quiet when true; also silences the failure message
+	Exec   sys.Process // nil uses the OS implementation from internal/sys
 	// Shell and ShellArgs override the justfile's set shell for every line,
 	// as upstream's --shell and --shell-arg: Shell alone keeps the default
 	// arguments (-cu), ShellArgs alone keeps the default shell (sh). Empty
@@ -70,6 +88,20 @@ type Result struct {
 type step struct {
 	recipe *ast.Recipe
 	scope  eval.Scope
+	// positional holds the value of each of the recipe's parameters, in
+	// order: the arguments set positional-arguments passes to a command.
+	positional []string
+	// env holds the variables the recipe's commands see besides the plan's
+	// environment: those exported with `export`, `$` or set export. It is nil
+	// when there are none.
+	env map[string]string
+}
+
+// prepared is the outcome of prepare: the steps in run order and the
+// evaluated expression settings.
+type prepared struct {
+	steps []step
+	set   settings.Resolved
 }
 
 // Run runs plan.Recipes and their dependencies. Each dependency runs before
@@ -84,12 +116,12 @@ type step struct {
 // ctx.Err(). Impure: it writes to the plan's streams and runs processes
 // through plan.Exec.
 func Run(ctx context.Context, plan Plan) (Result, error) {
-	steps, err := prepare(plan)
+	pre, err := prepare(plan)
 	if err != nil {
 		return Result{}, err
 	}
-	inv := newInvocation(ctx, plan)
-	for _, s := range steps {
+	inv := newInvocation(ctx, plan, pre.set)
+	for _, s := range pre.steps {
 		code, err := inv.recipe(s)
 		if err != nil || code != 0 {
 			return Result{ExitCode: code}, err
@@ -98,20 +130,26 @@ func Run(ctx context.Context, plan Plan) (Result, error) {
 	return Result{}, nil
 }
 
-// prepare resolves the requested recipes into steps in run order, binding
-// every recipe's parameters and evaluating the arguments of its dependencies.
-// It is pure.
-func prepare(plan Plan) ([]step, error) {
+// prepare evaluates the expression settings and resolves the requested
+// recipes into steps in run order, binding every recipe's parameters and
+// evaluating the arguments of its dependencies. With set lazy it evaluates
+// only the assignments that are used. It is pure.
+func prepare(plan Plan) (prepared, error) {
 	jf := plan.Justfile
 	calls, err := requested(plan)
 	if err != nil {
-		return nil, err
+		return prepared{}, err
 	}
-	globals, err := globalScope(jf)
+	set, err := settings.Resolve(jf)
 	if err != nil {
-		return nil, err
+		return prepared{}, err
 	}
-	return resolveOrder(jf, calls, globals)
+	globals, err := globalScope(jf, usedAssignments(jf, calls))
+	if err != nil {
+		return prepared{}, err
+	}
+	steps, err := resolveOrder(jf, calls, globals)
+	return prepared{steps: steps, set: set}, err
 }
 
 // requested returns the calls the plan asks for. Plan.Calls when set, else
@@ -139,10 +177,11 @@ func requested(plan Plan) ([]Call, error) {
 // are no names. Several names with arguments are a usage error. It is pure.
 func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 	if len(names) == 0 {
-		if len(jf.Recipes) == 0 {
+		recipes := jf.UniqueRecipes()
+		if len(recipes) == 0 {
 			return nil, usage("justfile contains no recipes")
 		}
-		return []Call{{Recipe: jf.Recipes[0].Name, Args: args}}, nil
+		return []Call{{Recipe: recipes[0].Name, Args: args}}, nil
 	}
 	if len(args) > 0 && len(names) > 1 {
 		return nil, usage("positional arguments need exactly one requested recipe, but %d were requested", len(names))
@@ -155,9 +194,11 @@ func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 	return calls, nil
 }
 
-// findRecipe returns the recipe of jf named name, or nil. It is pure.
+// findRecipe returns the recipe of jf named name, or nil. Of recipes that
+// share a name, which allow-duplicate-recipes lets a justfile have, it is the
+// last. It is pure.
 func findRecipe(jf *ast.Justfile, name string) *ast.Recipe {
-	for i := range jf.Recipes {
+	for i := len(jf.Recipes) - 1; i >= 0; i-- {
 		if jf.Recipes[i].Name == name {
 			return &jf.Recipes[i]
 		}
@@ -165,13 +206,15 @@ func findRecipe(jf *ast.Justfile, name string) *ast.Recipe {
 	return nil
 }
 
-// globalScope evaluates every assignment of jf. An assignment may refer to
-// one defined later in the file, so assignments are evaluated in passes until
-// none is left; a pass that makes no progress reports the first failure. It
-// is pure.
-func globalScope(jf *ast.Justfile) (eval.Scope, error) {
+// globalScope evaluates the assignments of jf: all of them when only is nil,
+// else those whose names are in only. Of assignments that share a name, which
+// allow-duplicate-variables lets a justfile have, the last wins. An
+// assignment may refer to one defined later in the file, so assignments are
+// evaluated in passes until none is left; a pass that makes no progress
+// reports the first failure. It is pure.
+func globalScope(jf *ast.Justfile, only map[string]bool) (eval.Scope, error) {
 	scope := make(eval.Scope, len(jf.Assignments))
-	pending := jf.Assignments
+	pending := wanted(jf.UniqueAssignments(), only)
 	for len(pending) > 0 {
 		rest, err := evalPass(jf.File, pending, scope)
 		if len(rest) == len(pending) {
@@ -211,10 +254,11 @@ func evalPass(file string, pending []ast.Assignment, scope eval.Scope) ([]ast.As
 // arguments, so `c 1 c 2 c 1` runs `c` twice. It is pure.
 func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, error) {
 	o := orderer{
-		jf:      jf,
-		globals: globals,
-		byName:  make(map[string]*ast.Recipe, len(jf.Recipes)),
-		active:  make(map[string]bool),
+		jf:       jf,
+		globals:  globals,
+		exported: exportedGlobals(jf),
+		byName:   make(map[string]*ast.Recipe, len(jf.Recipes)),
+		active:   make(map[string]bool),
 	}
 	for i := range jf.Recipes {
 		o.byName[jf.Recipes[i].Name] = &jf.Recipes[i]
@@ -232,7 +276,9 @@ func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, e
 type orderer struct {
 	jf      *ast.Justfile
 	globals eval.Scope
-	byName  map[string]*ast.Recipe
+	// exported lists the globals that every recipe's commands see.
+	exported []string
+	byName   map[string]*ast.Recipe
 	// active holds the calls being visited, which a cycle the analyzer missed
 	// would enter again.
 	active map[string]bool
@@ -259,14 +305,17 @@ func (o *orderer) visit(r *ast.Recipe, args []string, ran map[string]bool) error
 // expand appends the steps of r called with args, for visit. It is pure apart
 // from updating o and ran.
 func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]bool) error {
-	scope, err := bindParams(o.jf, r, args, o.globals)
+	scope, positional, err := bindParams(o.jf, r, args, o.globals)
 	if err != nil {
 		return err
 	}
 	if err := o.dependencies(r, r.Deps, scope, ran); err != nil {
 		return err
 	}
-	o.steps = append(o.steps, step{recipe: r, scope: scope})
+	o.steps = append(o.steps, step{
+		recipe: r, scope: scope, positional: positional,
+		env: exportedEnv(o.jf, r, o.exported, o.globals, scope),
+	})
 	return o.dependencies(r, r.Subsequents, scope, make(map[string]bool, len(r.Subsequents)))
 }
 
@@ -306,27 +355,29 @@ func callKey(name string, args []string) string {
 
 // bindParams returns globals extended with r's parameters: each takes the
 // next argument, or else its default, which may refer to earlier parameters.
-// It is pure.
-func bindParams(jf *ast.Justfile, r *ast.Recipe, args []string, globals eval.Scope) (eval.Scope, error) {
+// It also returns the value of each parameter, in order. It is pure.
+func bindParams(jf *ast.Justfile, r *ast.Recipe, args []string, globals eval.Scope) (eval.Scope, []string, error) {
 	if err := checkArgCount(r, len(args)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	scope := make(eval.Scope, len(globals)+len(r.Params))
 	for k, v := range globals {
 		scope[k] = v
 	}
+	values := make([]string, len(r.Params))
 	for i, p := range r.Params {
+		v := ""
 		if i < len(args) {
-			scope[p.Name] = args[i]
-			continue
+			v = args[i]
+		} else {
+			var err error
+			if v, err = eval.Evaluate(p.Default, scope); err != nil {
+				return nil, nil, locate(err, jf.File, r.Line)
+			}
 		}
-		v, err := eval.Evaluate(p.Default, scope)
-		if err != nil {
-			return nil, locate(err, jf.File, r.Line)
-		}
-		scope[p.Name] = v
+		scope[p.Name], values[i] = v, v
 	}
-	return scope, nil
+	return scope, values, nil
 }
 
 // checkArgCount reports a usage error, worded as upstream's
@@ -395,10 +446,10 @@ func renderLine(line ast.Line, scope eval.Scope) (string, error) {
 
 // shellArgv returns the argv that runs command: the shell and its arguments,
 // followed by command. The shell is chosen as upstream's Settings::shell
-// does: an override (shell, args) wins over the justfile's set shell, which
-// wins over `sh -cu`. It is pure.
-func shellArgv(settings ast.Settings, shell string, args []string, command string) []string {
-	prefix := shellPrefix(settings, shell, args)
+// does: an override (shell, args) wins over the justfile's shell (see
+// justfileShell), which wins over `sh -cu`. It is pure.
+func shellArgv(fromJustfile []string, shell string, args []string, command string) []string {
+	prefix := shellPrefix(fromJustfile, shell, args)
 	argv := make([]string, 0, len(prefix)+1)
 	return append(append(argv, prefix...), command)
 }
@@ -406,10 +457,10 @@ func shellArgv(settings ast.Settings, shell string, args []string, command strin
 // shellPrefix returns the shell and its arguments for shellArgv. An empty
 // shell and nil args are no override; either one alone takes the default for
 // the other. It is pure.
-func shellPrefix(settings ast.Settings, shell string, args []string) []string {
+func shellPrefix(fromJustfile []string, shell string, args []string) []string {
 	if shell == "" && args == nil {
-		if len(settings.Shell) != 0 {
-			return settings.Shell
+		if len(fromJustfile) != 0 {
+			return fromJustfile
 		}
 		return []string{defaultShell, defaultShellFlag}
 	}
@@ -420,6 +471,104 @@ func shellPrefix(settings ast.Settings, shell string, args []string) []string {
 		args = []string{defaultShellFlag}
 	}
 	return append([]string{shell}, args...)
+}
+
+// justfileShell is the shell the justfile asks for on the operating system
+// goos, as upstream's Settings::shell picks it: `set windows-shell` on
+// Windows, else `set windows-powershell` on Windows, else `set shell`. Nil
+// means it asks for none. It is pure.
+func justfileShell(set ast.Settings, res settings.Resolved, goos string) []string {
+	switch {
+	case goos == "windows" && res.WindowsShell != nil:
+		return res.WindowsShell
+	case goos == "windows" && set.WindowsPowerShell:
+		return append([]string{powershell}, powershellArgs()...)
+	}
+	return res.Shell
+}
+
+// workingDirectory is the directory the commands of a recipe run in. With set
+// no-cd it is the directory the command was run from; else it is the base
+// directory, with set working-directory joined to it, as upstream does, so
+// that an absolute setting replaces it. It is pure.
+func workingDirectory(plan Plan, res settings.Resolved) string {
+	if plan.Justfile.Settings.NoCd && plan.InvocationDir != "" {
+		return plan.InvocationDir
+	}
+	if plan.Justfile.Settings.NoCd || res.WorkingDirectory == nil {
+		return plan.WorkDir
+	}
+	dir := *res.WorkingDirectory
+	if filepath.IsAbs(dir) {
+		return dir
+	}
+	return filepath.Join(plan.WorkDir, dir)
+}
+
+// exportedGlobals lists the assignments whose values every recipe's commands
+// see: those written with `export`, and all of them under set export. Pure.
+func exportedGlobals(jf *ast.Justfile) []string {
+	var names []string
+	for _, a := range jf.UniqueAssignments() {
+		if a.Exported || jf.Settings.Export {
+			names = append(names, a.Name)
+		}
+	}
+	return names
+}
+
+// exportedEnv returns the variables the commands of r see besides the plan's
+// environment: the exported globals, then the parameters written with `$`,
+// or all of them under set export. A global that was not evaluated, under set
+// lazy, is left out. It is nil when there are none. It is pure.
+func exportedEnv(jf *ast.Justfile, r *ast.Recipe, exported []string, globals, scope eval.Scope) map[string]string {
+	var env map[string]string
+	add := func(name, value string) {
+		if env == nil {
+			env = make(map[string]string, len(exported)+len(r.Params))
+		}
+		env[name] = value
+	}
+	for _, name := range exported {
+		if v, ok := globals[name]; ok {
+			add(name, v)
+		}
+	}
+	for _, p := range r.Params {
+		if p.Exported || jf.Settings.Export {
+			add(p.Name, scope[p.Name])
+		}
+	}
+	return env
+}
+
+// mergeEnv returns base with the variables of extra added, in the order of
+// their names, replacing any base entry of the same name. It is pure.
+func mergeEnv(base []string, extra map[string]string) []string {
+	if len(extra) == 0 {
+		return base
+	}
+	out := make([]string, 0, len(base)+len(extra))
+	for _, kv := range base {
+		if key, _, _ := strings.Cut(kv, "="); !hasKey(extra, key) {
+			out = append(out, kv)
+		}
+	}
+	names := make([]string, 0, len(extra))
+	for name := range extra {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		out = append(out, name+"="+extra[name])
+	}
+	return out
+}
+
+// hasKey reports whether m has key. It is pure.
+func hasKey(m map[string]string, key string) bool {
+	_, ok := m[key]
+	return ok
 }
 
 // echoes reports whether a line with prefix p is echoed before it runs: not
@@ -483,12 +632,24 @@ type invocation struct {
 	plan   Plan
 	exec   sys.Process
 	stderr io.Writer
+	// shell is the shell the justfile asks for, nil for none, and dir the
+	// directory commands run in.
+	shell []string
+	dir   string
 }
 
-// newInvocation fills in the defaults for plan's optional fields. It is pure:
-// it only builds a value; sys.OSProcess is not used until a line runs.
-func newInvocation(ctx context.Context, plan Plan) *invocation {
-	inv := &invocation{ctx: ctx, plan: plan, exec: plan.Exec, stderr: plan.Stderr}
+// newInvocation fills in the defaults for plan's optional fields and picks
+// the shell and directory from the evaluated settings set. It is pure: it
+// only builds a value; sys.OSProcess is not used until a line runs.
+func newInvocation(ctx context.Context, plan Plan, set settings.Resolved) *invocation {
+	goos := plan.OS
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	inv := &invocation{
+		ctx: ctx, plan: plan, exec: plan.Exec, stderr: plan.Stderr,
+		shell: justfileShell(plan.Justfile.Settings, set, goos), dir: workingDirectory(plan, set),
+	}
 	if inv.exec == nil {
 		inv.exec = sys.OSProcess{}
 	}
@@ -499,36 +660,70 @@ func newInvocation(ctx context.Context, plan Plan) *invocation {
 }
 
 // recipe runs the lines of s in order. It returns the exit code of the
-// invocation, which is non-zero when a line failed. Impure: it runs commands.
+// invocation, which is non-zero when a line failed. A comment is skipped under
+// set ignore-comments, and a guard that fails ends the recipe, quietly.
+// Impure: it runs commands.
 func (inv *invocation) recipe(s step) (int, error) {
 	for _, line := range s.recipe.Lines {
-		code, err := inv.line(s, line)
-		if err != nil || code != 0 {
-			return code, err
+		if line.Comment && inv.plan.Justfile.Settings.IgnoreComments {
+			continue
+		}
+		res, err := inv.line(s, line)
+		if err != nil || res.code != 0 {
+			return res.code, err
+		}
+		if res.halt {
+			return 0, nil
 		}
 	}
 	return 0, nil
 }
 
+// lineResult is the outcome of one line: the invocation's exit code, which is
+// non-zero when the line failed, and whether a guard asked to end the recipe.
+type lineResult struct {
+	code int
+	halt bool
+}
+
 // line renders, echoes and runs one recipe line. A non-zero status of a line
-// without `-` writes the failure message and is returned as the exit code.
-// Impure: it writes to Stderr and runs a command.
-func (inv *invocation) line(s step, line ast.Line) (int, error) {
+// without `-` writes the failure message and is returned as the exit code. A
+// guard line with status 1 halts the recipe, and with a higher status is an
+// error. Impure: it writes to Stderr and runs a command.
+func (inv *invocation) line(s step, line ast.Line) (lineResult, error) {
 	if err := inv.ctx.Err(); err != nil {
-		return 0, err
+		return lineResult{}, err
 	}
 	command, err := renderLine(line, s.scope)
 	if err != nil {
-		return 0, locate(err, inv.plan.Justfile.File, line.Line)
+		return lineResult{}, locate(err, inv.plan.Justfile.File, line.Line)
 	}
 	if command == "" {
-		return 0, nil
+		return lineResult{}, nil
 	}
 	if echoes(line.Prefix, inv.plan.Quiet || inv.plan.Justfile.Settings.Quiet) {
 		fmt.Fprintln(inv.stderr, command)
 	}
-	code, err := inv.execLine(command)
-	return inv.outcome(s.recipe, line, code, err)
+	code, err := inv.execLine(s, command)
+	if line.Guard && err == nil {
+		return inv.guarded(s.recipe, line, code)
+	}
+	code, err = inv.outcome(s.recipe, line, code, err)
+	return lineResult{code: code}, err
+}
+
+// guarded is the outcome of a guard line that ran with status code: success
+// goes on, status 1 ends the recipe, and any other status is reserved. It is
+// pure.
+func (inv *invocation) guarded(r *ast.Recipe, line ast.Line, code int) (lineResult, error) {
+	switch code {
+	case 0:
+		return lineResult{}, nil
+	case 1:
+		return lineResult{halt: true}, nil
+	}
+	return lineResult{code: 1}, &diag.Error{Kind: diag.KindRuntime, Msg: fmt.Sprintf(
+		"guard line in recipe `%s` on line %d returned reserved exit code %d", r.Name, line.Line, code)}
 }
 
 // outcome turns the status of a line's command into the line's result: a
@@ -560,7 +755,7 @@ func (inv *invocation) signaled(recipe string, line ast.Line, code int, sig *sys
 	}
 	switch {
 	case sig.Signal != 0:
-		return inv.report(terminatedMessage(recipe, line.Line, sig.Signal), 128+sig.Signal)
+		return inv.reportExit(terminatedMessage(recipe, line.Line, sig.Signal), 128+sig.Signal)
 	case code != 0:
 		return inv.failed(recipe, line.Line, code)
 	}
@@ -577,7 +772,16 @@ func terminatedMessage(recipe string, line, signal int) string {
 // unless the plan is quiet, and returns the invocation's exit code. Impure:
 // it writes to Stderr.
 func (inv *invocation) failed(recipe string, line, code int) int {
-	return inv.report(failureMessage(recipe, line, code), exitCode(code))
+	return inv.reportExit(failureMessage(recipe, line, code), exitCode(code))
+}
+
+// reportExit is report for the message about a recipe's exit status, which
+// set no-exit-message also silences. Impure: it writes to Stderr.
+func (inv *invocation) reportExit(msg string, code int) int {
+	if inv.plan.Justfile.Settings.NoExitMessage {
+		return code
+	}
+	return inv.report(msg, code)
 }
 
 // report writes msg to Stderr, unless the plan is quiet, as upstream's -q
@@ -600,7 +804,7 @@ func (inv *invocation) startFailure(r *ast.Recipe, line ast.Line, err error) (in
 		return 0, ctxErr
 	}
 	p := inv.plan
-	shell := shellPrefix(p.Justfile.Settings, p.Shell, p.ShellArgs)[0]
+	shell := shellPrefix(inv.shell, p.Shell, p.ShellArgs)[0]
 	return 1, &diag.Error{Kind: diag.KindRuntime, File: p.Justfile.File, Line: line.Line,
 		Msg: shellFailure(r.Name, shell, err)}
 }
@@ -622,12 +826,16 @@ func shellFailure(recipe, shell string, err error) string {
 // execLine builds the process spec for command and runs it through the
 // plan's sys.Process. Cancellation and process groups are the process
 // runner's job. Impure: it runs a command.
-func (inv *invocation) execLine(command string) (int, error) {
+func (inv *invocation) execLine(s step, command string) (int, error) {
 	p := inv.plan
+	argv := shellArgv(inv.shell, p.Shell, p.ShellArgs, command)
+	if p.Justfile.Settings.PositionalArguments {
+		argv = append(append(argv, s.recipe.Name), s.positional...)
+	}
 	return inv.exec.Run(inv.ctx, sys.ProcessSpec{
-		Argv:   shellArgv(p.Justfile.Settings, p.Shell, p.ShellArgs, command),
-		Dir:    p.WorkDir,
-		Env:    exactEnv(p.Env),
+		Argv:   argv,
+		Dir:    inv.dir,
+		Env:    exactEnv(mergeEnv(p.Env, s.env)),
 		Stdin:  p.Stdin,
 		Stdout: p.Stdout,
 		Stderr: p.Stderr,

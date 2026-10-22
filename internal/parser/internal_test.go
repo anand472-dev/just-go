@@ -8,18 +8,18 @@ import (
 )
 
 // The lexer never produces a body line without a part, so Parse cannot reach
-// the empty case of splitPrefix. Pin it here.
-func TestSplitPrefixOfNoParts(t *testing.T) {
-	prefix, parts := splitPrefix(nil)
-	if prefix != ast.PrefixNone || parts != nil {
-		t.Errorf("splitPrefix(nil) = %v, %v", prefix, parts)
+// the empty case of splitSigils. Pin it here.
+func TestSplitSigilsOfNoParts(t *testing.T) {
+	found, parts := splitSigils(nil, true)
+	if found != (sigils{}) || parts != nil {
+		t.Errorf("splitSigils(nil) = %v, %v", found, parts)
 	}
 }
 
-func TestSplitPrefixKeepsLaterParts(t *testing.T) {
+func TestSplitSigilsKeepsLaterParts(t *testing.T) {
 	in := []ast.Expr{ast.Text{Value: "@"}, ast.Var{Name: "x"}}
-	prefix, parts := splitPrefix(in)
-	if prefix != ast.PrefixAt || !reflect.DeepEqual(parts, []ast.Expr{ast.Var{Name: "x"}}) {
-		t.Errorf("splitPrefix = %v, %v", prefix, parts)
+	found, parts := splitSigils(in, false)
+	if found.prefix() != ast.PrefixAt || !reflect.DeepEqual(parts, []ast.Expr{ast.Var{Name: "x"}}) {
+		t.Errorf("splitSigils = %v, %v", found, parts)
 	}
 }

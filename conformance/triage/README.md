@@ -42,35 +42,35 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `cli:<flag>` | Passes a flag the command does not implement, sets the `JUST_*` variable of one, or uses a command-line form the command does not implement: `cli:set` for `NAME=VALUE`, `cli:search-directory` for `dir/recipe`, `cli:justfile` for `--justfile -`, and `cli:list` for `--list <module>`. |
 | `module` | Uses `mod` or `import`, or names a `module::recipe` path. |
 | `dotenv` | Has a `.env` file or a `dotenv-*` setting. |
-| `setting:<name>` | Sets a setting other than `quiet` and `shell`. |
+| `setting:<name>` | Sets a setting that has no effect yet: `default-script` (needs script recipes, Task 11) and `fallback` (needs the search of parent justfiles, Phase 3). |
 | `attribute` | Uses an attribute (`[private]`, `[group]`, ...). |
 | `shebang` | Has a shebang recipe. |
 | `backtick` | Uses a backtick expression. |
 | `conditional` | Uses an `if` expression. |
 | `builtin:<family>` | Calls a builtin function, or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
-| `grammar` | Uses other syntax outside the implemented subset (`alias`, `export`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
+| `grammar` | Uses other syntax outside the implemented subset (`alias`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
 | `core-defect` | Uses only the implemented subset and still fails. Must be empty. |
 | `other` | Fails for a reason no rule above explains. |
 
 ## Current counts
 
-From the run recorded in `groups.json`: 195 pass, 1800 fail, 16 skip, of
+From the run recorded in `groups.json`: 260 pass, 1735 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
 |---|---|
 | `cli:*` | 657 |
 | `unstable:*` | 386 |
-| `attribute` | 220 |
+| `attribute` | 227 |
 | `module` | 157 |
-| `setting:*` | 112 |
-| `grammar` | 71 |
-| `builtin:*` | 58 |
-| `backtick` | 39 |
+| `grammar` | 69 |
+| `builtin:*` | 61 |
+| `backtick` | 57 |
 | `completions` | 40 |
 | `dotenv` | 30 |
-| `conditional` | 16 |
-| `shebang` | 14 |
+| `setting:*` | 13 |
+| `conditional` | 17 |
+| `shebang` | 21 |
 | `core-defect` | 0 |
 | `other` | 0 |
 

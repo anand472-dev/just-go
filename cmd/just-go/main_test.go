@@ -674,3 +674,38 @@ func TestRunUnknownRecipeSuggestsAName(t *testing.T) {
 		}
 	}
 }
+
+// The cases below are the corpus's default group: default_list_lists_recipes,
+// default_list_does_not_override_explicit_recipe and
+// default_list_false_runs_default_recipe.
+func TestRunDefaultListListsRecipesWhenNoneIsNamed(t *testing.T) {
+	src := "set default-list := true\n\nfoo:\n  @echo foo\n\nbar:\n"
+	got := runFake(t, map[string]string{"/w/justfile": src}, nil)
+	if want := "Available recipes:\n    bar\n    foo\n"; got.code != 0 || got.stdout != want || len(got.proc.Specs) != 0 {
+		t.Errorf("run = %d, stdout %q, ran %d; want 0, %q, none", got.code, got.stdout, len(got.proc.Specs), want)
+	}
+}
+
+func TestRunDefaultListDoesNotOverrideAnExplicitRecipe(t *testing.T) {
+	src := "set default-list\n\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+	got := runFake(t, map[string]string{"/w/justfile": src}, nil, "bar")
+	if got.code != 0 || got.stdout != "" || len(got.proc.Specs) != 1 {
+		t.Errorf("run = %d, stdout %q, ran %d", got.code, got.stdout, len(got.proc.Specs))
+	}
+}
+
+func TestRunDefaultListFalseRunsTheDefaultRecipe(t *testing.T) {
+	src := "set default-list := false\n\nfoo:\n  @echo foo\n\nbar:\n"
+	got := runFake(t, map[string]string{"/w/justfile": src}, nil)
+	if got.code != 0 || got.stdout != "" || len(got.proc.Specs) != 1 {
+		t.Errorf("run = %d, stdout %q, ran %d", got.code, got.stdout, len(got.proc.Specs))
+	}
+}
+
+func TestRunNoCdRunsInTheDirectoryItWasRunFrom(t *testing.T) {
+	// The justfile is found in the parent of the working directory.
+	got := runFake(t, map[string]string{"/justfile": "set no-cd\nfoo:\n  @echo\n"}, nil)
+	if got.code != 0 || len(got.proc.Specs) != 1 || got.proc.Specs[0].Dir != "/w" {
+		t.Errorf("run = %d, specs %+v; want one in /w", got.code, got.proc.Specs)
+	}
+}

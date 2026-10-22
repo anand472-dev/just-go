@@ -16,20 +16,67 @@ type Justfile struct {
 	Recipes     []Recipe
 }
 
-// Settings holds the values of `set` statements.
+// Settings holds the values of `set` statements. A boolean setting that is
+// not set is false, as upstream's default is; an expression setting that is
+// not set is nil.
+//
+// The expression settings are kept as written. Upstream evaluates them in a
+// const context before anything runs (see package settings), so a setting can
+// name a variable defined later in the file.
 type Settings struct {
-	Quiet bool
-	// Shell is the command and arguments used to run recipe lines. Nil means
-	// the default shell.
-	Shell []string
+	AllowDuplicateRecipes   bool
+	AllowDuplicateVariables bool
+	DefaultList             bool
+	DefaultScript           bool
+	Export                  bool
+	Fallback                bool
+	Guards                  bool
+	IgnoreComments          bool
+	Lazy                    bool
+	NoCd                    bool
+	NoExitMessage           bool
+	PositionalArguments     bool
+	Quiet                   bool
+	WindowsPowerShell       bool
+	// Shell, WindowsShell and ScriptInterpreter are the command and its
+	// arguments, each an expression. Nil means the setting is not set.
+	Shell             []Expr
+	WindowsShell      []Expr
+	ScriptInterpreter []Expr
+	// Tempdir and WorkingDirectory are nil when not set.
+	Tempdir          Expr
+	WorkingDirectory Expr
+	// Indentation is the validated indentation string of `set indentation`,
+	// and MinimumVersion the validated version of `set minimum-version`.
+	// Both are empty when the setting is not set.
+	Indentation    string
+	MinimumVersion string
+	// Sites lists every `set` statement in source order, for the checks that
+	// compare one setting with another.
+	Sites []SettingSite
+}
+
+// SettingSite is one `set` statement: the setting's name and where the name
+// is. Active is false for a boolean setting set to false, which conflicts
+// with nothing.
+type SettingSite struct {
+	Name   string
+	Active bool
+	Line   int
+	Col    int
 }
 
 // Assignment is `name := value`. Line and Col locate the name.
 type Assignment struct {
 	Name  string
 	Value Expr
-	Line  int
-	Col   int
+	// Exported is true for `export name := value`, which puts the variable in
+	// the environment of every recipe. Eager is true for `eager name :=
+	// value`, which `set lazy` evaluates even when nothing uses it.
+	Exported bool
+	Eager    bool
+	Line     int
+	Col      int
 }
 
 // Recipe is a named recipe. A leading `@` on the recipe name is folded into
@@ -65,8 +112,11 @@ type Dependency struct {
 
 // Param is a recipe parameter. Line and Col locate the name.
 type Param struct {
-	Name    string
-	Default Expr // nil when the parameter has no default
+	Name string
+	// Exported is true for `$name`, which puts the parameter in the
+	// environment of the recipe's commands.
+	Exported bool
+	Default  Expr // nil when the parameter has no default
 	// DefaultText is the default as written, with its quotes, and with single
 	// spaces around `+`; it is what `--list` shows. Empty when there is no
 	// default.
@@ -104,10 +154,76 @@ type Line struct {
 	// Line is the last physical line of the command, which upstream reports
 	// when the command fails.
 	Line int
+	// Guard is true when the command starts with the guard sigil `?`, which
+	// only `set guards` recognizes.
+	Guard bool
+	// GuardClash is the text of the command's first part, sigils included,
+	// when it has both the guard `?` and the infallible `-` sigils, which
+	// upstream rejects. The zero Span when it does not.
+	GuardClash Span
+	// Comment is true when the command's text starts with `#`, which
+	// `set ignore-comments` skips.
+	Comment bool
 	// ExtraIndent is the text of the command's first physical line when it
 	// starts with more whitespace than the recipe's indentation, which
 	// upstream rejects. The zero Span when it does not.
 	ExtraIndent Span
+}
+
+// UniqueRecipes returns the recipes of j with the first of any two that share
+// a name left out, as upstream keeps the last of them when
+// allow-duplicate-recipes is set. They stay in source order. Without
+// duplicates it returns j.Recipes itself. Pure.
+func (j *Justfile) UniqueRecipes() []Recipe {
+	last := make(map[string]int, len(j.Recipes))
+	for i, r := range j.Recipes {
+		last[r.Name] = i
+	}
+	if len(last) == len(j.Recipes) {
+		return j.Recipes
+	}
+	out := make([]Recipe, 0, len(last))
+	for i, r := range j.Recipes {
+		if last[r.Name] == i {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// UniqueAssignments is UniqueRecipes for assignments, the last of a name
+// winning. Pure.
+func (j *Justfile) UniqueAssignments() []Assignment {
+	last := make(map[string]int, len(j.Assignments))
+	for i, a := range j.Assignments {
+		last[a.Name] = i
+	}
+	if len(last) == len(j.Assignments) {
+		return j.Assignments
+	}
+	out := make([]Assignment, 0, len(last))
+	for i, a := range j.Assignments {
+		if last[a.Name] == i {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// Variables appends to names the name of each variable in e, in the order they
+// are written, and returns the result. Pure.
+func Variables(e Expr, names []string) []string {
+	switch e := e.(type) {
+	case Var:
+		return append(names, e.Name)
+	case Concat:
+		return Variables(e.Right, Variables(e.Left, names))
+	case Call:
+		for _, arg := range e.Args {
+			names = Variables(arg, names)
+		}
+	}
+	return names
 }
 
 // Expr is an expression node: Text, StringLit, Var or Concat.

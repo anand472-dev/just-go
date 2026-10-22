@@ -132,6 +132,9 @@ func undefinedInRecipe(jf *ast.Justfile, r *ast.Recipe, globals map[string]struc
 		return err
 	}
 	for _, l := range r.Lines {
+		if jf.Settings.IgnoreComments && l.Comment {
+			continue
+		}
 		for _, part := range l.Parts {
 			if err := references(part, check); err != nil {
 				return err

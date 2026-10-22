@@ -31,19 +31,22 @@ import (
 // Options carries everything a load or a run depends on. Load reads
 // Justfile, SearchFrom and FS; Run reads the rest.
 type Options struct {
-	Justfile   string      // explicit path; empty means search from SearchFrom
-	SearchFrom string      // directory to search upward from; used when Justfile is empty
-	WorkDir    string      // working directory for recipes; empty means the justfile's directory
-	Env        []string    // exact environment, "KEY=VALUE"; nil means empty, never the process environment
-	Stdin      io.Reader   // nil means no input
-	Stdout     io.Writer   // nil discards
-	Stderr     io.Writer   // nil discards; receives echoed commands and failure messages
-	Recipes    []string    // recipes to run; empty means the first recipe in the file
-	Args       []string    // positional arguments for the single requested recipe
-	Calls      []Call      // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
-	Quiet      bool        // suppress command echo, as if `set quiet` held
-	FS         sys.FS      // nil uses the OS implementation from internal/sys
-	Exec       sys.Process // nil uses the OS implementation from internal/sys
+	Justfile   string // explicit path; empty means search from SearchFrom
+	SearchFrom string // directory to search upward from; used when Justfile is empty
+	WorkDir    string // working directory for recipes; empty means the justfile's directory
+	// InvocationDir is the directory the command was run from, where recipes
+	// run under set no-cd. Empty means WorkDir.
+	InvocationDir string
+	Env           []string    // exact environment, "KEY=VALUE"; nil means empty, never the process environment
+	Stdin         io.Reader   // nil means no input
+	Stdout        io.Writer   // nil discards
+	Stderr        io.Writer   // nil discards; receives echoed commands and failure messages
+	Recipes       []string    // recipes to run; empty means the first recipe in the file
+	Args          []string    // positional arguments for the single requested recipe
+	Calls         []Call      // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
+	Quiet         bool        // suppress command echo, as if `set quiet` held
+	FS            sys.FS      // nil uses the OS implementation from internal/sys
+	Exec          sys.Process // nil uses the OS implementation from internal/sys
 	// Shell and ShellArgs override the justfile's set shell for every recipe
 	// line of the run, as upstream's --shell and --shell-arg do. Shell alone
 	// runs Shell with the default arguments (-cu); ShellArgs alone runs the
@@ -136,8 +139,9 @@ func Parse(name string, src []byte) (*Justfile, error) {
 // Recipes lists the justfile's recipes in declaration order. The result is
 // freshly allocated, so callers may modify it. Pure.
 func (j *Justfile) Recipes() []RecipeInfo {
-	infos := make([]RecipeInfo, len(j.tree.Recipes))
-	for i, r := range j.tree.Recipes {
+	recipes := j.tree.UniqueRecipes()
+	infos := make([]RecipeInfo, len(recipes))
+	for i, r := range recipes {
 		params := make([]string, len(r.Params))
 		defaults := make([]string, len(r.Params))
 		for k, p := range r.Params {
@@ -146,6 +150,20 @@ func (j *Justfile) Recipes() []RecipeInfo {
 		infos[i] = RecipeInfo{Name: r.Name, Doc: r.Doc, Params: params, Defaults: defaults}
 	}
 	return infos
+}
+
+// DefaultList reports whether the justfile asks, with set default-list, for
+// its recipes to be listed rather than its default recipe run when no recipe
+// is named. Pure.
+func (j *Justfile) DefaultList() bool {
+	return j.tree.Settings.DefaultList
+}
+
+// Fallback reports whether the justfile asks, with set fallback, for a
+// recipe it does not contain to be looked up in the justfile of the parent
+// directory. Pure.
+func (j *Justfile) Fallback() bool {
+	return j.tree.Settings.Fallback
 }
 
 // Run runs opts.Recipes, or the first recipe when none are named, with their
@@ -163,19 +181,20 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, usage("no working directory: set Options.WorkDir for a justfile parsed from memory")
 	}
 	res, err := runner.Run(ctx, runner.Plan{
-		Justfile:  j.tree,
-		Recipes:   opts.Recipes,
-		Args:      opts.Args,
-		Calls:     runnerCalls(opts.Calls),
-		Env:       opts.Env,
-		WorkDir:   dir,
-		Stdin:     opts.Stdin,
-		Stdout:    opts.Stdout,
-		Stderr:    opts.Stderr,
-		Quiet:     opts.Quiet,
-		Exec:      opts.Exec,
-		Shell:     opts.Shell,
-		ShellArgs: opts.ShellArgs,
+		Justfile:      j.tree,
+		Recipes:       opts.Recipes,
+		Args:          opts.Args,
+		Calls:         runnerCalls(opts.Calls),
+		Env:           opts.Env,
+		WorkDir:       dir,
+		InvocationDir: opts.InvocationDir,
+		Stdin:         opts.Stdin,
+		Stdout:        opts.Stdout,
+		Stderr:        opts.Stderr,
+		Quiet:         opts.Quiet,
+		Exec:          opts.Exec,
+		Shell:         opts.Shell,
+		ShellArgs:     opts.ShellArgs,
 	})
 	return Result{ExitCode: res.ExitCode}, err
 }

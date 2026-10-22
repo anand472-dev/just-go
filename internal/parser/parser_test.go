@@ -184,6 +184,15 @@ func TestParseQuietRecipeTogglesLinePrefix(t *testing.T) {
 	}
 }
 
+// lits returns string literals for the given values.
+func lits(values ...string) []ast.Expr {
+	out := make([]ast.Expr, len(values))
+	for i, v := range values {
+		out[i] = lit(v)
+	}
+	return out
+}
+
 func TestParseSetShell(t *testing.T) {
 	for src, want := range map[string][]string{
 		`set shell := ["bash", "-cu"]`:    {"bash", "-cu"},
@@ -193,7 +202,7 @@ func TestParseSetShell(t *testing.T) {
 		"set shell := [\"bash\"]\r\n\r\n": {"bash"},
 	} {
 		jf := mustParse(t, src)
-		if !reflect.DeepEqual(jf.Settings.Shell, want) {
+		if !reflect.DeepEqual(jf.Settings.Shell, lits(want...)) {
 			t.Errorf("Parse(%q) Shell = %q, want %q", src, jf.Settings.Shell, want)
 		}
 		if jf.Settings.Quiet {
@@ -452,7 +461,7 @@ func TestParseRecipeBodies(t *testing.T) {
 		{"tabs", "r:\n\ta\n\t\tb\n", []ast.Line{
 			{Parts: []ast.Expr{txt("a")}, Line: 2}, {Parts: []ast.Expr{txt("\tb")}, Line: 3}}},
 		{"comments in the body are text", "r:\n  # c\n  echo # d\n", []ast.Line{
-			{Parts: []ast.Expr{txt("# c")}, Line: 2}, {Parts: []ast.Expr{txt("echo # d")}, Line: 3}}},
+			{Parts: []ast.Expr{txt("# c")}, Line: 2, Comment: true}, {Parts: []ast.Expr{txt("echo # d")}, Line: 3}}},
 		{"CRLF", "r:\r\n  a\r\n  b\r\n", []ast.Line{
 			{Parts: []ast.Expr{txt("a")}, Line: 2}, {Parts: []ast.Expr{txt("b")}, Line: 3}}},
 		{"no final newline", "r:\n  a", []ast.Line{{Parts: []ast.Expr{txt("a")}, Line: 2}}},
@@ -728,7 +737,7 @@ func TestParseStringLiteralForms(t *testing.T) {
 	if !reflect.DeepEqual(jf.Assignments, want) {
 		t.Errorf("Assignments =\n %+v\nwant\n %+v", jf.Assignments, want)
 	}
-	if shell := []string{"bash", "\\c"}; !reflect.DeepEqual(jf.Settings.Shell, shell) {
+	if shell := lits("bash", "\\c"); !reflect.DeepEqual(jf.Settings.Shell, shell) {
 		t.Errorf("Shell = %q, want %q", jf.Settings.Shell, shell)
 	}
 }
@@ -806,7 +815,7 @@ func TestParseDelimiterContinuation(t *testing.T) {
 		t.Errorf("paren_continuation: Assignments = %+v, want x := %+v", jf.Assignments, want)
 	}
 	jf = mustParse(t, "set shell := [\n  'sh',\n  '-cu',\n]\n\nfoo:\n  echo foo\n")
-	if want := []string{"sh", "-cu"}; !reflect.DeepEqual(jf.Settings.Shell, want) {
+	if want := lits("sh", "-cu"); !reflect.DeepEqual(jf.Settings.Shell, want) {
 		t.Errorf("bracket_continuation: Shell = %q, want %q", jf.Settings.Shell, want)
 	}
 }
