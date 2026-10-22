@@ -30,7 +30,10 @@ type Process interface {
 
 // ProcessSpec describes one program invocation.
 type ProcessSpec struct {
-	Argv   []string  // Argv[0] is the program
+	// Argv[0] is the program. A bare name (no path separator) is searched
+	// for in the PATH of Env, or in a fixed default when Env has no PATH;
+	// the parent process's PATH is never consulted.
+	Argv   []string
 	Dir    string    // working directory; empty means the current directory
 	Env    []string  // exact environment, "KEY=VALUE"; nil means empty
 	Stdin  io.Reader // nil means no input

@@ -50,14 +50,20 @@ func (OSFS) ReadDir(path string) ([]string, error) {
 // OSProcess is the Process backed by os/exec.
 type OSProcess struct{}
 
-// Run executes spec. The child runs in its own process group, and cancelling
-// ctx kills the whole group, not just the direct child. Impure: it spawns an
-// operating-system process.
+// Run executes spec. A bare Argv[0] is resolved against the PATH of
+// spec.Env, never the parent's PATH (see resolveProgram). The child runs in
+// its own process group, and cancelling ctx kills the whole group, not just
+// the direct child. Impure: it spawns an operating-system process.
 func (OSProcess) Run(ctx context.Context, spec ProcessSpec) (int, error) {
 	if len(spec.Argv) == 0 {
 		return -1, errors.New("sys: empty argv")
 	}
-	cmd := exec.CommandContext(ctx, spec.Argv[0], spec.Argv[1:]...)
+	prog, err := resolveProgram(spec.Argv[0], spec.Env)
+	if err != nil {
+		return -1, err
+	}
+	cmd := exec.CommandContext(ctx, prog, spec.Argv[1:]...)
+	cmd.Args[0] = spec.Argv[0]
 	cmd.Dir = spec.Dir
 	cmd.Env = exactEnv(spec.Env)
 	cmd.Stdin = spec.Stdin

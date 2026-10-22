@@ -3,9 +3,36 @@
 package sys
 
 import (
+	"os"
 	"os/exec"
 	"syscall"
 )
+
+// defaultPath is searched for a bare program name when the child's
+// environment has no PATH. It is the POSIX execvp default.
+const defaultPath = "/usr/bin:/bin"
+
+// pathSeparators are the characters that make a program name a path.
+const pathSeparators = "/"
+
+// sameKey reports whether two environment keys name the same variable.
+// Unix keys are case-sensitive. Pure.
+func sameKey(a, b string) bool {
+	return a == b
+}
+
+// pathExts returns the file-name suffixes tried for a bare program name.
+// Unix tries the name alone. Pure.
+func pathExts([]string) []string {
+	return []string{""}
+}
+
+// isExecutable reports whether path is a regular file with an execute bit
+// set. Impure: it touches the real filesystem.
+func isExecutable(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+}
 
 // isolateGroup puts the child in its own process group and makes
 // cancellation kill that whole group. Impure: it configures process and
