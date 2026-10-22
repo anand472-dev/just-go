@@ -13,6 +13,7 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
 | Total cases | 2011 |
 | Cases with regex comparisons | 160 |
 | Cases with JSON responses | 3 |
+| Cases with a path-hashed cache file | 45 |
 
 ## How to read a case
 
@@ -21,12 +22,41 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
 - `stdout` and `stderr` are the expectations after upstream's `unindent`. They
   are omitted when the matching `*_regex` is set. A regex is the complete
   pattern upstream compiled, including its `^` and `$` anchors and `(?s)`.
-- `path_extra` holds the directory that `Test::path` put in `PATH`, relative to
-  the case's temporary directory. It is removed from `env`.
+- `path_extra` lists directories relative to the case's temporary directory
+  (`.` is the directory itself). Upstream's `Test::path` **replaces**
+  `PATH`, so a runner sets `PATH` to exactly these directories, resolved
+  against its temporary directory and joined with the platform's path list
+  separator. It does not prepend to the inherited `PATH`. The name is
+  historical. The field is used only when every element of upstream's `PATH`
+  lay inside the temporary directory; then `PATH` is removed from `env`.
+  Otherwise `PATH` stays in `env` (with placeholders, see below) and
+  `path_extra` is empty.
+- Absolute paths of the machine that recorded the corpus are replaced by
+  placeholders in every string of a case (`files` contents, `args`, `env`,
+  `stdin`, `stdout`, `stderr`, both regexes, decoded `expected_files`
+  contents, and `response`). A runner substitutes them back before it runs
+  the case and again in the expectations:
+  - `@@TEMPDIR@@` is the case's temporary directory. The runner must create
+    it with symbolic links resolved (on macOS `/var` is `/private/var`), so
+    that the plain and the canonical spelling are the same string.
+  - `@@TEMPDIR_PARENT@@` is the directory that contains it.
+  - `@@JUST_EXECUTABLE@@` is the absolute path of the binary under test.
+
+  Inside `stdout_regex` and `stderr_regex` the runner inserts the
+  regex-quoted path (Go's `regexp.QuoteMeta`). Everywhere else it inserts the
+  path as it is.
 - `files` is the content of the temporary directory just before just ran.
   Upstream makes executables by naming them `*.exe`; a runner should mark
   files with that suffix executable.
 - `response` is the value upstream compared with stdout, or `null`.
+
+## Cases that cannot be reproduced
+
+just names its cache files `.justcache/<hash>.json` after a hash of the
+justfile's absolute path. A case whose `files` contain such a file was
+recorded with the recorder's temporary directory in that hash, and no
+placeholder can stand for it. The table above counts them. The runner should
+treat them as path-dependent.
 
 ## What is not recorded
 

@@ -54,6 +54,25 @@ func TestCorpusSchema(t *testing.T) {
 	}
 }
 
+// TestCorpusHasNoRecorderPaths guards the placeholders: no recorded string may
+// hold a path of the machine that recorded the corpus.
+func TestCorpusHasNoRecorderPaths(t *testing.T) {
+	data, err := sys.OSFS{}.ReadFile(corpusPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{"/var/folders/", "/private/var/", "just-go-corpus", "/src/target/release/just"} {
+		if strings.Contains(string(data), marker) {
+			t.Errorf("corpus contains %q; the recorder must replace it with a placeholder", marker)
+		}
+	}
+	for _, token := range []string{TempDirToken, TempDirParentToken, JustExecutableToken} {
+		if !strings.Contains(string(data), token) {
+			t.Errorf("corpus never uses %s", token)
+		}
+	}
+}
+
 func TestCorpusIsNotEmpty(t *testing.T) {
 	fsys := sys.OSFS{}
 	cases, err := LoadCases(fsys, corpusPath)
@@ -210,15 +229,19 @@ func TestValidateCorpus(t *testing.T) {
 		t.Fatalf("duplicate id: got %v", err)
 	}
 	for name, mutate := range map[string]func(m map[string]any){
-		"no id":           func(m map[string]any) { m["id"] = "" },
-		"no status":       func(m map[string]any) { delete(m, "status") },
-		"no stdout":       func(m map[string]any) { delete(m, "stdout") },
-		"no stderr":       func(m map[string]any) { delete(m, "stderr") },
-		"both stdout":     func(m map[string]any) { m["stdout_regex"] = ".*" },
-		"both stderr":     func(m map[string]any) { m["stderr_regex"] = ".*" },
-		"bad stdout re":   func(m map[string]any) { delete(m, "stdout"); m["stdout_regex"] = "(" },
-		"bad stderr re":   func(m map[string]any) { delete(m, "stderr"); m["stderr_regex"] = "(" },
-		"bad base64 file": func(m map[string]any) { m["expected_files"] = map[string]any{"f": "!"} },
+		"no id":               func(m map[string]any) { m["id"] = "" },
+		"no status":           func(m map[string]any) { delete(m, "status") },
+		"no stdout":           func(m map[string]any) { delete(m, "stdout") },
+		"no stderr":           func(m map[string]any) { delete(m, "stderr") },
+		"both stdout":         func(m map[string]any) { m["stdout_regex"] = ".*" },
+		"both stderr":         func(m map[string]any) { m["stderr_regex"] = ".*" },
+		"bad stdout re":       func(m map[string]any) { delete(m, "stdout"); m["stdout_regex"] = "(" },
+		"bad stderr re":       func(m map[string]any) { delete(m, "stderr"); m["stderr_regex"] = "(" },
+		"bad base64 file":     func(m map[string]any) { m["expected_files"] = map[string]any{"f": "!"} },
+		"absolute path_extra": func(m map[string]any) { m["path_extra"] = []string{"/tmp/x"} },
+		"path list entry":     func(m map[string]any) { m["path_extra"] = []string{"a:b"} },
+		"backslash entry":     func(m map[string]any) { m["path_extra"] = []string{`a\b`} },
+		"empty path_extra":    func(m map[string]any) { m["path_extra"] = []string{""} },
 	} {
 		cases, err := ParseCases([]byte(lineWith(t, mutate)))
 		if err != nil {
@@ -238,6 +261,7 @@ func TestValidateAcceptsRegexForms(t *testing.T) {
 		m["stderr_regex"] = "^(?s).*$"
 		m["response"] = map[string]any{"environment-variable": nil}
 		m["expected_files"] = map[string]any{"f": "YQ=="}
+		m["path_extra"] = []string{".", "bin/dir"}
 	})
 	cases, err := ParseCases([]byte(line))
 	if err != nil {

@@ -15,6 +15,22 @@ import (
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
+// Placeholders that stand for machine-specific absolute paths in every string
+// of a recorded case. A runner substitutes its own values before it runs a
+// case and in the expectations. Inside StdoutRegex and StderrRegex the value
+// is regex-quoted; everywhere else it is inserted as it is.
+const (
+	// TempDirToken is the case's temporary directory. The runner must create
+	// it with symbolic links resolved, so that the plain and the canonical
+	// spelling of the path are the same string.
+	TempDirToken = "@@TEMPDIR@@"
+	// TempDirParentToken is the directory that contains the temporary
+	// directory.
+	TempDirParentToken = "@@TEMPDIR_PARENT@@"
+	// JustExecutableToken is the absolute path of the binary under test.
+	JustExecutableToken = "@@JUST_EXECUTABLE@@"
+)
+
 // Case is one recorded invocation of the just binary and the result upstream
 // expects. It mirrors one line of conformance/corpus/cases.jsonl.
 type Case struct {
@@ -28,8 +44,13 @@ type Case struct {
 	Args []string `json:"args"`
 	// Env is the exact environment of the run, apart from PathExtra.
 	Env map[string]string `json:"env"`
-	// PathExtra lists directories, relative to the temporary directory,
-	// that upstream's Test::path put in PATH.
+	// PathExtra lists directories, relative to the temporary directory ("."
+	// is the directory itself). Upstream's Test::path REPLACES PATH, so when
+	// PathExtra is not empty the runner sets PATH to exactly these
+	// directories, resolved against the temporary directory and joined with
+	// the platform's path list separator. It does not prepend them to the
+	// inherited PATH. The name is historical. When it is empty, PATH is
+	// either not set by the case or is in Env.
 	PathExtra []string `json:"path_extra"`
 	// Cwd is the working directory relative to the temporary directory.
 	Cwd   string `json:"cwd"`
@@ -120,6 +141,9 @@ func (c Case) Validate() error {
 	if c.Status == nil {
 		return errors.New("missing status")
 	}
+	if err := checkPathExtra(c.PathExtra); err != nil {
+		return err
+	}
 	if err := checkOutput("stdout", c.Stdout, c.StdoutRegex); err != nil {
 		return err
 	}
@@ -129,6 +153,17 @@ func (c Case) Validate() error {
 	for path, content := range c.ExpectedFiles {
 		if _, err := base64.StdEncoding.DecodeString(content); err != nil {
 			return fmt.Errorf("expected file %q: %w", path, err)
+		}
+	}
+	return nil
+}
+
+// checkPathExtra requires every entry to be a non-empty path relative to the
+// temporary directory that is not itself a path list. Pure.
+func checkPathExtra(entries []string) error {
+	for _, entry := range entries {
+		if entry == "" || strings.HasPrefix(entry, "/") || strings.ContainsAny(entry, `:\`) {
+			return fmt.Errorf("path_extra entry %q is not a relative directory", entry)
 		}
 	}
 	return nil

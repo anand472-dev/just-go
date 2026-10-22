@@ -18,7 +18,7 @@
      if let Some(stdout_regex) = &self.stdout_regex {
        assert!(
          stdout_regex.is_match(output_stdout),
-@@ -309,6 +313,158 @@
+@@ -309,6 +313,246 @@
        pid,
        stdout: output_stdout.into(),
        tempdir: self.tempdir,
@@ -30,6 +30,7 @@
 +mod recorder {
 +  use {
 +    super::*,
++    serde_json::Value,
 +    std::{cell::Cell, sync::Mutex},
 +  };
 +
@@ -41,6 +42,70 @@
 +
 +  fn record_file() -> Option<PathBuf> {
 +    env::var_os("JUST_RECORD_FILE").map(PathBuf::from)
++  }
++
++  // Placeholders for the machine-specific absolute paths that appear in
++  // cases. A runner substitutes its own values back before it runs a case:
++  // `@@TEMPDIR@@` is the case's temporary directory (with symbolic links
++  // resolved), `@@TEMPDIR_PARENT@@` is the directory that contains it, and
++  // `@@JUST_EXECUTABLE@@` is the absolute path of the binary under test.
++  const TEMPDIR_TOKEN: &str = "@@TEMPDIR@@";
++  const TEMPDIR_PARENT_TOKEN: &str = "@@TEMPDIR_PARENT@@";
++  const JUST_EXECUTABLE_TOKEN: &str = "@@JUST_EXECUTABLE@@";
++
++  type Forms = Vec<(String, &'static str)>;
++
++  // The tempdir as `Test` knows it and in canonical form (on macOS
++  // `/private/var/...`).
++  fn tempdir_roots(root: &Path) -> Vec<PathBuf> {
++    let mut roots = vec![root.to_owned()];
++    if let Ok(canonical) = fs::canonicalize(root) {
++      if canonical != root {
++        roots.push(canonical);
++      }
++    }
++    roots
++  }
++
++  // Every spelling that can appear in a case, as plain text and escaped for
++  // use inside a regex, paired with its placeholder. Longest first, so that
++  // a spelling is never replaced inside a longer one.
++  fn tempdir_forms(roots: &[PathBuf]) -> Forms {
++    let mut paths = Vec::new();
++    for root in roots {
++      paths.push((root.to_str(), TEMPDIR_TOKEN));
++      paths.push((root.parent().and_then(Path::to_str), TEMPDIR_PARENT_TOKEN));
++    }
++    paths.push((Some(env!("CARGO_BIN_EXE_just")), JUST_EXECUTABLE_TOKEN));
++
++    let mut forms = Forms::new();
++    for (text, token) in paths {
++      let Some(text) = text else { continue };
++      for form in [text.to_owned(), regex::escape(text)] {
++        if !forms.iter().any(|(existing, _)| *existing == form) {
++          forms.push((form, token));
++        }
++      }
++    }
++    forms.sort_by_key(|(form, _)| std::cmp::Reverse(form.len()));
++    forms
++  }
++
++  fn scrub(text: &str, forms: &Forms) -> String {
++    let mut text = text.to_owned();
++    for (form, token) in forms {
++      text = text.replace(form.as_str(), token);
++    }
++    text
++  }
++
++  fn scrub_value(value: &mut Value, forms: &Forms) {
++    match value {
++      Value::String(text) => *text = scrub(text, forms),
++      Value::Array(items) => items.iter_mut().for_each(|item| scrub_value(item, forms)),
++      Value::Object(map) => map.values_mut().for_each(|item| scrub_value(item, forms)),
++      _ => {}
++    }
 +  }
 +
 +  fn base64(bytes: &[u8]) -> String {
@@ -80,8 +145,8 @@
 +          files.insert(relative.replace('\\', "/"), content);
 +        }
 +      }
-+    }
-+  }
+     }
+   }
 +
 +  // Captures the files in the tempdir as they are before just runs.
 +  pub(super) fn snapshot(root: &Path) -> Option<BTreeMap<String, String>> {
@@ -113,20 +178,36 @@
 +    });
 +    let id = format!("{}#{counter}", thread.name().unwrap_or("unnamed"));
 +
-+    // `Test::path` stores an absolute path inside the tempdir. Record it
-+    // relative to the tempdir instead.
++    // `Test::path` REPLACES `PATH` with an absolute path inside the tempdir
++    // (it does not prepend). When every element of `PATH` lies inside the
++    // tempdir, record the elements relative to it in `path_extra` and drop
++    // `PATH` from `env`. Otherwise leave `PATH` in `env`; the tempdir inside
++    // it is replaced by the placeholder below.
++    let roots = tempdir_roots(test.tempdir.path());
++    let forms = tempdir_forms(&roots);
 +    let mut env = test.env.clone();
 +    let mut path_extra = Vec::new();
-+    if let Some(path) = env.get("PATH") {
-+      if let Some(relative) = Path::new(path)
-+        .strip_prefix(test.tempdir.path())
-+        .ok()
-+        .and_then(Path::to_str)
-+      {
-+        path_extra.push(relative.replace('\\', "/"));
++    if let Some(value) = env.get("PATH") {
++      let relative = env::split_paths(value)
++        .map(|entry| {
++          roots
++            .iter()
++            .find_map(|root| entry.strip_prefix(root).ok())
++            .and_then(Path::to_str)
++            .map(|relative| {
++              if relative.is_empty() {
++                ".".to_owned()
++              } else {
++                relative.replace('\\', "/")
++              }
++            })
++        })
++        .collect::<Option<Vec<_>>>();
++      if let Some(relative) = relative {
++        path_extra = relative;
 +        env.remove("PATH");
 +      }
-     }
++    }
 +
 +    // The command line the harness runs, including the `--shell` argument.
 +    let mut args = Vec::new();
@@ -139,7 +220,13 @@
 +    let expected_files = test
 +      .expected_files
 +      .iter()
-+      .map(|(path, content)| (path.to_string_lossy().replace('\\', "/"), base64(content)))
++      .map(|(path, content)| {
++        let content = match str::from_utf8(content) {
++          Ok(text) => scrub(text, &forms).into_bytes(),
++          Err(_) => content.clone(),
++        };
++        (path.to_string_lossy().replace('\\', "/"), base64(&content))
++      })
 +      .collect::<BTreeMap<_, _>>();
 +
 +    let mut case = json!({
@@ -164,6 +251,7 @@
 +    if test.stderr_regex.is_none() {
 +      object.insert("stderr".into(), stderr.into());
 +    }
++    scrub_value(&mut case, &forms);
 +
 +    let line = format!("{case}\n");
 +    let _guard = LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -175,5 +263,5 @@
 +    handle
 +      .write_all(line.as_bytes())
 +      .expect("failed to write JUST_RECORD_FILE");
-   }
++  }
  }
