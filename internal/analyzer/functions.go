@@ -21,6 +21,11 @@ type argRange struct{ lo, hi int }
 // builtin tables of the evaluator supersede it when they land; until then the
 // analyzer needs the names and counts to report an undefined function and a
 // wrong argument count in upstream's place in the walk.
+//
+// Six entries (bool, join_list, num_jobs, show, split, which) are gated by
+// upstream behind `set lists`, which upstream refuses without `set unstable`.
+// That gate belongs to Task 7 (settings group B, R15) and is not applied here,
+// so these six pass analysis until it lands.
 var arities = map[string]argRange{
 	"absolute_path":               {1, 1},
 	"append":                      {2, 2},
