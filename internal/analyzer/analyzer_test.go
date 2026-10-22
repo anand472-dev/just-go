@@ -327,9 +327,9 @@ func wantAt(t *testing.T, src string, line, col, width int, msg string) {
 
 // TestAnalyzeCircularDependencyMatchesUpstream pins the category, the
 // location and the cycle text of each circular-dependency case of the misc
-// corpus group, and of the subsequents group in
-// TestAnalyzeCorpusDiagnostics. The cycle is reported at the dependency that
-// closes it, in the recipe that names it.
+// corpus group. The cycle is reported at the dependency that closes it, in the
+// recipe that names it. The subsequents group's self-dependency is pinned in
+// TestAnalyzeCorpusDiagnostics.
 func TestAnalyzeCircularDependencyMatchesUpstream(t *testing.T) {
 	cases := []struct {
 		id, src          string
@@ -377,8 +377,8 @@ func TestAnalyzeUndefinedVariableInDefault(t *testing.T) {
 	}
 }
 
-// TestAnalyzeCorpusDiagnostics pins the analysis errors of the misc and
-// subsequents corpus groups, and of function_definitions, that the analyzer
+// TestAnalyzeCorpusDiagnostics pins the analysis errors of the misc,
+// function_definitions and subsequents corpus groups that the analyzer
 // reports with no other feature: the id names the case, and the location and
 // message are the corpus's.
 func TestAnalyzeCorpusDiagnostics(t *testing.T) {

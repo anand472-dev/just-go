@@ -347,6 +347,11 @@ func TestParseRecipeHeaderErrors(t *testing.T) {
 	wantError(t, "r x\n", 1, 4, "expected '*', ':', '$', '=', identifier, or '+', but found end of line")
 	wantError(t, "r 'x':\n", 1, 3, "expected '*', ':', '$', identifier, or '+', but found string")
 	wantError(t, "r x=:\n", 1, 5, "expected backtick, '!', '[', identifier, '(', or string, but found ':'")
+	// `r: a (b)` was an error before dependency arguments existed; it is a
+	// dependency with an argument list now (TestParseDependencyArguments). An
+	// empty argument list is still an error, and `r (x):` begins a function
+	// definition in upstream, which the parser does not read yet.
+	wantError(t, "r: a ()\n", 1, 7, "expected identifier, but found ')'")
 	wantError(t, "r: a 'b'\n", 1, 6, "expected "+afterDeps+", but found string")
 	wantError(t, "r: a := b\n", 1, 6, "expected "+afterDeps+", but found ':='")
 }

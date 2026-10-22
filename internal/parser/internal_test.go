@@ -5,7 +5,18 @@ import (
 	"testing"
 
 	"gitea.com/wimwian/just-go/internal/ast"
+	"gitea.com/wimwian/just-go/internal/lexer"
 )
+
+// The expected set is a uint64 with a bit for each token kind, so the kinds
+// must number fewer than 64. Text is the last kind declared; a 65th kind would
+// make `1 << k` wrap and expectedList stop short. This fails before that
+// happens, at 64 kinds, so the set is widened while there is still room.
+func TestTokenKindsFitTheExpectedSet(t *testing.T) {
+	if count := int(lexer.Text) + 1; count >= 64 {
+		t.Errorf("the lexer declares %d token kinds; the parser's uint64 expected set holds fewer than 64", count)
+	}
+}
 
 // The lexer never produces a body line without a part, so Parse cannot reach
 // the empty case of splitSigils. Pin it here.
