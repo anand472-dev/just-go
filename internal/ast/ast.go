@@ -216,8 +216,28 @@ type Recipe struct {
 	// Attributes are the recipe's attributes in source order.
 	Attributes []Attribute
 	Lines      []Line
-	Line       int
-	Col        int
+	// Raw is the body as a script sees it: one entry per physical line, blank
+	// ones included, with the text exactly as written (no sigil is cut off, and
+	// a trailing backslash does not join the next line). It ends at the last
+	// line that is not blank. The shell runs Lines instead.
+	Raw []RawLine
+	// Quiet is true when the name is written `@name`. The parser has toggled
+	// the `@` of every line of Lines for it (see Lines), so only a script,
+	// which has no such lines, reads it.
+	Quiet bool
+	Line  int
+	Col   int
+}
+
+// RawLine is one physical line of a recipe's body, as a script has it.
+type RawLine struct {
+	// Line is the line the physical line starts on, counted from 1. A line
+	// with an interpolation that spans several lines is one RawLine, so the
+	// lines after it have a Line that skips ahead.
+	Line int
+	// Parts holds the source text of the line (Text) and its interpolations,
+	// in order, as Line.Parts does. A blank line has none.
+	Parts []Expr
 }
 
 // Attribute names. The parser knows every attribute upstream has; these are
@@ -323,10 +343,16 @@ func (r *Recipe) Attribute(name string) *Attribute {
 // IsShebang reports whether the first line of the recipe's body starts with
 // `#!`, which makes the recipe a script. It is pure.
 func (r *Recipe) IsShebang() bool {
-	if len(r.Lines) == 0 || len(r.Lines[0].Parts) == 0 {
+	return len(r.Raw) > 0 && r.Raw[0].IsShebang()
+}
+
+// IsShebang reports whether the text of the line starts with `#!`. It is
+// pure.
+func (l RawLine) IsShebang() bool {
+	if len(l.Parts) == 0 {
 		return false
 	}
-	text, ok := r.Lines[0].Parts[0].(Text)
+	text, ok := l.Parts[0].(Text)
 	return ok && strings.HasPrefix(text.Value, "#!")
 }
 

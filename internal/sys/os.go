@@ -3,8 +3,11 @@ package sys
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -14,7 +17,12 @@ import (
 const killGrace = 2 * time.Second
 
 // OSFS is the FS backed by the real filesystem.
-type OSFS struct{}
+type OSFS struct {
+	// goos names the operating system that decides where MkdirTemp puts a
+	// directory it is given no place for, as runtime.GOOS does. It is empty for
+	// the system the program runs on, so only a test sets it.
+	goos string
+}
 
 // ReadFile reads the named file. Impure: it touches the real filesystem.
 func (OSFS) ReadFile(path string) ([]byte, error) {
@@ -46,6 +54,50 @@ func (OSFS) ReadDir(path string) ([]string, error) {
 		names[i] = e.Name()
 	}
 	return names, nil
+}
+
+// WriteFile writes the named file. Impure: it touches the real filesystem.
+func (OSFS) WriteFile(path string, data []byte, perm fs.FileMode) error {
+	return os.WriteFile(path, data, perm)
+}
+
+// MkdirTemp creates a directory in dir, or, for an empty dir, in the place
+// upstream makes its scripts: the directory called just in the Linux runtime
+// directory ($XDG_RUNTIME_DIR), made if need be, or else the system's
+// temporary directory. Impure: it touches the real filesystem and reads the
+// environment.
+func (o OSFS) MkdirTemp(dir, prefix string) (string, error) {
+	if dir == "" {
+		goos := o.goos
+		if goos == "" {
+			goos = runtime.GOOS
+		}
+		dir = os.TempDir()
+		if root := runtimeRoot(goos, os.Getenv("XDG_RUNTIME_DIR")); root != "" {
+			dir = root
+			if err := os.MkdirAll(root, 0o700); err != nil {
+				return "", err
+			}
+		}
+	}
+	return os.MkdirTemp(dir, prefix)
+}
+
+// runtimeRoot is the directory that holds the scripts of a system whose
+// runtime directory is xdg, the value of $XDG_RUNTIME_DIR: the directory called
+// just in it, on Linux when xdg is an absolute path. It is "" for a system that
+// has none. Pure.
+func runtimeRoot(goos, xdg string) string {
+	if goos != "linux" || !filepath.IsAbs(xdg) {
+		return ""
+	}
+	return filepath.Join(xdg, "just")
+}
+
+// RemoveAll removes path and what is below it. Impure: it touches the real
+// filesystem.
+func (OSFS) RemoveAll(path string) error {
+	return os.RemoveAll(path)
 }
 
 // OSProcess is the Process backed by os/exec.

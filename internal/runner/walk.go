@@ -164,12 +164,16 @@ func (inv *invocation) begin(r *ast.Recipe, args []string) (frame, error) {
 // stepOf makes the step that runs the commands of r: it evaluates the
 // `[working-directory]` and `[timestamp]` attributes, and sees to it that the
 // backticks of the lines see the exported variables and the `[env]`
-// attributes. Impure: it runs backticks.
+// attributes. A script evaluates its `[working-directory]` later, after its
+// lines (see script). Impure: it runs backticks.
 func (inv *invocation) stepOf(r *ast.Recipe, f frame) (step, error) {
 	cmd := inv.commander(f.exported, f.attr)
-	workdir, err := inv.workingDirectory(r, f.scope, cmd)
-	if err != nil {
-		return step{}, err
+	var workdir *string
+	if !r.IsScript(inv.plan.Justfile.Settings) {
+		var err error
+		if workdir, err = inv.workingDirectory(r, f.scope, cmd); err != nil {
+			return step{}, err
+		}
 	}
 	stamp, err := inv.timestamp(r, f.scope, cmd)
 	if err != nil {

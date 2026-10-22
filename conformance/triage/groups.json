@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 415,
-    "fail": 1580,
+    "pass": 456,
+    "fail": 1539,
     "skip": 16,
     "total": 2011
   },
@@ -71,9 +71,8 @@
     "dotenv": 21,
     "grammar": 76,
     "module": 157,
-    "setting:default-script": 6,
     "setting:fallback": 6,
-    "shebang": 38,
+    "shebang": 3,
     "unstable:cached-recipes": 85,
     "unstable:lists": 265,
     "unstable:user-defined-functions": 32
@@ -1357,14 +1356,6 @@
       "working_directory::working_dir_applies_to_shell_function_in_submodules#1": "uses mod or import",
       "working_directory::working_dir_in_submodule_is_relative_to_module_path#1": "uses mod or import"
     },
-    "setting:default-script": {
-      "ignore_comments::ignore_comments_evaluates_comments_in_default_script_recipes#1": "sets default-script",
-      "script::default_script_allows_extra_leading_whitespace#1": "sets default-script",
-      "script::default_script_makes_recipes_scripts#1": "sets default-script",
-      "script::default_script_recipe_with_script_attribute#1": "sets default-script",
-      "script::default_script_recipe_with_shebang_uses_shebang#1": "sets default-script",
-      "script::default_script_uses_script_interpreter#1": "sets default-script"
-    },
     "setting:fallback": {
       "fallback::multiple_levels_of_fallback_work#1": "sets fallback",
       "fallback::print_error_from_parent_if_recipe_not_found_in_current#1": "sets fallback",
@@ -1374,43 +1365,8 @@
       "fallback::stop_fallback_when_fallback_is_false#1": "sets fallback"
     },
     "shebang": {
-      "attributes::env_attribute_overrides_export_in_script#1": "has a shebang recipe",
-      "attributes::env_attribute_with_expression_in_script#1": "has a shebang recipe",
-      "attributes::extension#1": "has a shebang recipe",
-      "export::setting_shebang#1": "has a shebang recipe",
-      "export::shebang#1": "has a shebang recipe",
-      "ignore_comments::ignore_comments_evaluates_comments_in_scripts#1": "has a shebang recipe",
-      "interpolation::shebang_line_numbers_are_correct_with_multi_line_interpolations#1": "has a shebang recipe",
-      "misc::quiet_shebang_recipe#1": "has a shebang recipe",
-      "misc::shebang_backtick_failure#1": "has a shebang recipe",
-      "no_cd::shebang#1": "has a shebang recipe",
-      "no_exit_message::shebang_exit_message_setting_suppressed#1": "has a shebang recipe",
-      "no_exit_message::shebang_exit_message_suppressed#1": "has a shebang recipe",
-      "no_exit_message::signal_exit_message_not_suppressed#1": "has a shebang recipe",
-      "no_exit_message::signal_exit_message_setting_suppressed#1": "has a shebang recipe",
-      "no_exit_message::signal_exit_message_suppressed#1": "has a shebang recipe",
-      "positional_arguments::shebang#1": "has a shebang recipe",
-      "positional_arguments::shebang_with_attribute#1": "has a shebang recipe",
       "positional_arguments::variadic_shebang#1": "has a shebang recipe",
-      "script::allowed_with_shebang#1": "has a shebang recipe",
-      "script::multiline_shebang_line_numbers#1": "has a shebang recipe",
-      "script::no_arguments#1": "has a [script] recipe",
-      "script::no_arguments_with_default_script_interpreter#1": "has a [script] recipe",
-      "script::no_arguments_with_non_default_script_interpreter#1": "has a [script] recipe",
-      "script::runs_with_command#1": "has a [script] recipe",
-      "script::script_line_numbers#1": "has a [script] recipe",
-      "script::script_line_numbers_with_multi_line_recipe_signature#1": "has a [script] recipe",
-      "script::shebang_line_numbers#1": "has a shebang recipe",
-      "script::shebang_line_numbers_with_multiline_constructs#1": "has a shebang recipe",
-      "script::use_final_path_component_of_script_interpreter_to_determine_shell_kind#1": "has a [script] recipe",
-      "script::with_arguments#1": "has a [script] recipe",
-      "shebang::echo#1": "has a shebang recipe",
-      "shebang::invalid_shebang_error#1": "has a shebang recipe",
       "shebang::powershell_shebang_on_unix_has_no_bom#1": "has a shebang recipe",
-      "shebang::run_shebang#1": "has a shebang recipe",
-      "shebang::simple#1": "has a shebang recipe",
-      "tempdir::setting#1": "has a shebang recipe",
-      "timestamps::attribute_script#1": "has a shebang recipe",
       "unexport::unexport_environment_variable_shebang#1": "has a shebang recipe"
     },
     "unstable:cached-recipes": {

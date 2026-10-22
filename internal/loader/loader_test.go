@@ -92,6 +92,10 @@ func (l listFS) ReadFile(string) ([]byte, error)  { return nil, errors.New("unus
 func (l listFS) ReadDir(string) ([]string, error) { return l.entries, nil }
 func (l listFS) IsFile(p string) (bool, error)    { return l.regular[p], l.isErr }
 
+func (listFS) WriteFile(string, []byte, fs.FileMode) error { return errors.New("unused") }
+func (listFS) MkdirTemp(string, string) (string, error)    { return "", errors.New("unused") }
+func (listFS) RemoveAll(string) error                      { return errors.New("unused") }
+
 func TestFindSkipsDirectoriesNamedLikeJustfiles(t *testing.T) {
 	fsys := listFS{
 		entries: []string{".justfile", "justfile"},
@@ -167,6 +171,10 @@ type errFS struct{ err error }
 func (e errFS) ReadFile(string) ([]byte, error)  { return nil, e.err }
 func (e errFS) IsFile(string) (bool, error)      { return false, e.err }
 func (e errFS) ReadDir(string) ([]string, error) { return nil, e.err }
+
+func (e errFS) WriteFile(string, []byte, fs.FileMode) error { return e.err }
+func (e errFS) MkdirTemp(string, string) (string, error)    { return "", e.err }
+func (e errFS) RemoveAll(string) error                      { return e.err }
 
 func TestFindFilesystemErrorIsNotNoJustfile(t *testing.T) {
 	boom := errors.New("boom")

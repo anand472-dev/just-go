@@ -125,6 +125,7 @@ func TestParseRecipeWithParamsAndDeps(t *testing.T) {
 				Parts:  []ast.Expr{txt("cargo build "), ref("target")},
 				Line:   2,
 			}},
+			Raw:  []ast.RawLine{{Line: 2, Parts: []ast.Expr{txt("cargo build "), ref("target")}}},
 			Line: 1,
 		}},
 	}
@@ -271,6 +272,7 @@ func TestParseDocComment(t *testing.T) {
 	wantRecipe(t, "# build it\nbuild:\n  x", ast.Recipe{
 		Name: "build", Doc: "build it", Line: 2,
 		Lines: []ast.Line{{Parts: []ast.Expr{txt("x")}, Line: 3}},
+		Raw:   []ast.RawLine{{Line: 3, Parts: []ast.Expr{txt("x")}}},
 	})
 }
 
@@ -766,6 +768,10 @@ func TestParseBodyBraceEscape(t *testing.T) {
 		Lines: []ast.Line{
 			{Parts: []ast.Expr{txt("echo '{{'")}, Line: 2},
 			{Parts: []ast.Expr{txt("echo '{{{' {{"), ref("x")}, Line: 3},
+		},
+		Raw: []ast.RawLine{
+			{Line: 2, Parts: []ast.Expr{txt("echo '{{'")}},
+			{Line: 3, Parts: []ast.Expr{txt("echo '{{{' {{"), ref("x")}},
 		},
 	})
 }

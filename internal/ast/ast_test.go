@@ -195,7 +195,8 @@ func TestEnabledIgnoresOtherAttributes(t *testing.T) {
 }
 
 func TestRecipeScriptness(t *testing.T) {
-	shebang := []Line{{Parts: []Expr{Text{Value: "#!/bin/sh"}}}}
+	shebang := []RawLine{{Line: 2, Parts: []Expr{Text{Value: "#!/bin/sh"}}}}
+	echo := RawLine{Line: 2, Parts: []Expr{Text{Value: "echo"}}}
 	for _, tc := range []struct {
 		name    string
 		recipe  Recipe
@@ -203,15 +204,16 @@ func TestRecipeScriptness(t *testing.T) {
 		shebang bool
 		script  bool
 	}{
-		{"a plain recipe", Recipe{Lines: []Line{{Parts: []Expr{Text{Value: "echo"}}}}}, Settings{}, false, false},
+		{"a plain recipe", Recipe{Raw: []RawLine{echo}}, Settings{}, false, false},
 		{"an empty recipe", Recipe{}, Settings{}, false, false},
-		{"a line with no parts", Recipe{Lines: []Line{{}}}, Settings{}, false, false},
-		{"a line that begins with an interpolation", Recipe{Lines: []Line{{Parts: []Expr{Var{Name: "x"}}}}}, Settings{}, false, false},
-		{"a shebang", Recipe{Lines: shebang}, Settings{}, true, true},
-		{"a shebang only on the first line", Recipe{Lines: []Line{{Parts: []Expr{Text{Value: "echo"}}}, shebang[0]}}, Settings{}, false, false},
+		{"a blank line", Recipe{Raw: []RawLine{{Line: 2}}}, Settings{}, false, false},
+		{"a line that begins with an interpolation", Recipe{Raw: []RawLine{{Line: 2, Parts: []Expr{Var{Name: "x"}}}}}, Settings{}, false, false},
+		{"a shebang", Recipe{Raw: shebang}, Settings{}, true, true},
+		{"a sigil before the shebang", Recipe{Raw: []RawLine{{Line: 2, Parts: []Expr{Text{Value: "@#!/bin/sh"}}}}}, Settings{}, false, false},
+		{"a shebang only on the first line", Recipe{Raw: []RawLine{echo, shebang[0]}}, Settings{}, false, false},
 		{"a script attribute", Recipe{Attributes: attrs(AttrScript)}, Settings{}, false, true},
 		{"default-script", Recipe{}, Settings{DefaultScript: true}, false, true},
-		{"shell beats a shebang", Recipe{Attributes: attrs(AttrShell), Lines: shebang}, Settings{}, true, false},
+		{"shell beats a shebang", Recipe{Attributes: attrs(AttrShell), Raw: shebang}, Settings{}, true, false},
 		{"shell beats default-script", Recipe{Attributes: attrs(AttrShell)}, Settings{DefaultScript: true}, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

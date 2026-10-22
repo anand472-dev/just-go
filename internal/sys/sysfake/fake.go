@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"gitea.com/wimwian/just-go/internal/sys"
@@ -47,6 +48,36 @@ func (f FakeFS) ReadDir(path string) ([]string, error) {
 	}
 	sort.Strings(names)
 	return names, nil
+}
+
+// WriteFile stores data at path. The permission is not kept. Pure: it writes
+// only the in-memory map.
+func (f FakeFS) WriteFile(path string, data []byte, _ fs.FileMode) error {
+	f[path] = string(data)
+	return nil
+}
+
+// MkdirTemp returns the path of a directory in dir, "/tmp" for an empty dir,
+// called prefix and then "fake". The fake has no directory entries, so every
+// call returns the same name, and a directory exists only through the files
+// written below it. Pure: it reads and writes nothing.
+func (f FakeFS) MkdirTemp(dir, prefix string) (string, error) {
+	if dir == "" {
+		dir = "/tmp"
+	}
+	return filepath.Join(dir, prefix+"fake"), nil
+}
+
+// RemoveAll removes the file at path and every file below it. Pure: it writes
+// only the in-memory map.
+func (f FakeFS) RemoveAll(path string) error {
+	below := strings.TrimSuffix(path, "/") + "/"
+	for p := range f {
+		if p == path || strings.HasPrefix(p, below) {
+			delete(f, p)
+		}
+	}
+	return nil
 }
 
 // FakeProcess is a sys.Process that runs nothing. It records every spec and

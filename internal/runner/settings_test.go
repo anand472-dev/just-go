@@ -566,3 +566,31 @@ func TestExportedGlobalsAreTheExportedOnesOrAllUnderSetExport(t *testing.T) {
 		t.Errorf("exportedEnv of nothing = %v, want nil", got)
 	}
 }
+
+// set lazy evaluates the assignments a recipe uses. A comment that set
+// ignore-comments skips does not use any, but a script has no such comment.
+func TestUsedAssignmentsCountsTheCommentsOfScripts(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       []string
+	}{
+		{"a shell recipe skips them", "foo:\n  # {{a}}\n  echo {{b}}\n", []string{"b"}},
+		{"a shebang does not", "foo:\n  #!/bin/sh\n  # {{a}}\n  echo {{b}}\n", []string{"a", "b"}},
+		{"a script attribute does not", "[script('sh')]\nfoo:\n  # {{a}}\n  echo {{b}}\n", []string{"a", "b"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			jf, err := parser.Parse("justfile", []byte("set lazy\nset ignore-comments\na := 'a'\nb := 'b'\n"+tc.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var names []string
+			for name := range usedAssignments(jf, []Call{{Recipe: "foo"}}) {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			if !reflect.DeepEqual(names, tc.want) {
+				t.Errorf("usedAssignments = %v, want %v", names, tc.want)
+			}
+		})
+	}
+}

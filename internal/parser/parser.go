@@ -542,9 +542,11 @@ func (p *parser) recipe(jf *ast.Justfile, attrs attributeSet) error {
 	if err := p.header(&r); err != nil {
 		return err
 	}
-	if r.Lines, err = p.body(); err != nil {
+	body, err := p.body()
+	if err != nil {
 		return err
 	}
+	r.Lines, r.Raw, r.Quiet = body.lines, body.raw, quiet
 	if err := p.checkRecipeAttributes(attrs, name); err != nil {
 		return err
 	}
@@ -715,47 +717,72 @@ func quietPrefix(p ast.Prefix) ast.Prefix {
 }
 
 // skipBlankLines moves past line breaks, but only when a body line follows.
-// It returns the line of the first blank line it skipped, or 0.
-func (p *parser) skipBlankLines() int {
+// It returns the line of each blank line it skipped, or nil.
+func (p *parser) skipBlankLines() []int {
 	i := p.pos
+	var blanks []int
 	for p.toks[i].Kind == lexer.Newline {
+		blanks = append(blanks, p.toks[i].Line)
 		i++
 	}
 	if p.toks[i].Kind != lexer.Indent || i == p.pos {
-		return 0
+		return nil
 	}
-	first := p.toks[p.pos].Line
 	p.pos = i
-	return first
+	return blanks
+}
+
+// body is what the indented lines of a recipe parse to: the commands a shell
+// runs, one at a time, and the physical lines a script is made of.
+type body struct {
+	lines []ast.Line
+	raw   []ast.RawLine
+}
+
+// blank records the blank lines that follow the physical lines so far. They
+// end a command that a backslash continues, on the first of them, as upstream
+// does. The blank lines before the first body line are not part of the body.
+func (b *body) blank(blanks []int, continued bool) {
+	if continued {
+		b.lines[len(b.lines)-1].Line = blanks[0]
+	}
+	if len(b.raw) == 0 {
+		return
+	}
+	for _, line := range blanks {
+		b.raw = append(b.raw, ast.RawLine{Line: line})
+	}
 }
 
 // body parses the indented lines of a recipe. A physical line that ends in a
 // backslash continues into the next one, unless a blank line comes between,
 // which ends the command, as in upstream.
-func (p *parser) body() ([]ast.Line, error) {
-	var lines []ast.Line
+func (p *parser) body() (body, error) {
+	var b body
 	indent := ""
 	continued := false
 	for {
-		if blank := p.skipBlankLines(); blank != 0 && continued {
-			lines[len(lines)-1].Line, continued = blank, false
+		if blanks := p.skipBlankLines(); blanks != nil {
+			b.blank(blanks, continued)
+			continued = false
 		}
 		if p.peek().Kind != lexer.Indent {
-			return lines, nil
+			return b, nil
 		}
 		t := p.next()
 		var err error
 		if indent, err = p.lineIndent(indent, t); err != nil {
-			return nil, err
+			return body{}, err
 		}
 		phys, err := p.bodyLine(t, indent)
 		if err != nil {
-			return nil, err
+			return body{}, err
 		}
+		b.raw = append(b.raw, ast.RawLine{Line: phys.line, Parts: phys.raw})
 		if continued {
-			lines[len(lines)-1] = join(lines[len(lines)-1], phys)
+			b.lines[len(b.lines)-1] = join(b.lines[len(b.lines)-1], phys)
 		} else {
-			lines = append(lines, p.command(phys))
+			b.lines = append(b.lines, p.command(phys))
 		}
 		continued = phys.continues && !p.endsComment(phys, continued)
 	}
@@ -787,6 +814,7 @@ func (p *parser) endsComment(phys physical, wasContinuation bool) bool {
 // ends in a backslash, which has been removed from Parts.
 type physical struct {
 	parts     []ast.Expr
+	raw       []ast.Expr // parts as written, with the backslash and the sigils
 	line      int
 	col       int      // the column where the line's text starts, after its indentation
 	extra     ast.Span // the line's text when it starts with extra whitespace
@@ -803,7 +831,7 @@ func (p *parser) bodyLine(t lexer.Token, indent string) (physical, error) {
 		return physical{}, err
 	}
 	p.next() // the line break: the lexer ends every body line with one
-	phys := physical{parts: parts, line: t.Line, col: t.Col + utf8.RuneCountInString(t.Text)}
+	phys := physical{raw: parts, parts: parts, line: t.Line, col: t.Col + utf8.RuneCountInString(t.Text)}
 	if extra != "" {
 		phys.extra = ast.Span{Line: t.Line, Col: t.Col + utf8.RuneCountInString(indent), Width: width}
 	}
@@ -951,9 +979,13 @@ func splitSigils(parts []ast.Expr, guards bool) (sigils, []ast.Expr) {
 		return sigils{}, parts
 	}
 	found, rest := cutSigils(text, guards)
-	if rest != "" {
-		parts[0] = ast.Text{Value: rest}
+	if rest == text {
 		return found, parts
+	}
+	if rest != "" {
+		out := append([]ast.Expr(nil), parts...)
+		out[0] = ast.Text{Value: rest}
+		return found, out
 	}
 	if len(parts) == 1 {
 		return found, nil

@@ -6,7 +6,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -360,5 +363,97 @@ func BenchmarkOSClockNow(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		(sys.OSClock{}).Now()
+	}
+}
+
+func TestOSFSWritesAndRemovesAScriptDirectory(t *testing.T) {
+	fsys := sys.OSFS{}
+	root := t.TempDir()
+	dir, err := fsys.MkdirTemp(root, "just-")
+	if err != nil || filepath.Dir(dir) != root || !strings.HasPrefix(filepath.Base(dir), "just-") {
+		t.Fatalf("MkdirTemp = %q, %v; want a just-* directory of %s", dir, err, root)
+	}
+	path := filepath.Join(dir, "script")
+	if err := fsys.WriteFile(path, []byte("echo hi\n"), 0o700); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	wantFile(t, path, "echo hi\n")
+	if err := fsys.RemoveAll(dir); err != nil {
+		t.Fatalf("RemoveAll: %v", err)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("directory still there: %v", err)
+	}
+}
+
+// wantFile checks that the file at path holds want, and, where permissions
+// mean something, that it can be executed.
+func wantFile(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != want {
+		t.Fatalf("file = %q, %v; want %q", got, err, want)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
+		t.Fatalf("mode = %v, want an executable file", info.Mode())
+	}
+}
+
+func TestOSFSWriteFileReportsFailure(t *testing.T) {
+	err := (sys.OSFS{}).WriteFile(filepath.Join(t.TempDir(), "missing", "f"), nil, 0o600)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("err = %v, want ErrNotExist", err)
+	}
+}
+
+func TestOSFSMkdirTempReportsFailure(t *testing.T) {
+	_, err := (sys.OSFS{}).MkdirTemp(filepath.Join(t.TempDir(), "missing"), "just-")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("err = %v, want ErrNotExist", err)
+	}
+}
+
+func TestOSFSMkdirTempWithoutADirectoryUsesTheTemporaryDirectory(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("TMPDIR", root)
+	t.Setenv("TMP", root)
+	t.Setenv("TEMP", root)
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	dir, err := (sys.OSFS{}).MkdirTemp("", "just-")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	if rel, err := filepath.Rel(root, dir); err != nil || strings.HasPrefix(rel, "..") {
+		t.Fatalf("MkdirTemp = %q, want a directory of %s", dir, root)
+	}
+}
+
+func TestFakeFSWritesAScriptDirectory(t *testing.T) {
+	fsys := sysfake.FakeFS{"/keep": "k"}
+	dir, err := fsys.MkdirTemp("/work", "just-")
+	if err != nil || dir != "/work/just-fake" {
+		t.Fatalf("MkdirTemp = %q, %v; want /work/just-fake", dir, err)
+	}
+	if got, _ := fsys.MkdirTemp("", "just-"); got != "/tmp/just-fake" {
+		t.Fatalf("MkdirTemp(\"\") = %q; want /tmp/just-fake", got)
+	}
+	if err := fsys.WriteFile(dir+"/a", []byte("x"), 0o700); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if got, err := fsys.ReadFile(dir + "/a"); err != nil || string(got) != "x" {
+		t.Fatalf("ReadFile = %q, %v", got, err)
+	}
+	_ = fsys.WriteFile(dir+"/sub/b", nil, 0o600)
+	_ = fsys.WriteFile(dir+"-other/c", nil, 0o600)
+	if err := fsys.RemoveAll(dir); err != nil {
+		t.Fatalf("RemoveAll: %v", err)
+	}
+	if want := (sysfake.FakeFS{"/keep": "k", "/work/just-fake-other/c": ""}); !reflect.DeepEqual(fsys, want) {
+		t.Fatalf("after RemoveAll = %v; want %v", fsys, want)
 	}
 }

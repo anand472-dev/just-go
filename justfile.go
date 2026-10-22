@@ -55,8 +55,11 @@ type Options struct {
 	// silences Stderr, as upstream's --quiet does, still shows the prompts by
 	// giving them a writer of their own.
 	Prompt io.Writer
-	FS     sys.FS      // nil uses the OS implementation from internal/sys
-	Exec   sys.Process // nil uses the OS implementation from internal/sys
+	// FS reads the justfile and the files it names, and is where script
+	// recipes write their scripts; nil uses the OS implementation from
+	// internal/sys.
+	FS   sys.FS
+	Exec sys.Process // nil uses the OS implementation from internal/sys
 	// Clock tells the time that a recipe with `[timestamp]` prints; nil uses
 	// the system clock.
 	Clock sys.Clock
@@ -256,6 +259,7 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		Yes:           opts.Yes,
 		Prompt:        opts.Prompt,
 		Exec:          opts.Exec,
+		FS:            opts.FS,
 		Clock:         opts.Clock,
 		Shell:         opts.Shell,
 		ShellArgs:     opts.ShellArgs,

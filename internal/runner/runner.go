@@ -70,6 +70,12 @@ type Plan struct {
 	// upstream's --yes does.
 	Yes  bool
 	Exec sys.Process // nil uses the OS implementation from internal/sys
+	// FS is where script recipes write their scripts, in a directory it makes
+	// and removes again. Nil uses the OS implementation from internal/sys.
+	FS sys.FS
+	// Cygpath is the program that translates the path of a shebang interpreter
+	// on Windows, as upstream's --cygpath. Empty means "cygpath".
+	Cygpath string
 	// Clock tells the time that `[timestamp]` prints. Nil uses the system
 	// clock.
 	Clock sys.Clock
@@ -380,8 +386,14 @@ func count(n int, noun string) string {
 // renderLine evaluates the parts of line in scope and joins them into the
 // command text. A backtick is run by cmd. It is pure apart from what cmd does.
 func renderLine(line ast.Line, scope eval.Scope, cmd eval.Commander) (string, error) {
+	return renderParts(line.Parts, scope, cmd)
+}
+
+// renderParts evaluates parts in scope and joins them into text. A backtick
+// is run by cmd. It is pure apart from what cmd does.
+func renderParts(parts []ast.Expr, scope eval.Scope, cmd eval.Commander) (string, error) {
 	var b strings.Builder
-	for _, part := range line.Parts {
+	for _, part := range parts {
 		s, err := eval.EvaluateWith(part, scope, cmd)
 		if err != nil {
 			return "", err
@@ -570,12 +582,22 @@ func infallible(p ast.Prefix) bool {
 // failureMessage is the line written to Stderr when a command fails, worded
 // as upstream's Code error ("failed on line N with exit code M"). A negative
 // code means the process ended without an exit status (for example, by a
-// signal); upstream calls that an unknown reason. It is pure.
+// signal); upstream calls that an unknown reason. A script is one command, so
+// its line is 0, and the message does not name one. It is pure.
 func failureMessage(recipe string, line, code int) string {
 	if code < 0 {
-		return fmt.Sprintf("error: recipe `%s` failed on line %d for an unknown reason\n", recipe, line)
+		return fmt.Sprintf("error: recipe `%s` failed%s for an unknown reason\n", recipe, onLine(line))
 	}
-	return fmt.Sprintf("error: recipe `%s` failed on line %d with exit code %d\n", recipe, line, code)
+	return fmt.Sprintf("error: recipe `%s` failed%s with exit code %d\n", recipe, onLine(line), code)
+}
+
+// onLine is " on line N" for the line of a failed command, or "" for a script,
+// which has none (the line is 0). It is pure.
+func onLine(line int) string {
+	if line == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" on line %d", line)
 }
 
 // exitCode maps a command's status to the invocation's exit code: a status
@@ -614,6 +636,7 @@ type invocation struct {
 	ctx    context.Context
 	plan   Plan
 	exec   sys.Process
+	fs     sys.FS
 	clock  sys.Clock
 	stderr io.Writer
 	// held, when not nil, is where the failure message of a branch of a fork
@@ -630,6 +653,13 @@ type invocation struct {
 	dir   string
 	base  string
 	here  string
+	// goos is the operating system the plan runs for, as runtime.GOOS names it.
+	goos string
+	// scriptInterpreter is the command, with its arguments, of `set
+	// script-interpreter`, nil if it is not set. tempdir is `set tempdir`, nil
+	// if it is not set.
+	scriptInterpreter []string
+	tempdir           *string
 	// globals is the value of each assignment that was evaluated, and
 	// exported the names of those whose value the commands see. Neither
 	// changes once the assignments are evaluated.
@@ -656,9 +686,10 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared) *invocation {
 	}
 	jf := plan.Justfile
 	inv := &invocation{
-		ctx: ctx, plan: plan, exec: plan.Exec, clock: plan.Clock, stderr: plan.Stderr,
+		ctx: ctx, plan: plan, exec: plan.Exec, fs: plan.FS, clock: plan.Clock, stderr: plan.Stderr,
 		shell: justfileShell(jf.Settings, pre.set, goos), dir: workingDirectory(plan, pre.set),
-		base: baseDirectory(plan, pre.set), here: invocationDirectory(plan),
+		base: baseDirectory(plan, pre.set), here: invocationDirectory(plan), goos: goos,
+		scriptInterpreter: pre.set.ScriptInterpreter, tempdir: pre.set.Tempdir,
 		exported: exportedGlobals(jf), recipes: make(map[string]*ast.Recipe, len(jf.Recipes)),
 	}
 	for i := range jf.Recipes {
@@ -666,6 +697,9 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared) *invocation {
 	}
 	if inv.exec == nil {
 		inv.exec = sys.OSProcess{}
+	}
+	if inv.fs == nil {
+		inv.fs = sys.OSFS{}
 	}
 	if inv.clock == nil {
 		inv.clock = sys.OSClock{}
@@ -680,11 +714,14 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared) *invocation {
 	return inv
 }
 
-// recipe runs the lines of s in order. It returns the exit code of the
-// invocation, which is non-zero when a line failed. A comment is skipped under
-// set ignore-comments, and a guard that fails ends the recipe, quietly.
-// Impure: it runs commands.
+// recipe runs the lines of s in order, or, for a script recipe, the script
+// (see script). It returns the exit code of the invocation, which is non-zero
+// when a line failed. A comment is skipped under set ignore-comments, and a
+// guard that fails ends the recipe, quietly. Impure: it runs commands.
 func (inv *invocation) recipe(s step) (int, error) {
+	if s.recipe.IsScript(inv.plan.Justfile.Settings) {
+		return inv.script(s)
+	}
 	for _, line := range s.recipe.Lines {
 		if line.Comment && inv.plan.Justfile.Settings.IgnoreComments {
 			continue
@@ -788,9 +825,10 @@ func (inv *invocation) signaled(r *ast.Recipe, line ast.Line, code int, sig *sys
 }
 
 // terminatedMessage is the line written to Stderr when a signal terminates a
-// command, worded as upstream's Signal error. It is pure.
+// command, worded as upstream's Signal error. A script has no line (0). It is
+// pure.
 func terminatedMessage(recipe string, line, signal int) string {
-	return fmt.Sprintf("error: recipe `%s` was terminated on line %d by signal %d\n", recipe, line, signal)
+	return fmt.Sprintf("error: recipe `%s` was terminated%s by signal %d\n", recipe, onLine(line), signal)
 }
 
 // failed writes the failure message for a command of r that exited with code,

@@ -197,10 +197,21 @@ func (inv *invocation) echo(s step, line ast.Line, command string) error {
 		}
 		return nil
 	}
-	stamp, err := timefmt.Format(inv.clock.Now(), *s.timestamp)
+	stamp, err := inv.stamp(s)
 	if err != nil {
-		return &diag.Error{Kind: diag.KindRuntime, Msg: err.Error()}
+		return err
 	}
 	fmt.Fprintf(inv.prompt, "[%s] %s\n", stamp, command)
 	return nil
+}
+
+// stamp is the time now, in the format of the `[timestamp]` of the recipe of
+// s, which must have one. An invalid format is a runtime error. Impure: it
+// reads the clock.
+func (inv *invocation) stamp(s step) (string, error) {
+	stamp, err := timefmt.Format(inv.clock.Now(), *s.timestamp)
+	if err != nil {
+		return "", &diag.Error{Kind: diag.KindRuntime, Msg: err.Error()}
+	}
+	return stamp, nil
 }

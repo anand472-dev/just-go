@@ -143,6 +143,19 @@ func TestAnalyzeSkipsCommentsUnderIgnoreComments(t *testing.T) {
 	wantError(t, "set ignore-comments\n\nsome_recipe:\n  echo # {{ bar }}\n", 4, "variable `bar` not defined")
 }
 
+// A script is evaluated whole, so a comment in it is analyzed even under set
+// ignore-comments: ignore_comments::ignore_comments_evaluates_comments_in_scripts#1
+// and ..._in_default_script_recipes#1.
+func TestAnalyzeChecksCommentsOfScripts(t *testing.T) {
+	wantError(t, "set ignore-comments\n\nfoo:\n  #!/bin/sh\n  # {{ undefined }}\n  echo ok\n", 5, "variable `undefined` not defined")
+	wantError(t, "set default-script\nset ignore-comments\n\nfoo:\n  # {{ undefined }}\n  echo ok\n", 5, "variable `undefined` not defined")
+	wantError(t, "set ignore-comments\n\n[script('sh')]\nfoo:\n  # {{ undefined }}\n", 5, "variable `undefined` not defined")
+	ignored := "set ignore-comments\n\n[shell]\nfoo:\n  # {{ undefined }}\n"
+	if err := analyzer.Analyze(mustParse(t, ignored)); err != nil {
+		t.Errorf("Analyze(%q) = %v", ignored, err)
+	}
+}
+
 func TestAnalyzeSettingsCheckOrder(t *testing.T) {
 	// Settings and recipe parameters are checked in the order of the file,
 	// as upstream checks its items, and an undefined variable in a setting

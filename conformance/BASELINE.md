@@ -43,6 +43,7 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 8: attributes, group A | 329 | 329 | 1666 | 16 |
 | Compat Task 9: attributes, group B | 360 | 360 | 1635 | 16 |
 | Compat Task 10: backticks | 415 | 415 | 1580 | 16 |
+| Compat Task 11: shebang and script recipes | 456 | 456 | 1539 | 16 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the

@@ -59,15 +59,13 @@ SHORT_FLAGS = {
 FLAG_ALIASES = {"eval": "evaluate", "format": "fmt",
                 "initialize": "init", "no-dependencies": "no-deps"}
 # Settings the parser implements (internal/parser setting) and the runner
-# applies. `default-script` and `fallback` are parsed and validated but have no
-# effect yet: the first needs script recipes (Task 11), the second the search
-# of parent justfiles (Phase 3), so a case that sets either stays in its
-# setting group. `script-interpreter` and `tempdir` are listed because the
-# cases that fail on them fail first on a script recipe, which has its own
-# group.
+# applies. `fallback` is parsed and validated but has no effect yet: it needs
+# the search of parent justfiles (Phase 3), so a case that sets it stays in its
+# setting group. `default-script`, `script-interpreter` and `tempdir` act
+# through script recipes (Task 11).
 SUPPORTED_SETTINGS = {
     "allow-duplicate-recipes", "allow-duplicate-variables", "default-list",
-    "export", "guards", "ignore-comments", "indentation", "lazy", "lists",
+    "default-script", "export", "guards", "ignore-comments", "indentation", "lazy", "lists",
     "minimum-version", "no-cd", "no-exit-message", "positional-arguments",
     "quiet", "script-interpreter", "shell", "tempdir", "unstable",
     "windows-powershell", "windows-shell", "working-directory",

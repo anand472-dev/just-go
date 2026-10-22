@@ -153,11 +153,13 @@ func dependencyArguments(r *ast.Recipe) []ast.Expr {
 }
 
 // bodyParts returns the parts of the lines of r that are evaluated: all of
-// them, but for the comments that set ignore-comments skips. It is pure.
+// them, but for the comments that set ignore-comments skips. A script skips
+// none. It is pure.
 func bodyParts(jf *ast.Justfile, r *ast.Recipe) []ast.Expr {
 	var out []ast.Expr
+	skipComments := jf.Settings.IgnoreComments && !r.IsScript(jf.Settings)
 	for _, l := range r.Lines {
-		if !(l.Comment && jf.Settings.IgnoreComments) {
+		if !(l.Comment && skipComments) {
 			out = append(out, l.Parts...)
 		}
 	}

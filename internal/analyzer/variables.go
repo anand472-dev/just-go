@@ -145,10 +145,12 @@ func undefinedInRecipe(jf *ast.Justfile, r *ast.Recipe, globals map[string]struc
 
 // bodyReferences checks the calls and variables in the interpolations of the
 // lines of r with check, skipping the comments that set ignore-comments
-// ignores. It is pure.
+// ignores. A script has no comments to ignore: it is evaluated whole. It is
+// pure.
 func bodyReferences(jf *ast.Justfile, r *ast.Recipe, check func(ast.Expr) *diag.Error) *diag.Error {
+	skipComments := jf.Settings.IgnoreComments && !r.IsScript(jf.Settings)
 	for _, l := range r.Lines {
-		if jf.Settings.IgnoreComments && l.Comment {
+		if skipComments && l.Comment {
 			continue
 		}
 		for _, part := range l.Parts {

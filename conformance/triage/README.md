@@ -42,9 +42,9 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `cli:<flag>` | Passes a flag the command does not implement, sets the `JUST_*` variable of one, or uses a command-line form the command does not implement: `cli:set` for `NAME=VALUE`, `cli:search-directory` for `dir/recipe`, `cli:justfile` for `--justfile -`, and `cli:list` for `--list <module>`. |
 | `module` | Uses `mod` or `import`, or names a `module::recipe` path. |
 | `dotenv` | Has a `.env` file or a `dotenv-*` setting. The settings are parsed and validated; the cases that remain need a file loaded or a command run (Phase 3). |
-| `setting:<name>` | Sets a setting that has no effect yet: `default-script` (needs script recipes, Task 11) and `fallback` (needs the search of parent justfiles, Phase 3). |
+| `setting:<name>` | Sets a setting that has no effect yet: `fallback` (needs the search of parent justfiles, Phase 3). |
 | `attribute` | Uses an attribute the parser does not implement yet: `[arg]`, which no task owns yet, or `[cache]`, which is unstable (Tasks 8 and 9 implemented the rest). A case that uses only the others is sorted by what else it uses. |
-| `shebang` | Has a shebang recipe or a `[script]` recipe. |
+| `shebang` | Has a shebang recipe or a `[script]` recipe. Task 11 implemented them, so the cases left here fail for what else they use: a variadic parameter (no task owns it yet), `unexport`, and a builtin call in the shebang line (Task 14). |
 | `conditional` | Uses an `if` expression. A case that also uses a backtick is here: backticks are implemented (Task 10), so only the `if` keeps it failing. |
 | `builtin:<family>` | Calls a builtin function, or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
 | `grammar` | Uses other syntax outside the implemented subset (`alias`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
@@ -53,7 +53,7 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 
 ## Current counts
 
-From the run recorded in `groups.json`: 415 pass, 1580 fail, 16 skip, of
+From the run recorded in `groups.json`: 456 pass, 1539 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
@@ -66,9 +66,9 @@ From the run recorded in `groups.json`: 415 pass, 1580 fail, 16 skip, of
 | `builtin:*` | 63 |
 | `completions` | 40 |
 | `dotenv` | 21 |
-| `setting:*` | 12 |
+| `setting:*` | 6 |
 | `conditional` | 24 |
-| `shebang` | 38 |
+| `shebang` | 3 |
 | `core-defect` | 0 |
 | `other` | 0 |
 

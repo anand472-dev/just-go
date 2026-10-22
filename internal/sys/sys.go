@@ -11,9 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 )
 
-// FS is read access to the filesystem.
+// FS is access to the filesystem: reading justfiles and the files they name,
+// and the directory and files that script recipes run from.
 type FS interface {
 	ReadFile(path string) ([]byte, error)
 	// IsFile reports whether path exists and is a regular file.
@@ -22,6 +24,17 @@ type FS interface {
 	// at path, sorted by name. An unreadable or missing directory is an
 	// error.
 	ReadDir(path string) ([]string, error)
+	// WriteFile writes data to the file at path, creating it with permission
+	// perm if it does not exist and replacing its content if it does.
+	WriteFile(path string, data []byte, perm fs.FileMode) error
+	// MkdirTemp creates a new, empty directory whose name starts with prefix,
+	// inside the directory dir, and returns its path. An empty dir means the
+	// place for temporary scripts: the system's runtime directory, where it
+	// has one, else the temporary directory.
+	MkdirTemp(dir, prefix string) (string, error)
+	// RemoveAll removes path and everything below it. A path that does not
+	// exist is no error.
+	RemoveAll(path string) error
 }
 
 // Process runs external programs.
