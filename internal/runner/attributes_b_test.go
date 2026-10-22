@@ -8,9 +8,11 @@ import (
 	"io/fs"
 	"reflect"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -234,9 +236,10 @@ func TestRunContinueDoesNotForgiveFailure(t *testing.T) {
 // ends and how many run at once at most. It holds commands with channels and
 // not with sleeps, so that what it proves does not depend on the speed of the
 // machine: together makes the commands it names wait until all of them are
-// running, and after makes a command wait until another has ended. A wait
-// that is not met within guard gives up and sets timedOut, so that a hang
-// fails a test (see checkNoHang) and does not stall it.
+// running, after makes a command wait until another has ended, and until makes
+// a command wait until its condition holds (see poll). A wait that is not met
+// within guard gives up and sets timedOut, so that a hang fails a test (see
+// checkNoHang) and does not stall it.
 type timedProcess struct {
 	mu       sync.Mutex
 	events   []string
@@ -244,6 +247,7 @@ type timedProcess struct {
 	most     int
 	together []string
 	after    map[string]string
+	until    map[string]func() bool
 	guard    time.Duration
 	timedOut bool
 	latches  map[string]chan struct{}
@@ -294,6 +298,80 @@ func (p *timedProcess) wait(ch chan struct{}) {
 	}
 }
 
+// poll blocks until cond holds, or until the guard runs out, which it records.
+// It yields the processor between looks and does not sleep, so that it returns
+// as soon as cond holds and gives the other goroutines the time they need. cond
+// is called without p.mu held. The caller does not hold p.mu.
+func (p *timedProcess) poll(cond func() bool) {
+	guard := p.guard
+	if guard == 0 {
+		guard = defaultGuard
+	}
+	deadline := time.Now().Add(guard)
+	for !cond() {
+		if time.Now().After(deadline) {
+			p.mu.Lock()
+			p.timedOut = true
+			p.mu.Unlock()
+			return
+		}
+		runtime.Gosched()
+	}
+}
+
+// hold makes a command wait for what it waits for: the meeting of the commands
+// that run together (meet), the end of another command (ended) and its
+// condition (until). A nil one is not waited for. The caller does not hold
+// p.mu.
+func (p *timedProcess) hold(meet, ended chan struct{}, until func() bool) {
+	if meet != nil {
+		p.wait(meet)
+	}
+	if ended != nil {
+		p.wait(ended)
+	}
+	if until != nil {
+		p.poll(until)
+	}
+}
+
+// startedAny reports whether one of the commands has started. The caller does
+// not hold p.mu.
+func (p *timedProcess) startedAny(commands ...string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, c := range commands {
+		if p.index("start "+c) >= 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// awaiting reports whether a goroutine is blocked at a gate in
+// invocation.await, which is the only way to see that a branch of a fork has
+// reached the gate of a call another branch runs: it makes no sound of its
+// own. A goroutine that is blocked in the select of await has that function in
+// its stack and the state select in its header.
+func awaiting() bool {
+	buf := make([]byte, 1<<16)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+	for _, g := range strings.Split(string(buf), "\n\n") {
+		head, _, _ := strings.Cut(g, "\n")
+		if strings.Contains(head, "[select") && strings.Contains(g, "(*invocation).await(") {
+			return true
+		}
+	}
+	return false
+}
+
 // checkNoHang fails t if a held command gave up waiting.
 func (p *timedProcess) checkNoHang(t *testing.T) {
 	t.Helper()
@@ -310,24 +388,19 @@ func (p *timedProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error)
 	p.events = append(p.events, "start "+command)
 	p.running++
 	p.most = max(p.most, p.running)
-	meet, together := p.latch("meet"), slices.Contains(p.together, command)
-	if together {
+	var meet, ended chan struct{}
+	if slices.Contains(p.together, command) {
+		meet = p.latch("meet")
 		if p.arrived++; p.arrived == len(p.together) {
 			p.open("meet")
 		}
 	}
-	other, waits := p.after[command]
-	var ended chan struct{}
-	if waits {
+	if other, waits := p.after[command]; waits {
 		ended = p.latch("end " + other)
 	}
+	until := p.until[command]
 	p.mu.Unlock()
-	if together {
-		p.wait(meet)
-	}
-	if waits {
-		p.wait(ended)
-	}
+	p.hold(meet, ended, until)
 	if p.output != "" {
 		for range 50 {
 			io.WriteString(spec.Stdout, p.output)
@@ -414,11 +487,27 @@ func TestForksNeedsTwoDependenciesAndTheAttribute(t *testing.T) {
 }
 
 // A recipe two branches both depend on runs once, and the branch that did not
-// run it waits for it.
+// run it waits for it. The command of c is held until a branch is seen blocked
+// at the gate of c (or, if the branch does not wait, until a branch has started
+// its own command), so that the waiter is known to have reached the gate while
+// c is still running. Then a and b can start only after c ended if the waiter
+// waits; one that did not wait would start its command while c is held.
 func TestRunParallelBranchesShareADependency(t *testing.T) {
 	proc := &timedProcess{}
+	var sawWaiter atomic.Bool
+	proc.until = map[string]func() bool{"echo c": func() bool {
+		if awaiting() {
+			sawWaiter.Store(true)
+			return true
+		}
+		return proc.startedAny("echo a", "echo b")
+	}}
 	plan, _, _ := newPlan(t, "[parallel]\nall: a b\n  @echo all\na: c\n  @echo a\nb: c\n  @echo b\nc:\n  @echo c\n", proc)
 	mustRun(t, plan)
+	proc.checkNoHang(t)
+	if !sawWaiter.Load() {
+		t.Errorf("no branch was seen waiting at the gate of c while c ran: %v", proc.events)
+	}
 	if n := proc.count("start echo c"); n != 1 {
 		t.Errorf("c ran %d times, want once: %v", n, proc.events)
 	}
@@ -544,11 +633,26 @@ func TestRunParallelPlanErrors(t *testing.T) {
 }
 
 // A recipe named twice in a list that runs at once is run by the first branch,
-// and the second waits for it and does not run it again.
+// and the second waits for it and does not run it again. The command of a is
+// held until the second branch is seen blocked at the gate of a (or, if it does
+// not wait, until all has started), so that the second branch is known to wait
+// while a runs.
 func TestRunParallelRecipeNamedTwiceRunsOnce(t *testing.T) {
 	proc := &timedProcess{}
+	var sawWaiter atomic.Bool
+	proc.until = map[string]func() bool{"echo a": func() bool {
+		if awaiting() {
+			sawWaiter.Store(true)
+			return true
+		}
+		return proc.startedAny("echo all")
+	}}
 	plan, _, _ := newPlan(t, "[parallel]\nall: a a\n  @echo all\na:\n  @echo a\n", proc)
 	mustRun(t, plan)
+	proc.checkNoHang(t)
+	if !sawWaiter.Load() {
+		t.Errorf("the second branch was not seen waiting at the gate of a while a ran: %v", proc.events)
+	}
 	if n := proc.count("start echo a"); n != 1 || proc.index("start echo all") < proc.index("end echo a") {
 		t.Errorf("a ran %d times, or all started before it was done: %v", n, proc.events)
 	}
