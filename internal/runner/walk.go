@@ -257,13 +257,13 @@ func (inv *invocation) resolve(from *ast.Recipe, deps []ast.Dependency, f frame)
 // the plan's environment changed by the variables of under and then by those
 // of over. It is pure: it only builds a value.
 func (inv *invocation) commander(under, over map[string]string) eval.Commander {
-	return shell{inv: inv, under: under, over: over}
+	return backtickRunner{inv: inv, under: under, over: over}
 }
 
-// shell runs the commands of backticks through the shell of the invocation.
+// backtickRunner runs the commands of backticks through the shell of the invocation.
 // under and over are the variables that change the plan's environment for
 // them, over taking the place of under.
-type shell struct {
+type backtickRunner struct {
 	inv         *invocation
 	under, over map[string]string
 }
@@ -274,7 +274,7 @@ type shell struct {
 // input, as the command line's own is shared, and writes to the plan's
 // standard error unless the plan is quiet. A command that fails is a
 // *eval.CommandError. Impure: it runs a command.
-func (c shell) Backtick(command string) (string, error) {
+func (c backtickRunner) Backtick(command string) (string, error) {
 	inv := c.inv
 	p := inv.plan
 	var stderr io.Writer = inv.stderr
