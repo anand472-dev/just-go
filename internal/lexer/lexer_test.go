@@ -316,10 +316,11 @@ func TestLexBraceEscapeTextKeepsSource(t *testing.T) {
 }
 
 // Indented strings, opened by three quotes, single or double, lose their
-// common indentation and their blank first and last lines. A cooked one's
-// escapes are processed after that, as upstream does (the string::indented_*
-// corpus cases).
-func TestLexIndentedStringRemovesCommonIndent(t *testing.T) {
+// common indentation and their blank first and last lines. The lexer does not
+// do that: it keeps the raw text in the token (the first check), and
+// StringValue unindents it (the table). A cooked one's escapes are processed
+// after that, as upstream does (the string::indented_* corpus cases).
+func TestStringValueRemovesCommonIndentOfIndentedString(t *testing.T) {
 	wantTokens(t, "x := '''\n  foo\n  bar\n'''\n", []lexer.Token{
 		tok(lexer.Ident, "x", 1, 1),
 		tok(lexer.Assign, ":=", 1, 3),

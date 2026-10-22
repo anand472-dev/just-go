@@ -84,7 +84,7 @@ Performance targets (roadmap item 7) are out of this plan.
 - Consumes: `diag.Error`.
 - Produces: string literal tokens for cooked, raw, and indented forms; brace-escape handling in bodies and strings.
 
-- [ ] **Step 1: Failing tests.** `TestLexBraceEscapeInsideString` (`echo '{{{{'` yields `{{`), `TestLexIndentedStringRemovesCommonIndent`, `TestLexUnterminatedStringMatchesUpstream` (message and location from the corpus case `misc::brace_escape#1`).
+- [ ] **Step 1: Failing tests.** `TestLexBraceEscapeInsideString` (`echo '{{{{'` yields `{{`), `TestStringValueRemovesCommonIndentOfIndentedString`, `TestLexUnterminatedStringMatchesUpstream` (message and location from the corpus case `misc::brace_escape#1`).
 - [ ] **Step 2: Implement** to make them pass, keeping the lexer pure.
 - [ ] **Step 3: Verify** the `string`, `interpolation`, and `brace_escape` groups in the conformance output.
 - [ ] **Step 4: Commit** `feat: lexer brace escapes and string literal forms`.
