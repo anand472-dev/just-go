@@ -1,0 +1,5 @@
+bin/
+oracle/src/
+oracle/bin/
+*.test
+.DS_Store

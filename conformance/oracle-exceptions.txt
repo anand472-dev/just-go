@@ -1,0 +1,37 @@
+# Cases the pinned oracle (oracle/bin/just) fails under the conformance
+# harness, with the reason. TestConformance skips them.
+#
+# Format: one entry per line, "<case id> <category>: <reason>". Blank lines
+# and lines starting with "#" are comments. The category must be one of
+# exceptionCategories in runner_test.go; parsing rejects any other.
+#
+# Two tests keep this list honest: TestOracleExceptionsNameCorpusCases
+# (every id is a corpus case) and TestOracleExceptionsStillFail (with
+# JUST_GO_BIN=oracle/bin/just, every listed case still fails; one that
+# passes is stale and must be removed).
+#
+# The categories are closed (ledger ruling R9):
+#   path-hash    a .justcache file named after the recorder's temporary path,
+#                which differs on every machine and run
+#   machine-env  a variable inherited from the recording machine, such as USER
+#   fifo         a named pipe fed by a thread in the upstream test, which the
+#                corpus cannot record
+# Empty directories, symbolic links, and file modes are recorded (R8) and the
+# harness materializes them, so they are never a reason here.
+
+cache::dangling_symlink_output_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::environment_variables_may_be_removed_from_cache_key#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::extra_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::hit_prints_verbose_message#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::hit_skips_execution#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::input_expression_evaluated_with_arguments#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::input_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::missing_output_invalidates_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::multiple_outputs#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::output_directory_is_allowed#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::output_expression_evaluated_with_arguments#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::outputs_resolve_against_working_directory#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::symlink_to_file_is_followed#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+cache::unexported_variable_does_not_invalidate_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
+dotenv::fifo#1 fifo: `.env` is a FIFO fed by a thread in the upstream test; the corpus cannot record it
+functions::env_var_functions_unix#1 machine-env: expects the recording user's USER (`pancha`) inherited from the recorder's environment

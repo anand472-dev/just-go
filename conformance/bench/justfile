@@ -1,0 +1,35 @@
+# Startup benchmark fixture for scripts/bench-startup.sh. Both binaries run
+# `--list` on this file, so it uses only the core subset: assignments,
+# parameters with defaults, dependencies, and doc comments.
+
+version := "1.0.0"
+target := "dist"
+
+# Build the project into the target directory
+build mode="release":
+    echo building {{version}} in {{mode}} mode into {{target}}
+
+# Run the test suite
+test: build
+    echo testing
+
+lint:
+    echo linting
+
+# Format every source file
+fmt:
+    echo formatting
+
+# Remove build output
+clean:
+    echo removing {{target}}
+
+deploy env region="us-east-1": build test
+    echo deploying to {{env}} in {{region}}
+
+# Print the version
+show-version:
+    echo {{version}}
+
+ci: lint test
+    echo ci done
