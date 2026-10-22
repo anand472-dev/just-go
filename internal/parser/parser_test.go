@@ -712,3 +712,28 @@ func TestParseDelimiterContinuation(t *testing.T) {
 		t.Errorf("bracket_continuation: Shell = %q, want %q", jf.Settings.Shell, want)
 	}
 }
+
+// TestParseUnclosedDelimiterAtEOF pins the behaviour of a delimiter still open
+// when the file ends. Each row was compared with oracle/bin/just: the lexer
+// ends the file with an ordinary end of line, so the parser reports an
+// expected-token error at the file end (or at the next token), and an open
+// delimiter inside an interpolation is an unterminated interpolation.
+func TestParseUnclosedDelimiterAtEOF(t *testing.T) {
+	cases := []struct {
+		name, src string
+		line, col int
+		msg       string
+	}{
+		{"paren", "x := (\n", 1, 8, "expected " + value + ", but found end of file"},
+		{"paren then blank line", "x := (\n\n", 2, 2, "expected " + value + ", but found end of file"},
+		{"paren swallows next recipe", "x := (\ny:\n  echo\n", 2, 2,
+			"expected '&&', '!=', '!~', '||', '==', '=~', '(', ')', '+', '++', or '/', but found ':'"},
+		{"paren inside interpolation", "a:\n  echo {{(\n", 2, 8, "unterminated interpolation"},
+		{"dangling operator", "x := \"a\" +\n", 1, 11, "expected " + value + ", but found end of line"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			wantError(t, c.src, c.line, c.col, c.msg)
+		})
+	}
+}
