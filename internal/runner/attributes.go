@@ -88,7 +88,9 @@ func (inv *invocation) confirm(r *ast.Recipe, f frame) (int, error) {
 		}
 	}
 	fmt.Fprint(inv.prompt, prompt+" ")
-	if isYes(readLine(inv.plan.Stdin)) {
+	// A reader that makes no progress gives no answer, so the recipe is not
+	// confirmed, as at the end of the input.
+	if answer, _ := readLine(inv.plan.Stdin); isYes(answer) {
 		return 0, nil
 	}
 	return 1, &diag.Error{Kind: diag.KindRuntime, Msg: fmt.Sprintf("recipe `%s` was not confirmed", r.Name)}
@@ -101,23 +103,32 @@ func isYes(line string) bool {
 	return answer == "y" || answer == "yes"
 }
 
+// maxEmptyReads is how many reads in a row may return no byte and no error
+// before readLine gives up on its reader, as bufio.Reader does.
+const maxEmptyReads = 100
+
 // readLine reads r up to and including the next line break, a byte at a time
 // so that it takes nothing after it: the commands of a recipe may read the
 // rest. It returns what it has at the end of the input or on a failure to
-// read, and "" for a nil reader. Impure: it reads r.
-func readLine(r io.Reader) string {
+// read, and "" for a nil reader. A reader that returns maxEmptyReads times in
+// a row without a byte or an error ends the read with what it has and
+// io.ErrNoProgress. Impure: it reads r.
+func readLine(r io.Reader) (string, error) {
 	if r == nil {
-		return ""
+		return "", nil
 	}
 	var line []byte
 	b := make([]byte, 1)
-	for {
+	for empty := 0; ; {
 		n, err := r.Read(b)
 		if n == 1 {
 			line = append(line, b[0])
+			empty = 0
+		} else if empty++; err == nil && empty >= maxEmptyReads {
+			return string(line), io.ErrNoProgress
 		}
 		if err != nil || (n == 1 && b[0] == '\n') {
-			return string(line)
+			return string(line), nil
 		}
 	}
 }

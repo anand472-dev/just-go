@@ -2,6 +2,7 @@ package runner
 
 import (
 	"errors"
+	"io"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -180,12 +181,55 @@ func TestAnswerIsYes(t *testing.T) {
 func TestReadLineStopsAtTheLineBreak(t *testing.T) {
 	r := strings.NewReader("one\ntwo")
 	for _, want := range []string{"one\n", "two", ""} {
-		if got := readLine(r); got != want {
-			t.Errorf("readLine = %q, want %q", got, want)
+		if got, err := readLine(r); got != want || err != nil {
+			t.Errorf("readLine = %q, %v; want %q", got, err, want)
 		}
 	}
-	if got := readLine(nil); got != "" {
-		t.Errorf("readLine(nil) = %q", got)
+	if got, err := readLine(nil); got != "" || err != nil {
+		t.Errorf("readLine(nil) = %q, %v", got, err)
+	}
+}
+
+// emptyReader returns (0, nil) for empties reads, then reads from rest.
+type emptyReader struct {
+	empties int
+	rest    io.Reader
+	reads   int
+}
+
+func (e *emptyReader) Read(p []byte) (int, error) {
+	e.reads++
+	if e.empties > 0 {
+		e.empties--
+		return 0, nil
+	}
+	return e.rest.Read(p)
+}
+
+func TestReadLineGivesUpOnAReaderThatMakesNoProgress(t *testing.T) {
+	r := &emptyReader{empties: 1 << 30, rest: strings.NewReader("never")}
+	got, err := readLine(r)
+	if got != "" || !errors.Is(err, io.ErrNoProgress) {
+		t.Errorf("readLine = %q, %v; want \"\", io.ErrNoProgress", got, err)
+	}
+	if r.reads != maxEmptyReads {
+		t.Errorf("reads = %d, want %d", r.reads, maxEmptyReads)
+	}
+}
+
+func TestReadLineToleratesFewEmptyReads(t *testing.T) {
+	r := &emptyReader{empties: maxEmptyReads - 1, rest: strings.NewReader("ok\n")}
+	if got, err := readLine(r); got != "ok\n" || err != nil {
+		t.Errorf("readLine = %q, %v; want \"ok\\n\", nil", got, err)
+	}
+}
+
+func TestRunConfirmIsNotGivenByAReaderThatMakesNoProgress(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "[confirm]\nfoo:\n  echo\n", fake)
+	plan.Stdin = &emptyReader{empties: 1 << 30, rest: strings.NewReader("y\n")}
+	if _, err := Run(t.Context(), plan); err == nil || !strings.Contains(err.Error(), "was not confirmed") {
+		t.Errorf("Run error = %v, want not confirmed", err)
 	}
 }
 
