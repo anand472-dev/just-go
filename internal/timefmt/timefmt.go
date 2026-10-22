@@ -193,7 +193,7 @@ func body(spec byte, after string) ([]item, int, bool) {
 func special(spec byte, after string) ([]item, int, bool) {
 	switch spec {
 	case '%', 'n', 't':
-		return []item{{text: map[byte]string{'%': "%", 'n': "\n", 't': "\t"}[spec]}}, 0, true
+		return []item{{text: literal(spec)}}, 0, true
 	case ':':
 		return colonOffset(after)
 	case '.':
@@ -203,6 +203,31 @@ func special(spec byte, after string) ([]item, int, bool) {
 		return items, n - 1, ok
 	}
 	return nil, 0, false
+}
+
+// literal is the text of the specifiers %%, %n and %t. Pure.
+func literal(spec byte) string {
+	switch spec {
+	case 'n':
+		return "\n"
+	case 't':
+		return "\t"
+	}
+	return "%"
+}
+
+// digitCount is the number of digits that the specifier digit 3, 6 or 9 asks
+// for, and 0 for any other byte. Pure.
+func digitCount(b byte) int {
+	switch b {
+	case '3':
+		return 3
+	case '6':
+		return 6
+	case '9':
+		return 9
+	}
+	return 0
 }
 
 // fraction parses what follows `%.` (dotted) or `%` (not): `f`, or a digit 3,
@@ -215,7 +240,7 @@ func fraction(after string, dotted bool) ([]item, int, bool) {
 	if after[0] == 'f' && dotted {
 		return []item{{fixed: fractionOf(0, true)}}, 1, true
 	}
-	digits := map[byte]int{'3': 3, '6': 6, '9': 9}[after[0]]
+	digits := digitCount(after[0])
 	if digits == 0 || len(after) < 2 || after[1] != 'f' {
 		return nil, 0, false
 	}
