@@ -8,7 +8,8 @@ import (
 )
 
 // isolateGroup puts the child in its own process group and makes
-// cancellation kill that whole group.
+// cancellation kill that whole group. Impure: it configures process and
+// signal behavior of cmd.
 func isolateGroup(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {

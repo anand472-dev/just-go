@@ -112,7 +112,9 @@ func TestOSProcessCancelKillsGroup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	// The shell forks sleep, so only a group kill ends the pipe promptly.
+	// The shell forks sleep. Without a group kill, the orphaned sleep holds the
+	// output pipe open until Cmd.WaitDelay (killGrace, 2s) force-closes it, so
+	// the bound must be below killGrace to prove the group was killed.
 	var out bytes.Buffer
 	_, err := sys.OSProcess{}.Run(ctx, sys.ProcessSpec{
 		Argv:   []string{"/bin/sh", "-c", "sleep 30; echo done"},
@@ -121,7 +123,7 @@ func TestOSProcessCancelKillsGroup(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
 	}
-	if d := time.Since(start); d > 5*time.Second {
+	if d := time.Since(start); d > time.Second {
 		t.Fatalf("took %v; process group was not killed", d)
 	}
 }

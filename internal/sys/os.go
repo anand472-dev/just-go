@@ -15,13 +15,13 @@ const killGrace = 2 * time.Second
 // OSFS is the FS backed by the real filesystem.
 type OSFS struct{}
 
-// ReadFile reads the named file.
+// ReadFile reads the named file. Impure: it touches the real filesystem.
 func (OSFS) ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
 // IsFile reports whether path is an existing regular file. A missing path is
-// not an error.
+// not an error. Impure: it touches the real filesystem.
 func (OSFS) IsFile(path string) (bool, error) {
 	info, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -37,7 +37,8 @@ func (OSFS) IsFile(path string) (bool, error) {
 type OSProcess struct{}
 
 // Run executes spec. The child runs in its own process group, and cancelling
-// ctx kills the whole group, not just the direct child.
+// ctx kills the whole group, not just the direct child. Impure: it spawns an
+// operating-system process.
 func (OSProcess) Run(ctx context.Context, spec ProcessSpec) (int, error) {
 	if len(spec.Argv) == 0 {
 		return -1, errors.New("sys: empty argv")
@@ -54,7 +55,7 @@ func (OSProcess) Run(ctx context.Context, spec ProcessSpec) (int, error) {
 }
 
 // exactEnv returns env as a non-nil slice: a nil Cmd.Env would inherit the
-// parent environment, but ProcessSpec.Env is exact.
+// parent environment, but ProcessSpec.Env is exact. Pure.
 func exactEnv(env []string) []string {
 	if env == nil {
 		return []string{}
@@ -62,7 +63,7 @@ func exactEnv(env []string) []string {
 	return env
 }
 
-// exitStatus maps the error from Cmd.Run to the Process.Run contract.
+// exitStatus maps the error from Cmd.Run to the Process.Run contract. Pure.
 func exitStatus(ctx context.Context, err error) (int, error) {
 	if err == nil {
 		return 0, nil

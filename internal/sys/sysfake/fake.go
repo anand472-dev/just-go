@@ -13,6 +13,7 @@ import (
 type FakeFS map[string]string
 
 // ReadFile returns the content at path, or an error wrapping fs.ErrNotExist.
+// Pure: it reads only the in-memory map.
 func (f FakeFS) ReadFile(path string) ([]byte, error) {
 	content, ok := f[path]
 	if !ok {
@@ -21,7 +22,8 @@ func (f FakeFS) ReadFile(path string) ([]byte, error) {
 	return []byte(content), nil
 }
 
-// IsFile reports whether path is present in the map.
+// IsFile reports whether path is present in the map. Pure: it reads only the
+// in-memory map.
 func (f FakeFS) IsFile(path string) (bool, error) {
 	_, ok := f[path]
 	return ok, nil
@@ -39,7 +41,8 @@ type FakeProcess struct {
 	Specs []sys.ProcessSpec
 }
 
-// Run records spec and returns the next scripted result.
+// Run records spec and returns the next scripted result. Pure: it runs no
+// process and mutates only the fake's own records.
 func (p *FakeProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error) {
 	p.Specs = append(p.Specs, spec)
 	if p.Err != nil {
