@@ -19,6 +19,24 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
 | Cases with file modes outside the convention (`modes`) | 3 |
 | Lossy cases (an input that is not valid UTF-8 was left out) | 0 |
 
+## Baseline
+
+`conformance/baseline.txt` lists the cases `bin/just-go` passes. The
+ratchet (`make ratchet`) only adds to it, and `TestBaseline` fails if any of
+them stops passing. This section is written by hand at each milestone gate;
+`make corpus` regenerates the rest of this file and drops it.
+
+| | |
+|---|---|
+| Recorded | 2026-10-22, milestone 1 gate, `just-go` at commit `722d05d` |
+| Corpus cases | 2011 |
+| Cases in the baseline | 1 |
+
+The count is low mostly because upstream adds `--shell bash` to the command line
+(1949 cases carry it, see below), and milestone 1's CLI does not accept
+`--shell`. Of the other cases, 1994 fail and 16 are skipped as oracle
+exceptions.
+
 ## How to read a case
 
 - `args` is the full command line. Upstream adds `--shell bash` unless a test
