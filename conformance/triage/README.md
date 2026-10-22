@@ -12,11 +12,15 @@ scripts/triage.py --input events.json   # triages a saved `go test -json` run in
 
 `TestTriageCoversEveryFailure` (`conformance/triage_test.go`) keeps it honest.
 Every failing case is in exactly one group. The groups hold exactly the
-failing count. Pass, fail, and skip add up to the corpus. No grouped case is
+failing count. Pass, fail, and skip add up to the corpus, and the pass count equals the
+number of baseline cases. No grouped case is
 an oracle exception or a baseline case. The `core-defect` group is empty.
 When a change makes cases pass, run `make ratchet` and then
 `scripts/triage.py`, and commit both. A ratcheted case that is still in a
 group fails the test.
+
+The classifier has unit tests, `conformance/triage_test_py.py`. Run them with
+`make triage-test`; they are not part of `make check`.
 
 ## Format
 

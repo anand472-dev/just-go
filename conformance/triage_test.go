@@ -58,7 +58,7 @@ func checkTriage(doc triage, corpus []string, exceptions map[string]string, base
 		passing[id] = true
 	}
 	c := doc.Counts
-	errs := []error{checkCounts(c.Pass, c.Fail, c.Skip, c.Total, len(corpus), len(exceptions))}
+	errs := []error{checkCounts(c.Pass, c.Fail, c.Skip, c.Total, len(corpus), len(exceptions), len(baseline))}
 	group := map[string]string{}
 	for name, cases := range doc.Groups {
 		errs = append(errs, checkGroup(name, cases, doc.GroupSizes[name]))
@@ -77,8 +77,9 @@ func checkTriage(doc triage, corpus []string, exceptions map[string]string, base
 }
 
 // checkCounts requires pass, fail, and skip to add up to total, total to be
-// the corpus size, and skip to be the number of oracle exceptions. Pure.
-func checkCounts(pass, fail, skip, total, corpus, exceptions int) error {
+// the corpus size, skip to be the number of oracle exceptions, and pass to be
+// the number of baseline cases. Pure.
+func checkCounts(pass, fail, skip, total, corpus, exceptions, baseline int) error {
 	switch {
 	case pass+fail+skip != total:
 		return fmt.Errorf("counts: %d pass + %d fail + %d skip is not the total %d", pass, fail, skip, total)
@@ -86,6 +87,8 @@ func checkCounts(pass, fail, skip, total, corpus, exceptions int) error {
 		return fmt.Errorf("counts: total %d, but the corpus has %d cases", total, corpus)
 	case skip != exceptions:
 		return fmt.Errorf("counts: %d skipped, but there are %d oracle exceptions", skip, exceptions)
+	case pass != baseline:
+		return fmt.Errorf("counts: %d pass, but the baseline has %d cases", pass, baseline)
 	}
 	return nil
 }
@@ -181,6 +184,7 @@ func TestCheckTriage(t *testing.T) {
 		want   string
 	}{
 		{"counts do not add up", func(d *triage) { d.Counts.Pass = 2 }, "is not the total"},
+		{"pass is not the baseline", func(d *triage) { d.Counts.Pass, d.Counts.Fail = 2, 1 }, "the baseline has"},
 		{"total is not the corpus", func(d *triage) { d.Counts.Total, d.Counts.Pass = 5, 2 }, "the corpus has"},
 		{"skip is not the exceptions", func(d *triage) { d.Counts.Skip, d.Counts.Pass = 0, 2 }, "oracle exceptions"},
 		{"bad group name", func(d *triage) { rename(d, "grammar", "Grammar") }, "not a triage group name"},

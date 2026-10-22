@@ -1,6 +1,6 @@
 GOCYCLO_VERSION := v0.6.0
 
-.PHONY: build test vet oracle corpus conformance-report baseline ratchet cover cyclo bench check tools
+.PHONY: build test vet oracle corpus conformance-report baseline ratchet cover cyclo bench check tools triage-test
 
 build:
 	go build -o bin/just-go ./cmd/just-go
@@ -46,6 +46,10 @@ bench:
 	go test -bench=. -benchmem ./... | tee docs/benchmarks/go-bench.txt
 
 check: vet test baseline
+
+# The unit tests of scripts/triage.py. Not part of check.
+triage-test:
+	python3 -m unittest conformance.triage_test_py
 
 # Developer tool, not a module dependency.
 tools:
