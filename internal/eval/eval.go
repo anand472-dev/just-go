@@ -116,12 +116,13 @@ type Scope map[string]string
 
 // Evaluate returns the string value of e, looking variables up in scope. A
 // variable with no entry in scope, a list (which belongs to the unstable
-// `lists` setting), a backtick (there is no Commander to run it), or an
-// expression of a type the evaluator does not know, is a *diag.Error of
-// KindRuntime. A conditional evaluates only the branch its comparison picks;
-// an assert is the empty string, or an error when its comparison fails. An undefined variable is located at its name, as the syntax
-// tree records it, but without a file, which the caller fills in. Evaluate is
-// pure.
+// `lists` setting), a backtick (there is no Commander to run it), a call of a
+// function (the builtins are not implemented yet), or an expression of a type
+// the evaluator does not know, is a *diag.Error of KindRuntime. A conditional
+// evaluates only the branch its comparison picks; an assert is the empty
+// string, or an error when its comparison fails. An undefined variable is
+// located at its name, as the syntax tree records it, but without a file,
+// which the caller fills in. Evaluate is pure.
 func Evaluate(e ast.Expr, scope Scope) (string, error) {
 	return EvaluateWith(e, scope, nil)
 }
@@ -151,8 +152,21 @@ func EvaluateWith(e ast.Expr, scope Scope, cmd Commander) (string, error) {
 	case ast.Assert:
 		return assertion(x, scope, cmd)
 	default:
-		return "", fail("cannot evaluate expression of type %T", e)
+		return "", unsupported(e)
 	}
+}
+
+// unsupported is the error for an expression that EvaluateWith has no case
+// for. A call of a function is located at its name; any other expression is
+// named by its Go type. It is pure.
+func unsupported(e ast.Expr) *diag.Error {
+	c, ok := e.(ast.Call)
+	if !ok {
+		return fail("cannot evaluate expression of type %T", e)
+	}
+	err := fail("function %s is not implemented yet", c.Name)
+	err.Line, err.Col, err.Width = c.Line, c.Col, len(c.Name)
+	return err
 }
 
 // EvaluateAll returns the string value of each of exprs, in order, looking

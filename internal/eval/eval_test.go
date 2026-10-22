@@ -94,6 +94,18 @@ func TestEvaluateUnknownExpression(t *testing.T) {
 	requireRuntime(t, err, "cannot evaluate expression of type eval.foreign")
 }
 
+// A call of a function is refused until the builtins exist. The error names
+// the function, not a Go type, and is located at the call's name.
+func TestEvaluateRefusesCallOfFunction(t *testing.T) {
+	call := ast.Call{Name: "uppercase", Args: []ast.Expr{ast.StringLit{Value: "x"}}, Line: 2, Col: 7}
+	_, err := Evaluate(call, nil)
+	requireRuntime(t, err, "function uppercase is not implemented yet")
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("uppercase") {
+		t.Errorf("location = %+v; want line 2, column 7, width 9", de)
+	}
+}
+
 // A list belongs to `set lists`, which is unstable and not implemented; the
 // error says so rather than naming a Go type.
 func TestEvaluateRefusesLists(t *testing.T) {
