@@ -6,6 +6,8 @@ import (
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/eval/builtins"
+	"gitea.com/wimwian/just-go/internal/sys/sysfake"
 )
 
 // lit is a string literal.
@@ -95,6 +97,75 @@ func TestEvaluateRefusesACallTheAnalyzerWouldRefuse(t *testing.T) {
 	requireRuntime(t, err, "function `uppercase` called with 0 arguments")
 	_, err = Evaluate(call("uppercase", lit("a"), lit("b")), nil)
 	requireRuntime(t, err, "function `uppercase` called with 2 arguments")
+}
+
+// hosted is a Commander that is also Hosted.
+type hosted struct {
+	scripted
+	host builtins.Host
+}
+
+func (h *hosted) Host() builtins.Host { return h.host }
+
+// A builtin that reads the world is given the Host of the commander the
+// evaluation runs with, and its arguments are evaluated first.
+func TestEvaluateGivesABuiltinTheHostOfTheCommander(t *testing.T) {
+	cmd := &hosted{host: builtins.Host{
+		FS:      sysfake.FakeFS{"/w/f": "text", "/w/d/g": ""},
+		WorkDir: "/w", Justfile: "/w/justfile", SourceFile: "/w/justfile", ModuleFile: "/w/justfile",
+	}}
+	scope := Scope{"name": "f"}
+	for _, tc := range []struct {
+		name string
+		e    ast.Expr
+		want string
+	}{
+		{"read", call("read", ast.Var{Name: "name"}), "text"},
+		{"path_exists", call("path_exists", lit("d")), "true"},
+		{"absolute_path", call("absolute_path", ast.Concat{Left: lit("d/"), Right: lit("g")}), "/w/d/g"},
+		{"justfile", call("justfile"), "/w/justfile"},
+		{"abbreviated", call("justfile_dir"), "/w"},
+		{"in a call", call("uppercase", call("read", lit("f"))), "TEXT"},
+	} {
+		got, err := EvaluateWith(tc.e, scope, cmd)
+		if err != nil || got != tc.want {
+			t.Errorf("%s: got %q, %v; want %q", tc.name, got, err, tc.want)
+		}
+	}
+}
+
+func TestEvaluateLocatesTheErrorOfAHostBuiltinAtItsName(t *testing.T) {
+	cmd := &hosted{host: builtins.Host{FS: sysfake.FakeFS{}, WorkDir: "/w"}}
+	_, err := EvaluateWith(call("read", lit("bar")), nil, cmd)
+	requireRuntime(t, err, "I/O error reading `bar`: No such file or directory (os error 2)")
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("read") {
+		t.Errorf("location = %+v; want line 2, column 7, width 4", de)
+	}
+}
+
+// An evaluation that has no Host, such as one with no commander, cannot call a
+// builtin that needs one, and says so at its name.
+func TestEvaluateRefusesAHostBuiltinWithoutAHost(t *testing.T) {
+	for _, cmd := range []Commander{nil, &scripted{}} {
+		_, err := EvaluateWith(call("path_exists", lit("x")), nil, cmd)
+		requireRuntime(t, err, "function `path_exists` cannot be called without a justfile")
+		var de *diag.Error
+		if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("path_exists") {
+			t.Errorf("location = %+v; want line 2, column 7, width 11", de)
+		}
+	}
+}
+
+func BenchmarkEvaluateHostCall(b *testing.B) {
+	cmd := &hosted{host: builtins.Host{FS: sysfake.FakeFS{"/w/a/b": ""}, WorkDir: "/w"}}
+	e := call("path_exists", call("clean", lit("a/./b/")))
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if got, err := EvaluateWith(e, nil, cmd); err != nil || got != "true" {
+			b.Fatal(got, err)
+		}
+	}
 }
 
 func BenchmarkEvaluateCall(b *testing.B) {

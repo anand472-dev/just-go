@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -455,5 +458,119 @@ func TestFakeFSWritesAScriptDirectory(t *testing.T) {
 	}
 	if want := (sysfake.FakeFS{"/keep": "k", "/work/just-fake-other/c": ""}); !reflect.DeepEqual(fsys, want) {
 		t.Fatalf("after RemoveAll = %v; want %v", fsys, want)
+	}
+}
+
+func TestOSFSExistsFollowsLinksAndSeesDirectories(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "f")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(filepath.Join(dir, "missing"), link); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+	fsys := sys.OSFS{}
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"file", file, true}, {"directory", dir, true}, {"missing", filepath.Join(dir, "none"), false},
+		{"broken link", link, false}, {"through a file", filepath.Join(file, "x"), false},
+	} {
+		if got := fsys.Exists(tc.path); got != tc.want {
+			t.Errorf("Exists(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestOSFSCanonicalizeResolvesLinksAndDots(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "real"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(dir, "link")); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+	fsys := sys.OSFS{}
+	for _, in := range []string{
+		filepath.Join(dir, "link"), filepath.Join(dir, "real", "..", "link"), filepath.Join(dir, ".", "real"),
+	} {
+		got, err := fsys.Canonicalize(in)
+		if want := filepath.Join(dir, "real"); err != nil || got != want {
+			t.Errorf("Canonicalize(%s) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	if _, err := fsys.Canonicalize(filepath.Join(dir, "none")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("Canonicalize(missing) error = %v, want not exist", err)
+	}
+}
+
+func TestOSFSCanonicalizeMakesARelativePathAbsolute(t *testing.T) {
+	got, err := sys.OSFS{}.Canonicalize(".")
+	if want, _ := os.Getwd(); err != nil || !filepath.IsAbs(got) || filepath.Base(got) != filepath.Base(want) {
+		t.Errorf("Canonicalize(.) = %q, %v; want the absolute working directory %q", got, err, want)
+	}
+}
+
+func TestFakeFSExistsAndCanonicalizeSeeFilesAndTheirDirectories(t *testing.T) {
+	fsys := sysfake.FakeFS{"/w/a/f": "x", "/w/g": "y"}
+	for _, tc := range []struct {
+		path, canonical string
+		exists          bool
+	}{
+		{"/w/g", "/w/g", true}, {"/w/a", "/w/a", true}, {"/w/a/", "/w/a", true}, {"/w/./a/../g", "/w/g", true},
+		{"/w", "/w", true}, {"/", "/", true}, {"/w/none", "", false}, {"/w/a/f/x", "", false}, {"/ww", "", false},
+	} {
+		got, err := fsys.Canonicalize(tc.path)
+		if (err == nil) != tc.exists || got != tc.canonical {
+			t.Errorf("Canonicalize(%s) = %q, %v; want %q, exists %v", tc.path, got, err, tc.canonical, tc.exists)
+		}
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Canonicalize(%s) error %v does not wrap fs.ErrNotExist", tc.path, err)
+		}
+		if got := fsys.Exists(tc.path); got != tc.exists {
+			t.Errorf("Exists(%s) = %v, want %v", tc.path, got, tc.exists)
+		}
+	}
+}
+
+// The wording is Rust's Display of an io::Error, which the oracle printed for
+// read('bar'), read of a directory and canonicalize of a path through a file.
+func TestErrorTextWordsAnErrorAsRustDoes(t *testing.T) {
+	_, missing := os.ReadFile(filepath.Join(t.TempDir(), "bar"))
+	_, dir := os.ReadFile(t.TempDir())
+	_, through := os.Stat(filepath.Join(t.TempDir(), "x", "y"))
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"missing", missing, "No such file or directory (os error 2)"},
+		{"directory", dir, "Is a directory (os error 21)"},
+		{"missing in an existing directory", through, "No such file or directory (os error 2)"},
+		{"permission", syscall.EACCES, "Permission denied (os error 13)"},
+		{"a fake's missing file", fmt.Errorf("read x: %w", fs.ErrNotExist), "No such file or directory (os error 2)"},
+		{"a fake's refusal", fmt.Errorf("read x: %w", fs.ErrPermission), "Permission denied (os error 13)"},
+		{"no number", errors.New("boom"), "boom"},
+	} {
+		if runtime.GOOS == "windows" && tc.name != "no number" {
+			continue
+		}
+		if got := sys.ErrorText(tc.err); got != tc.want {
+			t.Errorf("%s: ErrorText = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func BenchmarkErrorText(b *testing.B) {
+	_, err := os.ReadFile(filepath.Join(b.TempDir(), "bar"))
+	for i := 0; i < b.N; i++ {
+		_ = sys.ErrorText(err)
 	}
 }

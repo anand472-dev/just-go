@@ -100,6 +100,36 @@ func (OSFS) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
 
+// Exists reports whether a file or a directory is at path, following symbolic
+// links, as Rust's Path::exists does: a path that cannot be examined does not
+// exist. Impure: it touches the real filesystem.
+func (OSFS) Exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// Canonicalize returns the absolute path of what path names, with every
+// symbolic link resolved, as Rust's fs::canonicalize does. Impure: it touches
+// the real filesystem.
+func (OSFS) Canonicalize(path string) (string, error) {
+	return canonicalize(os.Getwd, path)
+}
+
+// canonicalize resolves path, which is taken from the directory getwd names if
+// it is relative. The path is not cleaned first, because a `..` after a
+// symbolic link names the parent of what the link points to. Impure: it
+// touches the real filesystem.
+func canonicalize(getwd func() (string, error), path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		dir, err := getwd()
+		if err != nil {
+			return "", err
+		}
+		path = dir + string(filepath.Separator) + path
+	}
+	return filepath.EvalSymlinks(path)
+}
+
 // OSProcess is the Process backed by os/exec.
 //
 // Without Signals, as a library uses it, each child runs in its own process

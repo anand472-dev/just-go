@@ -1,0 +1,2271 @@
+[
+ {
+  "name": "clean('')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean(' ')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean(' ') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('./a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('./a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a//b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a//b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('//a//b//')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('//a//b//') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/a/../b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/a/../b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/a/b/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/a/b/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('../a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('../a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/./../b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/./../b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('.../a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('.../a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/b/../../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/b/../../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/a/../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/a/../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('./..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('./..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('./.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('./.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('foo/bar/./baz/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('foo/bar/./baz/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/b/c/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/b/c/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/a/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/a/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('//')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('//') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('./')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('./') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('../')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('../') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a/../../b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a/../../b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('/a/./b/../c/.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('/a/./b/../c/.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('a b/c d')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('a b/c d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('é/ü')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('é/ü') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "clean('./a/../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ clean('./a/../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory(' ')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory(' ') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('./a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('./a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a//b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a//b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('//a//b//')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('//a//b//') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/a/../b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/a/../b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/a/b/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/a/b/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('../a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('../a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/./../b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/./../b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('.../a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('.../a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/b/../../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/b/../../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/a/../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/a/../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('./..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('./..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('./.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('./.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('foo/bar/./baz/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('foo/bar/./baz/..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/b/c/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/b/c/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/a')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/a/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/a/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('//')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('//') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('./')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('./') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('../')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('../') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a/../../b')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a/../../b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('/a/./b/../c/.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('/a/./b/../c/.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('a b/c d')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('a b/c d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('é/ü')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('é/ü') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "parent_directory('./a/../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ parent_directory('./a/../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('x')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('x') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('x') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('x') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('x') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('./x')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('./x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('./x') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('./x') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('./x') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('./x') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('x/../y')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('x/../y') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('x/../y') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('x/../y') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('x/../y') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('x/../y') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('/abs')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('/abs') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('/abs') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('/abs') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('/abs') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('/abs') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('/abs/../z')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('/abs/../z') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('/abs/../z') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('/abs/../z') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('/abs/../z') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('/abs/../z') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('..') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('..') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('..') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('..') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('../x')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('../x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('../x') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('../x') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('../x') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('../x') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('.') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('.') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('.') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('.') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('../../..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('../../..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('../../..') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('../../..') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('../../..') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('../../..') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('a/b/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('a/b/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('a/b/') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('a/b/') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('a/b/') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('a/b/') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('/') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('/') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('/') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('/') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('/') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "absolute_path('//')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('//') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('//') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'sub/dir'\nfoo:\n  @echo '{{ absolute_path('//') }}'\n",
+   "sub/dir/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "absolute_path('//') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ absolute_path('//') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "path_exists('f')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('f') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('d') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('d') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d/g')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('d/g') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d/g') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('d/g') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d/none')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('d/none') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d/none') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('d/none') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('none')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('none') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('none') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('none') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('f/x')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('f/x') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('f/x') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('f/x') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('./f')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('./f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('./f') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('./f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d/../f')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('d/../f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('d/../f') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('d/../f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('..') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('..') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('..') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('.') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('.') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('.') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('sub/h')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('sub/h') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('sub/h') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('sub/h') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('/')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('/') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('/') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('/') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('/nonexistent-just-go-path')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('/nonexistent-just-go-path') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('/nonexistent-just-go-path') in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('/nonexistent-just-go-path') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists('h') }} {{ path_exists('f') }}'\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "path_exists in an assignment",
+  "files": {
+   "justfile": "x := path_exists('f')\nfoo:\n  @echo {{x}}\n",
+   "f": "x",
+   "d/g": "y",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('f')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('f') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('d/g')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('d/g') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('none')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('none') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('d')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('d') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('f/x')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('f/x') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read('./f')",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ read('./f') }}]'\n",
+   "f": "héllo\n",
+   "d/g": "",
+   "sub/h": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '[{{ read('g') }}]'\n",
+   "d/g": "inside",
+   "g": "outside"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read in an assignment",
+  "files": {
+   "justfile": "x := read('f')\nfoo:\n  @echo '[{{x}}]'\n",
+   "f": "text"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "read of a missing file in an assignment",
+  "files": {
+   "justfile": "x := read('none')\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('.') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('..') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('d')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('d') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('d/..')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('d/..') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('none')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('none') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('f/g')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('f/g') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('f')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('f') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('d/../f')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('d/../f') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize('./d/./.')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ canonicalize('./d/./.') }}'\n",
+   "f": "",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "canonicalize in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ canonicalize('g') }}'\n",
+   "d/g": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ justfile() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ justfile() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "justfile() in an assignment",
+  "files": {
+   "justfile": "x := justfile()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := justfile()\nfoo:\n  @echo '[{{x}}] [{{ justfile() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile_directory()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ justfile_directory() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile_directory() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ justfile_directory() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "justfile_directory() in an assignment",
+  "files": {
+   "justfile": "x := justfile_directory()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile_directory() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := justfile_directory()\nfoo:\n  @echo '[{{x}}] [{{ justfile_directory() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile_dir()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ justfile_dir() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile_dir() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ justfile_dir() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "justfile_dir() in an assignment",
+  "files": {
+   "justfile": "x := justfile_dir()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "justfile_dir() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := justfile_dir()\nfoo:\n  @echo '[{{x}}] [{{ justfile_dir() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_directory()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_directory() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_directory() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_directory() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "invocation_directory() in an assignment",
+  "files": {
+   "justfile": "x := invocation_directory()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_directory() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := invocation_directory()\nfoo:\n  @echo '[{{x}}] [{{ invocation_directory() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_dir()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_dir() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_dir() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_dir() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "invocation_dir() in an assignment",
+  "files": {
+   "justfile": "x := invocation_dir()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_dir() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := invocation_dir()\nfoo:\n  @echo '[{{x}}] [{{ invocation_dir() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_directory_native()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_directory_native() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_directory_native() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_directory_native() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "invocation_directory_native() in an assignment",
+  "files": {
+   "justfile": "x := invocation_directory_native()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_directory_native() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := invocation_directory_native()\nfoo:\n  @echo '[{{x}}] [{{ invocation_directory_native() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_dir_native()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_dir_native() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_dir_native() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ invocation_dir_native() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "invocation_dir_native() in an assignment",
+  "files": {
+   "justfile": "x := invocation_dir_native()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "invocation_dir_native() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := invocation_dir_native()\nfoo:\n  @echo '[{{x}}] [{{ invocation_dir_native() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_file()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ source_file() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_file() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ source_file() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "source_file() in an assignment",
+  "files": {
+   "justfile": "x := source_file()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_file() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := source_file()\nfoo:\n  @echo '[{{x}}] [{{ source_file() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_directory()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ source_directory() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_directory() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ source_directory() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "source_directory() in an assignment",
+  "files": {
+   "justfile": "x := source_directory()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_directory() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := source_directory()\nfoo:\n  @echo '[{{x}}] [{{ source_directory() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_dir()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ source_dir() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_dir() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ source_dir() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "source_dir() in an assignment",
+  "files": {
+   "justfile": "x := source_dir()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "source_dir() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := source_dir()\nfoo:\n  @echo '[{{x}}] [{{ source_dir() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_file()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_file() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_file() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_file() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "module_file() in an assignment",
+  "files": {
+   "justfile": "x := module_file()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_file() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := module_file()\nfoo:\n  @echo '[{{x}}] [{{ module_file() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_directory()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_directory() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_directory() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_directory() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "module_directory() in an assignment",
+  "files": {
+   "justfile": "x := module_directory()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_directory() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := module_directory()\nfoo:\n  @echo '[{{x}}] [{{ module_directory() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_dir()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_dir() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_dir() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_dir() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "module_dir() in an assignment",
+  "files": {
+   "justfile": "x := module_dir()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_dir() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := module_dir()\nfoo:\n  @echo '[{{x}}] [{{ module_dir() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_path()",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_path() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_path() from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '[{{ module_path() }}]'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "module_path() in an assignment",
+  "files": {
+   "justfile": "x := module_path()\nfoo:\n  @echo '[{{x}}]'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "module_path() in a working directory",
+  "files": {
+   "justfile": "set working-directory := 'd'\nx := module_path()\nfoo:\n  @echo '[{{x}}] [{{ module_path() }}]'\n",
+   "d/keep": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "the places in a parameter default",
+  "files": {
+   "justfile": "foo a=justfile_directory() b=invocation_directory():\n  @echo '{{a}} {{b}}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "the places with set no-cd",
+  "files": {
+   "justfile": "set no-cd\nfoo:\n  @echo '{{ invocation_directory() }} {{ absolute_path('x') }}'\n",
+   "sub/keep": ""
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
+  "name": "the places in a dependency argument",
+  "files": {
+   "justfile": "bar x:\n  @echo '{{x}}'\nfoo: (bar justfile_directory())\n  @echo done\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "the places in a backtick",
+  "files": {
+   "justfile": "x := `echo` + justfile_directory()\nfoo:\n  @echo '{{x}}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "an argument that fails",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ path_exists(read('none')) }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "a wrong count",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ read('a', 'b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "a function in a setting",
+  "files": {
+   "justfile": "set working-directory := absolute_path('x')\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ }
+]

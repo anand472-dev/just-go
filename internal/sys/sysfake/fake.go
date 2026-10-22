@@ -80,6 +80,28 @@ func (f FakeFS) RemoveAll(path string) error {
 	return nil
 }
 
+// Exists reports whether path is a file in the map or a directory above one.
+// Pure: it reads only the in-memory map.
+func (f FakeFS) Exists(path string) bool {
+	_, err := f.Canonicalize(path)
+	return err == nil
+}
+
+// Canonicalize returns path cleaned, if it is a file in the map or a directory
+// above one, and an error wrapping fs.ErrNotExist if it is not. The fake has
+// no symbolic links and no working directory, so a relative path stays
+// relative. Pure: it reads only the in-memory map.
+func (f FakeFS) Canonicalize(path string) (string, error) {
+	clean := filepath.Clean(path)
+	below := strings.TrimSuffix(clean, "/") + "/"
+	for p := range f {
+		if filepath.Clean(p) == clean || strings.HasPrefix(p, below) {
+			return clean, nil
+		}
+	}
+	return "", fmt.Errorf("canonicalize %s: %w", path, fs.ErrNotExist)
+}
+
 // FakeProcess is a sys.Process that runs nothing. It records every spec and
 // answers with scripted results.
 type FakeProcess struct {

@@ -3,7 +3,7 @@
 (Task 6 in cases.json, Task 7 in cases-unstable.json, Task 8 in
 cases-attributes.json, Task 9 in cases-attributes-b.json, Task 10 in
 cases-backticks.json, Task 12 in cases-conditionals.json, Task 14 in
-cases-builtins-string.json) against the oracle
+cases-builtins-string.json, Task 15 in cases-builtins-path.json) against the oracle
 and against bin/just-go, and compares exit status, stdout and stderr (the
 temporary directory is masked as $D). A case may set "env", added to the
 environment of both, "cwd", the directory under the temporary one to run in,

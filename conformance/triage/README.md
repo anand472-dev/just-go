@@ -48,15 +48,15 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `dotenv` | Has a `.env` file or a `dotenv-*` setting. The settings are parsed and validated; the cases that remain need a file loaded or a command run (Phase 3). |
 | `setting:<name>` | Sets a setting that has no effect yet: `fallback` (needs the search of parent justfiles, Phase 3). |
 | `attribute` | Uses an attribute the parser does not implement yet: `[arg]`, which no task owns yet, or `[cache]`, which is unstable (Tasks 8 and 9 implemented the rest). A case that uses only the others is sorted by what else it uses. |
-| `shebang` | Has a shebang recipe or a `[script]` recipe. Task 11 implemented them, so the cases left here fail for what else they use: a variadic parameter (no task owns it yet), `unexport`, and a builtin call in the shebang line (Task 14). |
-| `builtin:<family>` | Calls a builtin function that is not implemented yet (Task 14 implemented the string and case families, and the path functions that work on a string), or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
+| `shebang` | Has a shebang recipe or a `[script]` recipe. Task 11 implemented them, so the cases left here fail for what else they use: a variadic parameter (no task owns it yet) and `unexport`. |
+| `builtin:<family>` | Calls a builtin function that is not implemented yet (Task 14 implemented the string and case families, and the path functions that work on a string; Task 15 implemented the rest of the path family and the functions that name the justfile, the module and the invocation directory), or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
 | `grammar` | Uses other syntax outside the implemented subset (`alias`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
 | `core-defect` | Uses only the implemented subset and still fails. Must be empty. |
 | `other` | Fails for a reason no rule above explains. |
 
 ## Current counts
 
-From the run recorded in `groups.json`: 505 pass, 1490 fail, 16 skip, of
+From the run recorded in `groups.json`: 515 pass, 1480 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
@@ -66,11 +66,11 @@ From the run recorded in `groups.json`: 505 pass, 1490 fail, 16 skip, of
 | `attribute` | 112 |
 | `module` | 157 |
 | `grammar` | 75 |
-| `builtin:*` | 42 |
+| `builtin:*` | 33 |
 | `completions` | 40 |
 | `dotenv` | 21 |
 | `setting:*` | 6 |
-| `shebang` | 3 |
+| `shebang` | 2 |
 | `core-defect` | 0 |
 | `other` | 0 |
 

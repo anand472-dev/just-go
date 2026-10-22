@@ -3,8 +3,10 @@
 // It is pure: every function reads the expression and scope it is given and
 // returns a value. None performs I/O, none mutates its input, and there is no
 // package-level state apart from the read-only tables of the builtins
-// package, which holds the functions a call can name. The evaluator knows nothing of recipes, shells, or the
-// environment. A backtick is the one expression whose value comes from outside:
+// package, which holds the functions a call can name. The evaluator knows
+// nothing of recipes, shells, or the environment. A builtin that looks at the
+// filesystem, such as read, is given the Host of the caller's Commander, and
+// the file system is the caller's to choose. A backtick is the one expression whose value comes from outside:
 // the caller hands over a Commander, which runs the command, and the evaluator
 // only words the failure. Strings are Go strings, which are byte sequences,
 // and no conversion is applied, so multibyte text passes through unchanged.

@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -59,5 +60,35 @@ func TestMkdirTempReportsAnUnusableRuntimeDirectory(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", file)
 	if dir, err := (OSFS{goos: "linux"}).MkdirTemp("", "just-"); err == nil {
 		t.Fatalf("MkdirTemp = %q, want an error", dir)
+	}
+}
+
+func TestCanonicalizeFailsWhenTheWorkingDirectoryCannotBeRead(t *testing.T) {
+	boom := errors.New("no working directory")
+	if got, err := canonicalize(func() (string, error) { return "", boom }, "x"); !errors.Is(err, boom) {
+		t.Errorf("canonicalize(x) = %q, %v; want %v", got, err, boom)
+	}
+}
+
+// A relative path is taken from the directory getwd names, and its `..` is
+// read after the symbolic links before it are resolved: link/../f is real/f
+// when link points to real/inner, though a lexical clean would say f.
+func TestCanonicalizeReadsARelativePathFromTheWorkingDirectory(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "real", "inner"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "real", "f"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("real", "inner"), filepath.Join(dir, "link")); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+	got, err := canonicalize(func() (string, error) { return dir, nil }, "link"+string(filepath.Separator)+".."+string(filepath.Separator)+"f")
+	if want := filepath.Join(dir, "real", "f"); err != nil || got != want {
+		t.Errorf("canonicalize(link/../f) = %q, %v; want %q", got, err, want)
 	}
 }

@@ -95,6 +95,8 @@ func (l listFS) IsFile(p string) (bool, error)    { return l.regular[p], l.isErr
 func (listFS) WriteFile(string, []byte, fs.FileMode) error { return errors.New("unused") }
 func (listFS) MkdirTemp(string, string) (string, error)    { return "", errors.New("unused") }
 func (listFS) RemoveAll(string) error                      { return errors.New("unused") }
+func (listFS) Exists(string) bool                          { return false }
+func (listFS) Canonicalize(string) (string, error)         { return "", errors.New("unused") }
 
 func TestFindSkipsDirectoriesNamedLikeJustfiles(t *testing.T) {
 	fsys := listFS{
@@ -175,6 +177,8 @@ func (e errFS) ReadDir(string) ([]string, error) { return nil, e.err }
 func (e errFS) WriteFile(string, []byte, fs.FileMode) error { return e.err }
 func (e errFS) MkdirTemp(string, string) (string, error)    { return "", e.err }
 func (e errFS) RemoveAll(string) error                      { return e.err }
+func (e errFS) Exists(string) bool                          { return false }
+func (e errFS) Canonicalize(string) (string, error)         { return "", e.err }
 
 func TestFindFilesystemErrorIsNotNoJustfile(t *testing.T) {
 	boom := errors.New("boom")

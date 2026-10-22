@@ -132,11 +132,15 @@ BUILTINS = {name: family for family, names in BUILTIN_FAMILIES.items()
 # with an implementation). A call of one of these does not put a case in a
 # builtin group; the case is sorted by what else it uses.
 IMPLEMENTED_BUILTINS = set("""
-append capitalize encode_uri_component extension file_name file_stem join
-kebabcase len lowercamelcase lowercase prepend quote replace replace_regex
-shoutykebabcase shoutysnakecase snakecase titlecase trim trim_end
-trim_end_match trim_end_matches trim_start trim_start_match
-trim_start_matches uppercamelcase uppercase without_extension
+absolute_path append canonicalize capitalize clean encode_uri_component
+extension file_name file_stem invocation_directory
+invocation_directory_native join justfile justfile_directory kebabcase len
+lowercamelcase lowercase module_directory module_file module_path
+parent_directory path_exists prepend quote read replace replace_regex
+shoutykebabcase shoutysnakecase snakecase source_directory source_file
+titlecase trim trim_end trim_end_match trim_end_matches trim_start
+trim_start_match trim_start_matches uppercamelcase uppercase
+without_extension
 """.split())
 
 IDENT = r"[A-Za-z_][A-Za-z0-9_-]*"

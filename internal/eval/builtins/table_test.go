@@ -1,6 +1,14 @@
 package builtins
 
-import "testing"
+import (
+	"os"
+	"regexp"
+	"slices"
+	"strings"
+	"testing"
+
+	"gitea.com/wimwian/just-go/internal/sys/sysfake"
+)
 
 // TestTableKnowsEveryUpstreamFunction checks the table against the list of
 // upstream's function names and their argument ranges, copied from
@@ -79,8 +87,9 @@ func TestAcceptsTheArgumentRange(t *testing.T) {
 // there.
 func TestImplementedFunctionsTakeTheirWholeArgumentRange(t *testing.T) {
 	implemented := 0
+	h := host(sysfake.FakeFS{"/w/a b": "a b"})
 	for _, b := range table {
-		if b.Pure == nil {
+		if !b.Implemented() {
 			continue
 		}
 		implemented++
@@ -93,7 +102,11 @@ func TestImplementedFunctionsTakeTheirWholeArgumentRange(t *testing.T) {
 			for i := range args {
 				args[i] = "a b"
 			}
-			_, _ = b.Pure(args)
+			if b.Pure != nil {
+				_, _ = b.Pure(args)
+			} else {
+				_, _ = b.Impure(h, args)
+			}
 		}
 	}
 	if implemented == 0 {
@@ -109,5 +122,42 @@ func BenchmarkLookup(b *testing.B) {
 		if _, ok := Lookup("config_dir"); !ok {
 			b.Fatal("not found")
 		}
+	}
+}
+
+func TestAFunctionIsPureOrImpureNeverBoth(t *testing.T) {
+	for name, b := range table {
+		if b.Pure != nil && b.Impure != nil {
+			t.Errorf("%s has both a pure and an impure implementation", name)
+		}
+		if got := b.Implemented(); got != (b.Pure != nil || b.Impure != nil) {
+			t.Errorf("%s: Implemented() = %v", name, got)
+		}
+	}
+	if (Builtin{}).Implemented() {
+		t.Error("a function with no implementation is implemented")
+	}
+}
+
+// scripts/triage.py keeps its own list of the implemented builtins, to sort the
+// cases that call one by what else they use. It must be the table's.
+func TestTriageListsTheImplementedBuiltins(t *testing.T) {
+	src, err := os.ReadFile("../../../scripts/triage.py")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?s)IMPLEMENTED_BUILTINS = set\("""(.*?)"""\.split\(\)\)`).FindSubmatch(src)
+	if m == nil {
+		t.Fatal("scripts/triage.py has no IMPLEMENTED_BUILTINS")
+	}
+	var want []string
+	for name, b := range table {
+		if b.Implemented() {
+			want = append(want, name)
+		}
+	}
+	slices.Sort(want)
+	if got := strings.Fields(string(m[1])); !slices.Equal(got, want) {
+		t.Errorf("IMPLEMENTED_BUILTINS = %v\nthe table implements   %v", got, want)
 	}
 }

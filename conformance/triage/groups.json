@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 505,
-    "fail": 1490,
+    "pass": 515,
+    "fail": 1480,
     "skip": 16,
     "total": 2011
   },
@@ -10,8 +10,7 @@
     "builtin:constants": 3,
     "builtin:env": 8,
     "builtin:external": 1,
-    "builtin:invocation": 15,
-    "builtin:path": 7,
+    "builtin:invocation": 13,
     "builtin:semver": 1,
     "builtin:style": 4,
     "builtin:system": 3,
@@ -69,7 +68,7 @@
     "grammar": 75,
     "module": 157,
     "setting:fallback": 6,
-    "shebang": 3,
+    "shebang": 2,
     "unstable:cached-recipes": 85,
     "unstable:lists": 262,
     "unstable:user-defined-functions": 32
@@ -211,8 +210,6 @@
       "confirm::confirm_expression_is_dependency_is_false_for_direct_invocation#1": "calls is_dependency()",
       "confirm::confirm_expression_is_dependency_is_true_for_dependency_invocation#1": "calls is_dependency()",
       "constants::constants_are_not_exported#1": "calls just_executable()",
-      "functions::dir_abbreviations_are_accepted#1": "calls justfile_dir()",
-      "functions::invocation_dir_native_abbreviation_is_accepted#1": "calls invocation_directory_native()",
       "functions::is_dependency#1": "calls is_dependency()",
       "functions::is_dependency#2": "calls is_dependency()",
       "functions::recipe_name#1": "calls recipe_name()",
@@ -223,15 +220,6 @@
       "request::environment_variable_missing#1": "calls just_executable()",
       "request::environment_variable_set#1": "calls just_executable()",
       "search_arguments::passing_dot_as_argument_is_allowed#1": "calls just_executable()"
-    },
-    "builtin:path": {
-      "booleans::path_exists_without_lists_returns_string#1": "calls path_exists()",
-      "functions::broken_directory_function#1": "calls parent_directory()",
-      "functions::broken_directory_function2#1": "calls parent_directory()",
-      "functions::clean#1": "calls clean()",
-      "functions::parent_directory_of_bare_filename#1": "calls parent_directory()",
-      "functions::path_functions#1": "calls parent_directory()",
-      "functions::path_functions2#1": "calls parent_directory()"
     },
     "builtin:semver": {
       "functions::semver_matches#1": "calls semver_matches()"
@@ -1311,7 +1299,6 @@
     },
     "shebang": {
       "positional_arguments::variadic_shebang#1": "has a shebang recipe",
-      "shebang::powershell_shebang_on_unix_has_no_bom#1": "has a shebang recipe",
       "unexport::unexport_environment_variable_shebang#1": "has a shebang recipe"
     },
     "unstable:cached-recipes": {

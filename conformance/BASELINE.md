@@ -47,6 +47,7 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 12: conditionals and assert | 485 | 485 | 1510 | 16 |
 | Compat Task 13: Phase 1 gate (no new cases; ratchet adds 0) | 485 | 485 | 1510 | 16 |
 | Compat Task 14: string builtins | 505 | 505 | 1490 | 16 |
+| Compat Task 15: path builtins | 515 | 515 | 1480 | 16 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the

@@ -12,6 +12,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"syscall"
+	"unicode"
+	"unicode/utf8"
 )
 
 // FS is access to the filesystem: reading justfiles and the files they name,
@@ -35,6 +38,13 @@ type FS interface {
 	// RemoveAll removes path and everything below it. A path that does not
 	// exist is no error.
 	RemoveAll(path string) error
+	// Exists reports whether a file or a directory is at path, following
+	// symbolic links. A path that cannot be examined does not exist.
+	Exists(path string) bool
+	// Canonicalize returns the absolute path of what path names, with every
+	// symbolic link resolved and every `.` and `..` gone. A path that does not
+	// exist is an error.
+	Canonicalize(path string) (string, error)
 }
 
 // Process runs external programs.
@@ -168,4 +178,26 @@ func Capture(ctx context.Context, p Process, spec ProcessSpec) (Captured, error)
 		return got, nil
 	}
 	return got, err
+}
+
+// ErrorText words err as Rust's Display does for an io::Error: the operating
+// system's description of the failure, with its first letter in upper case,
+// then the system's error number, as "No such file or directory (os error 2)".
+// An error that carries no system error number is worded as one of the two
+// that a fake filesystem raises (a missing file, a refused permission), or as
+// it words itself. Pure.
+func ErrorText(err error) string {
+	var errno syscall.Errno
+	switch {
+	case errors.As(err, &errno):
+	case errors.Is(err, fs.ErrNotExist):
+		errno = syscall.ENOENT
+	case errors.Is(err, fs.ErrPermission):
+		errno = syscall.EACCES
+	default:
+		return err.Error()
+	}
+	text := errno.Error()
+	first, size := utf8.DecodeRuneInString(text)
+	return fmt.Sprintf("%s%s (os error %d)", string(unicode.ToUpper(first)), text[size:], int(errno))
 }
