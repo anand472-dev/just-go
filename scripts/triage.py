@@ -128,6 +128,16 @@ BUILTIN_FAMILIES = {
 }
 BUILTINS = {name: family for family, names in BUILTIN_FAMILIES.items()
             for name in names.split()}
+# Builtins the evaluator implements (internal/eval/builtins table, entries
+# with an implementation). A call of one of these does not put a case in a
+# builtin group; the case is sorted by what else it uses.
+IMPLEMENTED_BUILTINS = set("""
+append capitalize encode_uri_component extension file_name file_stem join
+kebabcase len lowercamelcase lowercase prepend quote replace replace_regex
+shoutykebabcase shoutysnakecase snakecase titlecase trim trim_end
+trim_end_match trim_end_matches trim_start trim_start_match
+trim_start_matches uppercamelcase uppercase without_extension
+""".split())
 
 IDENT = r"[A-Za-z_][A-Za-z0-9_-]*"
 CALL = re.compile(r"(?<![A-Za-z0-9_-])(" + IDENT + r")\s*\(")
@@ -310,10 +320,11 @@ def has_shebang(source):
 
 
 def builtin_group(expressions):
-    """The family of the first builtin called, or None. Pure."""
+    """The family of the first builtin called that is not implemented yet, or
+    None. Pure."""
     for name in CALL.findall(expressions):
         lookup = re.sub(r"_dir(_native)?$", r"_directory\1", name)
-        if lookup in BUILTINS:
+        if lookup in BUILTINS and lookup not in IMPLEMENTED_BUILTINS:
             return "builtin:" + BUILTINS[lookup], "calls " + name + "()"
     return None
 

@@ -2,7 +2,8 @@
 //
 // It is pure: every function reads the expression and scope it is given and
 // returns a value. None performs I/O, none mutates its input, and there is no
-// package-level state. The evaluator knows nothing of recipes, shells, or the
+// package-level state apart from the read-only tables of the builtins
+// package, which holds the functions a call can name. The evaluator knows nothing of recipes, shells, or the
 // environment. A backtick is the one expression whose value comes from outside:
 // the caller hands over a Commander, which runs the command, and the evaluator
 // only words the failure. Strings are Go strings, which are byte sequences,
@@ -117,8 +118,10 @@ type Scope map[string]string
 // Evaluate returns the string value of e, looking variables up in scope. A
 // variable with no entry in scope, a list (which belongs to the unstable
 // `lists` setting), a backtick (there is no Commander to run it), a call of a
-// function (the builtins are not implemented yet), or an expression of a type
-// the evaluator does not know, is a *diag.Error of KindRuntime. A conditional
+// function that is not implemented yet, or an expression of a type the
+// evaluator does not know, is a *diag.Error of KindRuntime. A call of a
+// builtin evaluates its arguments and then the builtin, and the error of
+// either is located as it is. A conditional
 // evaluates only the branch its comparison picks; an assert is the empty
 // string, or an error when its comparison fails. An undefined variable is
 // located at its name, as the syntax tree records it, but without a file,
@@ -143,30 +146,33 @@ func EvaluateWith(e ast.Expr, scope Scope, cmd Commander) (string, error) {
 		return backtick(x, cmd)
 	case ast.Var:
 		return lookup(x, scope)
-	case ast.Concat:
-		return concat(x, scope, cmd)
 	case ast.List, ast.Comparison:
 		return "", errLists()
+	}
+	return evaluateCompound(e, scope, cmd)
+}
+
+// evaluateCompound is EvaluateWith for the expressions that hold other
+// expressions: a concatenation, a call, a conditional and an assert. Any
+// other expression is an error. It is pure apart from what cmd does.
+func evaluateCompound(e ast.Expr, scope Scope, cmd Commander) (string, error) {
+	switch x := e.(type) {
+	case ast.Concat:
+		return concat(x, scope, cmd)
+	case ast.Call:
+		return evaluateCall(x, scope, cmd)
 	case ast.Conditional:
 		return conditional(x, scope, cmd)
 	case ast.Assert:
 		return assertion(x, scope, cmd)
-	default:
-		return "", unsupported(e)
 	}
+	return "", unsupported(e)
 }
 
 // unsupported is the error for an expression that EvaluateWith has no case
-// for. A call of a function is located at its name; any other expression is
-// named by its Go type. It is pure.
+// for, which it names by its Go type. It is pure.
 func unsupported(e ast.Expr) *diag.Error {
-	c, ok := e.(ast.Call)
-	if !ok {
-		return fail("cannot evaluate expression of type %T", e)
-	}
-	err := fail("function %s is not implemented yet", c.Name)
-	err.Line, err.Col, err.Width = c.Line, c.Col, len(c.Name)
-	return err
+	return fail("cannot evaluate expression of type %T", e)
 }
 
 // EvaluateAll returns the string value of each of exprs, in order, looking

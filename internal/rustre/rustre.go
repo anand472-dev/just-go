@@ -25,8 +25,9 @@ func Compile(pattern string) (*regexp.Regexp, error) {
 
 // message words the failure err to compile pattern as Rust's regex crate
 // words a parse error: the pattern, a caret under the place the fault is, and
-// the fault. Go's regexp finds the same four faults as the crate does, and the
-// scan places each as the crate does; for any other fault the caret is at the
+// the fault. Go's regexp finds the same five faults as the crate does, and the
+// scan (or, for a trailing backslash, the end of the pattern) places each as
+// the crate does; for any other fault the caret is at the
 // start and the fault is Go's own words. Pure.
 func message(pattern string, err error) string {
 	at, fault := 0, err.Error()
@@ -54,6 +55,8 @@ func place(pattern string, code syntax.ErrorCode, fault string) (int, string) {
 		at, words = s.repeat, "repetition operator missing expression"
 	case syntax.ErrMissingBracket:
 		at, words = s.class, "unclosed character class"
+	case syntax.ErrTrailingBackslash:
+		at, words = utf8.RuneCountInString(pattern)-1, "incomplete escape sequence, reached end of pattern prematurely"
 	}
 	return max(at, 0), words
 }

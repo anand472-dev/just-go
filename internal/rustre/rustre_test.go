@@ -13,6 +13,7 @@ func TestCompileWordsErrorsAsTheRegexCrateWordsThem(t *testing.T) {
 		unopened = "unopened group"
 		repeat   = "repetition operator missing expression"
 		class    = "unclosed character class"
+		escape   = "incomplete escape sequence, reached end of pattern prematurely"
 	)
 	for _, tc := range []struct {
 		pattern string
@@ -26,6 +27,7 @@ func TestCompileWordsErrorsAsTheRegexCrateWordsThem(t *testing.T) {
 		{")", 0, unopened}, {"a)", 1, unopened}, {"(a))", 3, unopened}, {"a(b)c)", 5, unopened},
 		{"*", 0, repeat}, {"+a", 0, repeat}, {"a|*", 2, repeat}, {"(?:*)", 3, repeat}, {"(*)", 1, repeat},
 		{"a|+", 2, repeat}, {"**", 0, repeat},
+		{`foo\`, 3, escape}, {`é\`, 1, escape}, {`\`, 0, escape}, {`a\\\`, 3, escape}, {`[\`, 1, escape},
 		{"[", 0, class}, {"[a", 0, class}, {"a[", 1, class}, {"[[:alpha:]", 0, class},
 	} {
 		want := "regex parse error:\n    " + tc.pattern + "\n    " + strings.Repeat(" ", tc.at) + "^\nerror: " + tc.fault

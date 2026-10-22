@@ -213,6 +213,14 @@ class ClassifyPrecedenceTest(unittest.TestCase):
     def test_builtin_family(self):
         self.assertEqual(group("x := uuid()\n"), "builtin:random")
 
+    def test_implemented_builtin_is_not_a_builtin_group(self):
+        self.assertEqual(group("x := uppercase('a')\n", actual="status: got 1"),
+                         "other")
+
+    def test_unimplemented_builtin_after_an_implemented_one(self):
+        self.assertEqual(group("x := uppercase(uuid())\n"),
+                         "builtin:random")
+
     def test_dir_alias_maps_to_directory(self):
         self.assertEqual(group("x := home_dir()\n"),
                          "builtin:directories")

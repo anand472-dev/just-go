@@ -1,0 +1,166 @@
+// Package builtins holds upstream's builtin functions and the one table that
+// names them.
+//
+// Each builtin is a pure function of its arguments, which are already
+// evaluated strings, and returns a string or an error whose text is
+// upstream's. A builtin that needs the outside world is not pure, takes an
+// internal/sys interface, and is kept apart in the table. The table also holds
+// the number of arguments each function takes, which the analyzer reads to
+// refuse a call that has the wrong number and the evaluator to dispatch a call.
+// A function whose implementation has not landed is in the table with no
+// implementation: the analyzer knows its name and arity, and the evaluator
+// reports it as not implemented.
+//
+// Without `set lists`, which is unstable and out of scope (R15), every value
+// is a string, which upstream treats as a list of one element. The functions
+// that exist for lists (bool, join_list, num_jobs, show, split, which) are
+// refused by the analyzer without the setting and are not implemented here.
+package builtins
+
+import "strings"
+
+// Unbounded is the upper end of the argument range of a function that takes
+// any number of arguments from its lower end on.
+const Unbounded = -1
+
+// Func is a pure builtin: it maps the evaluated arguments to a string. A
+// failure is an error whose text is upstream's wording, without a location,
+// which the evaluator adds.
+type Func func(args []string) (string, error)
+
+// Builtin describes one function: the number of arguments it takes, from Lo to
+// Hi or Unbounded, and its implementation. Pure is nil for a function that
+// is not implemented yet.
+type Builtin struct {
+	Lo, Hi int
+	Pure   Func
+}
+
+// Accepts reports whether n arguments are a number the function takes. It is
+// pure.
+func (b Builtin) Accepts(n int) bool {
+	return n >= b.Lo && (b.Hi == Unbounded || n <= b.Hi)
+}
+
+// Lookup returns the builtin called name. Upstream reads a name that ends in
+// `_dir` or `_dir_native` as the same name ending in `_directory` or
+// `_directory_native`. ok is false if there is no such function. It is pure.
+func Lookup(name string) (b Builtin, ok bool) {
+	if prefix, found := strings.CutSuffix(name, "_dir"); found {
+		name = prefix + "_directory"
+	} else if prefix, found := strings.CutSuffix(name, "_dir_native"); found {
+		name = prefix + "_directory_native"
+	}
+	b, ok = table[name]
+	return b, ok
+}
+
+// table holds the name, the argument range and the implementation of each of
+// upstream's functions, as oracle/src/src/function.rs lists them. It is
+// read-only.
+var table = map[string]Builtin{
+	"absolute_path":               {1, 1, nil},
+	"append":                      {2, 2, binary(appendEach)},
+	"arch":                        {0, 0, nil},
+	"blake3":                      {1, 1, nil},
+	"blake3_file":                 {1, 1, nil},
+	"bool":                        {1, 1, nil},
+	"cache_directory":             {0, 0, nil},
+	"canonicalize":                {1, 1, nil},
+	"capitalize":                  {1, 1, unary(capitalize)},
+	"choose":                      {2, 2, nil},
+	"clean":                       {1, 1, nil},
+	"config_directory":            {0, 0, nil},
+	"config_local_directory":      {0, 0, nil},
+	"data_directory":              {0, 0, nil},
+	"data_local_directory":        {0, 0, nil},
+	"datetime":                    {1, 1, nil},
+	"datetime_utc":                {1, 1, nil},
+	"encode_uri_component":        {1, 1, unary(encodeURIComponent)},
+	"env":                         {1, 2, nil},
+	"env_var":                     {1, 1, nil},
+	"env_var_or_default":          {2, 2, nil},
+	"error":                       {1, 1, nil},
+	"executable_directory":        {0, 0, nil},
+	"extension":                   {1, 1, failing(extension)},
+	"file_name":                   {1, 1, failing(fileName)},
+	"file_stem":                   {1, 1, failing(fileStem)},
+	"home_directory":              {0, 0, nil},
+	"invocation_directory":        {0, 0, nil},
+	"invocation_directory_native": {0, 0, nil},
+	"is_dependency":               {0, 0, nil},
+	"join":                        {2, Unbounded, join},
+	"join_list":                   {1, 2, nil},
+	"just_executable":             {0, 0, nil},
+	"just_pid":                    {0, 0, nil},
+	"just_version":                {0, 0, nil},
+	"justfile":                    {0, 0, nil},
+	"justfile_directory":          {0, 0, nil},
+	"kebabcase":                   {1, 1, unary(kebabcase)},
+	"len":                         {1, 1, unary(length)},
+	"lowercamelcase":              {1, 1, unary(lowercamelcase)},
+	"lowercase":                   {1, 1, unary(lowercase)},
+	"module_directory":            {0, 0, nil},
+	"module_file":                 {0, 0, nil},
+	"module_path":                 {0, 0, nil},
+	"num_cpus":                    {0, 0, nil},
+	"num_jobs":                    {0, 0, nil},
+	"os":                          {0, 0, nil},
+	"os_family":                   {0, 0, nil},
+	"parent_directory":            {1, 1, nil},
+	"path_exists":                 {1, 1, nil},
+	"prepend":                     {2, 2, binary(prependEach)},
+	"quote":                       {1, 1, unary(quote)},
+	"read":                        {1, 1, nil},
+	"recipe_name":                 {0, 0, nil},
+	"replace":                     {3, 3, ternary(strings.ReplaceAll)},
+	"replace_regex":               {3, 3, replaceRegex},
+	"require":                     {1, 1, nil},
+	"runtime_directory":           {0, 0, nil},
+	"semver_matches":              {2, 2, nil},
+	"sha256":                      {1, 1, nil},
+	"sha256_file":                 {1, 1, nil},
+	"shell":                       {1, Unbounded, nil},
+	"shoutykebabcase":             {1, 1, unary(shoutykebabcase)},
+	"shoutysnakecase":             {1, 1, unary(shoutysnakecase)},
+	"show":                        {1, 1, nil},
+	"snakecase":                   {1, 1, unary(snakecase)},
+	"source_directory":            {0, 0, nil},
+	"source_file":                 {0, 0, nil},
+	"split":                       {1, 2, nil},
+	"style":                       {1, 2, nil},
+	"titlecase":                   {1, 1, unary(titlecase)},
+	"trim":                        {1, 1, unary(strings.TrimSpace)},
+	"trim_end":                    {1, 1, unary(trimEnd)},
+	"trim_end_match":              {2, 2, binary(strings.TrimSuffix)},
+	"trim_end_matches":            {2, 2, binary(trimEndMatches)},
+	"trim_start":                  {1, 1, unary(trimStart)},
+	"trim_start_match":            {2, 2, binary(strings.TrimPrefix)},
+	"trim_start_matches":          {2, 2, binary(trimStartMatches)},
+	"uppercamelcase":              {1, 1, unary(uppercamelcase)},
+	"uppercase":                   {1, 1, unary(uppercase)},
+	"uuid":                        {0, 0, nil},
+	"which":                       {1, 1, nil},
+	"without_extension":           {1, 1, failing(withoutExtension)},
+}
+
+// unary adapts a function of one string to a Func. It is pure.
+func unary(f func(string) string) Func {
+	return func(args []string) (string, error) { return f(args[0]), nil }
+}
+
+// failing adapts a function of one string that can fail to a Func. It is
+// pure.
+func failing(f func(string) (string, error)) Func {
+	return func(args []string) (string, error) { return f(args[0]) }
+}
+
+// binary adapts a function of two strings to a Func. It is pure.
+func binary(f func(a, b string) string) Func {
+	return func(args []string) (string, error) { return f(args[0], args[1]), nil }
+}
+
+// ternary adapts a function of three strings to a Func. It is pure.
+func ternary(f func(a, b, c string) string) Func {
+	return func(args []string) (string, error) { return f(args[0], args[1], args[2]), nil }
+}

@@ -1,20 +1,18 @@
 {
   "counts": {
-    "pass": 485,
-    "fail": 1510,
+    "pass": 505,
+    "fail": 1490,
     "skip": 16,
     "total": 2011
   },
   "group_sizes": {
     "attribute": 112,
-    "builtin:case": 10,
     "builtin:constants": 3,
     "builtin:env": 8,
     "builtin:external": 1,
     "builtin:invocation": 15,
-    "builtin:path": 12,
+    "builtin:path": 7,
     "builtin:semver": 1,
-    "builtin:string": 8,
     "builtin:style": 4,
     "builtin:system": 3,
     "cli:alias-style": 3,
@@ -68,7 +66,7 @@
     "cli:working-directory": 7,
     "completions": 40,
     "dotenv": 21,
-    "grammar": 72,
+    "grammar": 75,
     "module": 157,
     "setting:fallback": 6,
     "shebang": 3,
@@ -191,18 +189,6 @@
       "options::value_with_undefined_variable_is_an_error#1": "uses the [arg] attribute",
       "options::variadics_can_follow_options#1": "uses the [arg] attribute"
     },
-    "builtin:case": {
-      "functions::capitalize#1": "calls capitalize()",
-      "functions::kebabcase#1": "calls kebabcase()",
-      "functions::lowercamelcase#1": "calls lowercamelcase()",
-      "functions::lowercase#1": "calls lowercase()",
-      "functions::shoutykebabcase#1": "calls shoutykebabcase()",
-      "functions::shoutysnakecase#1": "calls shoutysnakecase()",
-      "functions::snakecase#1": "calls snakecase()",
-      "functions::titlecase#1": "calls titlecase()",
-      "functions::uppercamelcase#1": "calls uppercamelcase()",
-      "functions::uppercase#1": "calls uppercase()"
-    },
     "builtin:constants": {
       "constants::constants_are_defined_in_recipe_bodies#1": "uses the constant HEX",
       "constants::constants_are_defined_in_recipe_parameters#1": "uses the constant HEX",
@@ -242,28 +228,13 @@
       "booleans::path_exists_without_lists_returns_string#1": "calls path_exists()",
       "functions::broken_directory_function#1": "calls parent_directory()",
       "functions::broken_directory_function2#1": "calls parent_directory()",
-      "functions::broken_extension_function#1": "calls extension()",
-      "functions::broken_extension_function2#1": "calls extension()",
-      "functions::broken_file_name_function#1": "calls file_name()",
-      "functions::broken_file_stem_function#1": "calls file_stem()",
-      "functions::broken_without_extension_function#1": "calls without_extension()",
       "functions::clean#1": "calls clean()",
       "functions::parent_directory_of_bare_filename#1": "calls parent_directory()",
-      "functions::path_functions#1": "calls without_extension()",
-      "functions::path_functions2#1": "calls without_extension()"
+      "functions::path_functions#1": "calls parent_directory()",
+      "functions::path_functions2#1": "calls parent_directory()"
     },
     "builtin:semver": {
       "functions::semver_matches#1": "calls semver_matches()"
-    },
-    "builtin:string": {
-      "functions::invalid_replace_regex#1": "calls replace_regex()",
-      "functions::replace#1": "calls replace()",
-      "functions::replace_regex#1": "calls replace_regex()",
-      "functions::trim#1": "calls trim()",
-      "lists::quote_of_empty_variadic_is_empty_string_without_lists_setting#1": "calls quote()",
-      "parameters::variadic_arguments_are_joined_when_passed_to_functions#1": "calls quote()",
-      "parameters::variadic_parameter_passed_to_dependency_is_joined_with_spaces#1": "calls quote()",
-      "quote::quoted_strings_can_be_used_as_arguments#1": "calls quote()"
     },
     "builtin:style": {
       "style::style_command_default#1": "calls style()",
@@ -1116,6 +1087,7 @@
       "format_string::unmatched_close_is_ignored#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unterminated_format_string_error#1": "just-go reports a parse error: unterminated string",
       "lists::dependency_arguments_join_lists_without_lists_setting#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
+      "lists::quote_of_empty_variadic_is_empty_string_without_lists_setting#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "markdown::code_blocks_are_concatenated#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
       "markdown::extension_is_case_insensitive#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
       "markdown::line_numbers_are_preserved#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
@@ -1155,6 +1127,8 @@
       "parameters::empty_star_parameter_is_equal_to_empty_string#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "parameters::exported_variadic_parameter_is_joined_with_spaces#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '+'",
       "parameters::star_may_follow_default#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
+      "parameters::variadic_arguments_are_joined_when_passed_to_functions#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
+      "parameters::variadic_parameter_passed_to_dependency_is_joined_with_spaces#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "parser::comment_after_unexport#1": "uses `unexport`",
       "positional_arguments::empty_variadic_is_undefined#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "positional_arguments::variadic_arguments_are_separate#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",

@@ -1,0 +1,109 @@
+package eval
+
+import (
+	"errors"
+	"testing"
+
+	"gitea.com/wimwian/just-go/internal/ast"
+	"gitea.com/wimwian/just-go/internal/diag"
+)
+
+// lit is a string literal.
+func lit(s string) ast.Expr { return ast.StringLit{Value: s} }
+
+// callOf is a call of the function name at 2:7 with args.
+func call(name string, args ...ast.Expr) ast.Call {
+	return ast.Call{Name: name, Args: args, Line: 2, Col: 7}
+}
+
+func TestEvaluateCallsABuiltinWithTheValuesOfItsArguments(t *testing.T) {
+	scope := Scope{"x": "bar"}
+	for _, tc := range []struct {
+		name string
+		e    ast.Expr
+		want string
+	}{
+		{"one argument", call("uppercase", lit("bar")), "BAR"},
+		{"a variable", call("uppercase", ast.Var{Name: "x"}), "BAR"},
+		{"a concatenation", call("uppercase", ast.Concat{Left: ast.Var{Name: "x"}, Right: lit("!")}), "BAR!"},
+		{"three arguments", call("replace", lit("barbar"), lit("bar"), lit("foo")), "foofoo"},
+		{"a call as an argument", call("quote", call("trim", lit("  it's  "))), `'it'\''s'`},
+		{"variable arguments", call("join", lit("a"), lit("b"), ast.Var{Name: "x"}), "a/b/bar"},
+		{"a call in a call of one argument less", call("append", lit("-"), call("lowercase", lit("A B"))), "a- b-"},
+	} {
+		got, err := Evaluate(tc.e, scope)
+		if err != nil || got != tc.want {
+			t.Errorf("%s: got %q, %v; want %q", tc.name, got, err, tc.want)
+		}
+	}
+}
+
+// functions::broken_extension_function#1: the error of a function is located
+// at its name.
+func TestEvaluateLocatesTheErrorOfABuiltinAtItsName(t *testing.T) {
+	_, err := Evaluate(call("extension", lit("")), nil)
+	requireRuntime(t, err, "could not extract extension from ``")
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("extension") || de.File != "" {
+		t.Errorf("error = %+v; want it at 2:7 with width 9 and no file", de)
+	}
+}
+
+// functions::invalid_replace_regex#1
+func TestEvaluateWordsABadPatternAsTheRegexCrateDoes(t *testing.T) {
+	_, err := Evaluate(call("replace_regex", lit("barbarbar"), lit("foo\\"), lit("foo")), nil)
+	requireRuntime(t, err, "regex parse error:\n    foo\\\n       ^\nerror: incomplete escape sequence, reached end of pattern prematurely")
+}
+
+func TestEvaluateStopsAtTheFirstArgumentThatFails(t *testing.T) {
+	e := call("replace", ast.Var{Name: "first", Line: 5, Col: 3}, ast.Var{Name: "second"}, lit(""))
+	_, err := Evaluate(e, nil)
+	requireRuntime(t, err, "variable `first` not defined")
+}
+
+// The arguments of a call are evaluated with the commander of the caller.
+func TestEvaluateWithRunsTheBackticksOfTheArguments(t *testing.T) {
+	cmd := &scripted{out: []string{" out "}}
+	got, err := EvaluateWith(call("trim", tick), nil, cmd)
+	if err != nil || got != "out" {
+		t.Errorf("got %q, %v; want %q", got, err, "out")
+	}
+}
+
+func TestEvaluateReadsDirAsDirectory(t *testing.T) {
+	_, err := Evaluate(call("cache_dir"), nil)
+	requireRuntime(t, err, "function cache_dir is not implemented yet")
+}
+
+// A function that has a name and no implementation yet says so, located at
+// its name.
+func TestEvaluateRefusesAFunctionThatIsNotImplementedYet(t *testing.T) {
+	_, err := Evaluate(call("uuid"), nil)
+	requireRuntime(t, err, "function uuid is not implemented yet")
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("uuid") {
+		t.Errorf("location = %+v; want line 2, column 7, width 4", de)
+	}
+}
+
+// The analyzer refuses these before the evaluator sees them; a caller that
+// skips the analyzer gets an error, not a panic.
+func TestEvaluateRefusesACallTheAnalyzerWouldRefuse(t *testing.T) {
+	_, err := Evaluate(call("nope", lit("a")), nil)
+	requireRuntime(t, err, "call to undefined function `nope`")
+	_, err = Evaluate(call("uppercase"), nil)
+	requireRuntime(t, err, "function `uppercase` called with 0 arguments")
+	_, err = Evaluate(call("uppercase", lit("a"), lit("b")), nil)
+	requireRuntime(t, err, "function `uppercase` called with 2 arguments")
+}
+
+func BenchmarkEvaluateCall(b *testing.B) {
+	e := call("replace", call("uppercase", ast.Var{Name: "x"}), lit("BAR"), call("trim", lit(" foo ")))
+	scope := Scope{"x": "barbarbar"}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := Evaluate(e, scope); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

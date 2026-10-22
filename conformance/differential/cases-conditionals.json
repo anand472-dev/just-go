@@ -516,8 +516,7 @@
   "name": "assert 5",
   "files": {
    "justfile": "foo:\n  {{ assert(uppercase('a')=='b') }}\n"
-  },
-  "known": "builtin functions are Phase 2 (Task 14)"
+  }
  },
  {
   "name": "assert 6",

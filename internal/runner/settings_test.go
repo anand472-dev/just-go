@@ -421,11 +421,11 @@ func TestRunDuplicateVariableTakesTheLastValue(t *testing.T) {
 	}
 }
 
-// The cases below are the corpus's lazy group. A call is what the evaluator
-// cannot evaluate yet, so an assignment that uses one fails when it is
-// evaluated.
+// The cases below are the corpus's lazy group. A call of extension on a name
+// with no extension is what fails to evaluate, so an assignment that uses one
+// fails when it is evaluated.
 func TestRunLazyEvaluatesOnlyWhatIsUsed(t *testing.T) {
-	const bad = "x := uppercase('a')\n"
+	const bad = "x := extension('a')\n"
 	for _, tc := range []struct {
 		name, src string
 		fails     bool
@@ -441,7 +441,7 @@ func TestRunLazyEvaluatesOnlyWhatIsUsed(t *testing.T) {
 		{"lazy::eager_assignments_are_evaluated", "set lazy\neager " + bad + "foo:\n", true},
 		{"an exported assignment", "set lazy\nexport " + bad + "foo:\n", true},
 		{"set export evaluates all", "set lazy\nset export\n" + bad + "foo:\n", true},
-		{"lazy::multiple_invocations_evaluate_union", "set lazy\nx := 'foo'\ny := 'bar'\nz := uppercase('a')\na:\n  @echo {{x}}\nb:\n  @echo {{y}}\n", false},
+		{"lazy::multiple_invocations_evaluate_union", "set lazy\nx := 'foo'\ny := 'bar'\nz := extension('a')\na:\n  @echo {{x}}\nb:\n  @echo {{y}}\n", false},
 		{"a parameter shadows the assignment", "set lazy\n" + bad + "foo x='q':\n  @echo {{x}}\n", false},
 		{"a later parameter does not shadow an earlier default", "set lazy\n" + bad + "foo a=x x='q':\n", true},
 		{"a comment is not read under ignore-comments", "set lazy\nset ignore-comments\n" + bad + "foo:\n  # {{x}}\n", false},

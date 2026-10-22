@@ -320,21 +320,18 @@
   "files": {
    "justfile": "set lazy\nx := uppercase('a')\nfoo:\n  @echo {{x}}\n"
   },
-  "known": "builtin calls arrive in Task 10 (report concern 6)",
   "name": "lazy used"
  },
  {
   "files": {
    "justfile": "set lazy\neager x := uppercase('a')\nfoo:\n  @echo hi\n"
   },
-  "known": "builtin calls arrive in Task 10 (report concern 6)",
   "name": "eager"
  },
  {
   "files": {
    "justfile": "set lazy\nexport x := uppercase('a')\nfoo:\n  @echo hi\n"
   },
-  "known": "builtin calls arrive in Task 10 (report concern 6)",
   "name": "export kw lazy"
  },
  {
