@@ -16,7 +16,10 @@ unstable-only families (R15) stay failing by decision. The 16 skips are the
 oracle exceptions of the closed categories in R16.
 
 `go-bench.txt` is the baseline for the performance work in later phases.
-Run-to-run noise on this machine is a few percent.
+Run-to-run noise on this machine, measured as the ns/op difference of the 58
+benchmarks between the `go-bench.txt` of `c589227` and this one (no Go source
+differs between the two), has a median of 0.4% and a largest value of 5.1%
+(`BenchmarkMergeEnv`); 57 of the 58 differ by less than 5%.
 
 ## Reproducing the gate
 
@@ -30,5 +33,5 @@ make conformance-report        # exits 1 by design: 485 pass, 1510 fail, 16 skip
 make ratchet                   # ratchet: 485 passing, 485 in baseline (0 new)
 ```
 
-`make bench` rewrites `go-bench.txt`; ns/op varies by a few percent from run
+`make bench` rewrites `go-bench.txt`; ns/op varies by up to about 5% from run
 to run, but the set of Benchmark functions and their PASS result does not.

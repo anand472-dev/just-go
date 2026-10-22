@@ -61,7 +61,7 @@ Performance targets (roadmap item 7) are out of this plan.
 
 **Files:**
 - Create: `conformance/triage/README.md`, `conformance/triage/groups.json`, `scripts/triage.py`
-- Modify: `internal/loader/loader.go` (error column rune counting), `cmd/just-go/main.go` (describe skips the snippet when the source is empty or the column is zero), `internal/diag/diag.go` (rune columns)
+- Modify: `internal/loader/loader.go` (error column rune counting), `cmd/just-go/main.go` (describe skips the snippet only when the column is zero; an empty source line is still quoted, as upstream quotes it), `internal/diag/diag.go` (rune columns)
 - Test: `internal/diag/diag_test.go`, `cmd/just-go/main_test.go`, `conformance/triage_test.go`
 
 **Interfaces:**

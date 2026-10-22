@@ -55,17 +55,26 @@ byte for byte when its message matches.
 ## Platform-dependent baseline entries
 
 The corpus was recorded on macOS, and the baseline was measured on macOS. Of
-the 360 baseline cases exactly one expects output that depends on the
-operating system: `os_attributes::os#1`. Its justfile defines `foo` once per
-operating-system gate (`[macos]`, `[linux]`, `[windows]`, and the BSDs), and
+the 485 baseline cases (the count at the Compat Task 13 gate) exactly one
+expects output that depends on which Unix runs it: `os_attributes::os#1`. Its
+justfile defines `foo` once per operating-system gate (`[macos]`, `[linux]`, `[windows]`, and the BSDs), and
 the recorded output is the `[macos]` recipe's (`bar`). On Linux the `[linux]`
 recipe runs and the case fails. The other `os_attributes` baseline cases
 (`all`, `assignment`, `none`, `os_family`, `setting`) use `[unix]` or every
 gate, and give the same output on any Unix. A scan of the other baseline
 cases for gates, `os()`, `arch()`, `windows-shell`, and backslash or path
-dependence found no other host-dependent case: the `arch()` cases fail to
-parse before `arch()` is evaluated, and the `windows` cases do not select a
-shell.
+dependence found no other host-dependent case between macOS and Linux: the
+`arch()` cases fail to parse or to evaluate before `arch()` returns, and the
+`windows` cases do not select a shell. The shebang and `[script]` cases added
+since Task 11 (`attributes::extension#1` and `tempdir::setting#1` among them)
+print temporary-directory file names, but the corpus masks those with a regex
+or a glob, so they give the same result on any Unix. `signal_exit_message_*`
+expects signal 15, which is the same on macOS and Linux.
+
+The scan counted 47 baseline cases that run a shebang or `[script]` recipe, or
+a `.exe` file that is a shell script. They need `sh`, `bash`, or
+`/usr/bin/env` and so are Unix-only, not Windows-compatible. That is a
+Windows limit, not a difference between the recording platform and Linux.
 
 This entry is not an oracle exception (the oracle passes it on macOS and
 fails it elsewhere, and the closed categories of R9 and R16 do not cover a
