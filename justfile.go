@@ -44,6 +44,14 @@ type Options struct {
 	Quiet      bool        // suppress command echo, as if `set quiet` held
 	FS         sys.FS      // nil uses the OS implementation from internal/sys
 	Exec       sys.Process // nil uses the OS implementation from internal/sys
+	// Shell and ShellArgs override the justfile's set shell for every recipe
+	// line of the run, as upstream's --shell and --shell-arg do. Shell alone
+	// runs Shell with the default arguments (-cu); ShellArgs alone runs the
+	// default shell (sh) with them. An empty Shell and a nil ShellArgs leave
+	// the justfile's setting in force; a non-nil, empty ShellArgs means the
+	// shell gets no arguments before the command.
+	Shell     string
+	ShellArgs []string
 }
 
 // Call is one recipe to run with the positional arguments for its own
@@ -155,17 +163,19 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, usage("no working directory: set Options.WorkDir for a justfile parsed from memory")
 	}
 	res, err := runner.Run(ctx, runner.Plan{
-		Justfile: j.tree,
-		Recipes:  opts.Recipes,
-		Args:     opts.Args,
-		Calls:    runnerCalls(opts.Calls),
-		Env:      opts.Env,
-		WorkDir:  dir,
-		Stdin:    opts.Stdin,
-		Stdout:   opts.Stdout,
-		Stderr:   opts.Stderr,
-		Quiet:    opts.Quiet,
-		Exec:     opts.Exec,
+		Justfile:  j.tree,
+		Recipes:   opts.Recipes,
+		Args:      opts.Args,
+		Calls:     runnerCalls(opts.Calls),
+		Env:       opts.Env,
+		WorkDir:   dir,
+		Stdin:     opts.Stdin,
+		Stdout:    opts.Stdout,
+		Stderr:    opts.Stderr,
+		Quiet:     opts.Quiet,
+		Exec:      opts.Exec,
+		Shell:     opts.Shell,
+		ShellArgs: opts.ShellArgs,
 	})
 	return Result{ExitCode: res.ExitCode}, err
 }

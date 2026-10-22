@@ -63,6 +63,8 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Stdout:     stdout,
 		Stderr:     stderr,
 		Quiet:      cfg.quiet,
+		Shell:      cfg.shell,
+		ShellArgs:  cfg.shellArgs,
 		FS:         fsys,
 		Exec:       exec,
 	}
@@ -138,10 +140,15 @@ type config struct {
 	list     bool     // -l/--list
 	quiet    bool     // -q/--quiet
 	words    []string // positional words: recipe names, then their arguments
+	// shell is --shell; shellGiven records that it appeared, since upstream
+	// rejects it a second time.
+	shell      string
+	shellGiven bool
+	shellArgs  []string // --shell-arg, in order; it may repeat; nil when absent
 }
 
-// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet and positional
-// words. Flags may come before, between and after words; "--" ends flag
+// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --shell PATH,
+// --shell-arg ARG (which may repeat) and positional words. Flags may come before, between and after words; "--" ends flag
 // parsing, so every later argument is a word. A short flag may be clustered
 // (-lq) and a value may be attached (-fPATH, --justfile=PATH). Pure.
 func parseArgs(args []string) (config, error) {
@@ -182,7 +189,7 @@ func parseLong(cfg *config, arg string, rest []string) (int, error) {
 		if attached {
 			return 0, usage("unexpected value for '--%s'", long)
 		}
-		setFlag(cfg, long, "")
+		setSwitch(cfg, long)
 		return 0, nil
 	}
 	used := 0
@@ -192,8 +199,7 @@ func parseLong(cfg *config, arg string, rest []string) (int, error) {
 		}
 		value, used = rest[0], 1
 	}
-	setFlag(cfg, long, value)
-	return used, nil
+	return used, setFlag(cfg, long, value)
 }
 
 // parseShort applies the short flags in arg ("-l", "-lq", "-fPATH"). A flag
@@ -206,33 +212,43 @@ func parseShort(cfg *config, arg string, rest []string) (int, error) {
 		if !ok {
 			return 0, usage("unexpected argument '-%s' found", cluster[i:i+1])
 		}
-		if !takesValue(long) {
-			setFlag(cfg, long, "")
-			continue
+		if takesValue(long) {
+			return shortValue(cfg, long, cluster[i+1:], rest)
 		}
-		if value := cluster[i+1:]; value != "" {
-			setFlag(cfg, long, value)
-			return 0, nil
-		}
-		if len(rest) == 0 {
-			return 0, missingValue(long)
-		}
-		setFlag(cfg, long, rest[0])
-		return 1, nil
+		setSwitch(cfg, long)
 	}
 	return 0, nil
 }
 
+// shortValue applies the short flag long, which takes a value: attached when
+// it is not empty, else the first of rest. The result is how many of rest it
+// consumed. Pure apart from updating cfg.
+func shortValue(cfg *config, long, attached string, rest []string) (int, error) {
+	if attached != "" {
+		return 0, setFlag(cfg, long, attached)
+	}
+	if len(rest) == 0 {
+		return 0, missingValue(long)
+	}
+	return 1, setFlag(cfg, long, rest[0])
+}
+
 // missingValue is the error for a flag given without its value. Pure.
 func missingValue(long string) *diag.Error {
-	return usage("a value is required for '--%s <%s>' but none was supplied", long, strings.ToUpper(long))
+	return usage("a value is required for '--%s <%s>' but none was supplied", long, valueName(long))
+}
+
+// valueName is the placeholder for the value of the flag with this long
+// name, as upstream's help prints it: SHELL_ARG for --shell-arg. Pure.
+func valueName(long string) string {
+	return strings.ReplaceAll(strings.ToUpper(long), "-", "_")
 }
 
 // longFlagName reports whether name is the spelling of a long flag, which
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet":
+	case "justfile", "list", "quiet", "shell", "shell-arg":
 		return name, true
 	}
 	return "", false
@@ -253,20 +269,40 @@ func shortFlagName(letter string) (string, bool) {
 
 // takesValue reports whether the flag with this long name has a value. Pure.
 func takesValue(long string) bool {
-	return long == "justfile"
+	switch long {
+	case "justfile", "shell", "shell-arg":
+		return true
+	}
+	return false
 }
 
-// setFlag records the flag with this long name in cfg. Pure apart from
-// updating cfg.
-func setFlag(cfg *config, long, value string) {
+// setSwitch records the flag with this long name, which takes no value, in
+// cfg. Pure apart from updating cfg.
+func setSwitch(cfg *config, long string) {
 	switch long {
-	case "justfile":
-		cfg.justfile = value
 	case "list":
 		cfg.list = true
 	case "quiet":
 		cfg.quiet = true
 	}
+}
+
+// setFlag records the flag with this long name, which takes a value, in cfg.
+// A second --shell is a usage error, as upstream's; --shell-arg accumulates.
+// Pure apart from updating cfg.
+func setFlag(cfg *config, long, value string) error {
+	switch long {
+	case "justfile":
+		cfg.justfile = value
+	case "shell":
+		if cfg.shellGiven {
+			return usage("the argument '--shell <SHELL>' cannot be used multiple times")
+		}
+		cfg.shell, cfg.shellGiven = value, true
+	case "shell-arg":
+		cfg.shellArgs = append(cfg.shellArgs, value)
+	}
+	return nil
 }
 
 // selectRecipes groups the positional words into the recipes to run, each

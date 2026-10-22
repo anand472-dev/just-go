@@ -286,6 +286,11 @@ func TestParseArgs(t *testing.T) {
 		{"flags after words", []string{"a", "-q", "b"}, config{quiet: true, words: []string{"a", "b"}}},
 		{"double dash ends flags", []string{"a", "--", "-q", "--list"}, config{words: []string{"a", "-q", "--list"}}},
 		{"lone dash is a word", []string{"-"}, config{words: []string{"-"}}},
+		{"shell", []string{"--shell", "bash"}, config{shell: "bash", shellGiven: true}},
+		{"attached shell", []string{"--shell=bash"}, config{shell: "bash", shellGiven: true}},
+		{"shell arg", []string{"--shell-arg", "-c"}, config{shellArgs: []string{"-c"}}},
+		{"shell args repeat in order", []string{"--shell-arg", "-e", "a", "--shell-arg=-c"}, config{shellArgs: []string{"-e", "-c"}, words: []string{"a"}}},
+		{"shell with args", []string{"--shell-arg", "-c", "--shell", "zsh"}, config{shell: "zsh", shellGiven: true, shellArgs: []string{"-c"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := parseArgs(tc.args)
@@ -308,6 +313,9 @@ func TestParseArgsErrors(t *testing.T) {
 		{[]string{"--justfile"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
 		{[]string{"-f"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
 		{[]string{"a", "-lf"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
+		{[]string{"--shell"}, "a value is required for '--shell <SHELL>' but none was supplied"},
+		{[]string{"--shell-arg"}, "a value is required for '--shell-arg <SHELL_ARG>' but none was supplied"},
+		{[]string{"--shell", "a", "--shell=b"}, "the argument '--shell <SHELL>' cannot be used multiple times"},
 	} {
 		_, err := parseArgs(tc.args)
 		var de *diag.Error
@@ -496,5 +504,37 @@ func BenchmarkParseArgs(b *testing.B) {
 		if _, err := parseArgs(args); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestRunShellFlagsOverrideSetShell(t *testing.T) {
+	files := map[string]string{"/w/justfile": "set shell := [\"bash\", \"-c\"]\nr:\n\techo hi\n"}
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"set shell without flags", []string{"r"}, []string{"bash", "-c", "echo hi"}},
+		{"shell", []string{"--shell", "zsh", "r"}, []string{"zsh", "-cu", "echo hi"}},
+		{"shell arg", []string{"--shell-arg", "-c", "r"}, []string{"sh", "-c", "echo hi"}},
+		{"repeated shell args", []string{"--shell-arg", "-e", "--shell-arg", "-c", "--shell", "zsh", "r"}, []string{"zsh", "-e", "-c", "echo hi"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := runFake(t, files, nil, tc.args...)
+			if o.code != 0 || len(o.proc.Specs) != 1 {
+				t.Fatalf("run = %d, specs %d (stderr %q)", o.code, len(o.proc.Specs), o.stderr)
+			}
+			if got := o.proc.Specs[0].Argv; !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("argv = %q; want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunRepeatedShellExitsTwo(t *testing.T) {
+	o := runFake(t, map[string]string{"/w/justfile": "r:\n\techo hi\n"}, nil, "--shell", "a", "--shell", "b", "r")
+	want := "error: the argument '--shell <SHELL>' cannot be used multiple times\n"
+	if o.code != 2 || o.stderr != want || len(o.proc.Specs) != 0 {
+		t.Errorf("run = %d, stderr %q, specs %d; want 2, %q, 0", o.code, o.stderr, len(o.proc.Specs), want)
 	}
 }

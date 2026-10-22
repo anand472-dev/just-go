@@ -505,3 +505,51 @@ func BenchmarkRenderLine(b *testing.B) {
 		}
 	}
 }
+
+func TestShellArgvOverrides(t *testing.T) {
+	set := ast.Settings{Shell: []string{"bash", "-c"}}
+	for _, tc := range []struct {
+		name     string
+		settings ast.Settings
+		shell    string
+		args     []string
+		want     []string
+	}{
+		{"default", ast.Settings{}, "", nil, []string{"sh", "-cu", "cmd"}},
+		{"set shell", set, "", nil, []string{"bash", "-c", "cmd"}},
+		{"shell keeps default args", set, "zsh", nil, []string{"zsh", "-cu", "cmd"}},
+		{"args use default shell", set, "", []string{"-e", "-c"}, []string{"sh", "-e", "-c", "cmd"}},
+		{"shell and args", set, "zsh", []string{"-c"}, []string{"zsh", "-c", "cmd"}},
+		{"empty args are no args", set, "zsh", []string{}, []string{"zsh", "cmd"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shellArgv(tc.settings, tc.shell, tc.args, "cmd"); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("shellArgv = %q; want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunPlanShellOverridesSetShell(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "set shell := [\"bash\", \"-c\"]\nr: d\n\techo hi\nd:\n\techo d\n", fake)
+	plan.Shell = "zsh"
+	plan.ShellArgs = []string{"-e", "-c"}
+	mustRun(t, plan)
+	for _, s := range fake.Specs {
+		if want := []string{"zsh", "-e", "-c"}; !reflect.DeepEqual(s.Argv[:3], want) {
+			t.Errorf("argv = %q; want prefix %q", s.Argv, want)
+		}
+	}
+	if len(fake.Specs) != 2 {
+		t.Fatalf("specs = %d; want 2", len(fake.Specs))
+	}
+}
+
+func BenchmarkShellArgv(b *testing.B) {
+	set := ast.Settings{Shell: []string{"bash", "-c"}}
+	args := []string{"-e", "-c"}
+	for i := 0; i < b.N; i++ {
+		_ = shellArgv(set, "zsh", args, "echo hi")
+	}
+}

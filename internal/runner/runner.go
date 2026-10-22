@@ -42,6 +42,13 @@ type Plan struct {
 	Stderr   io.Writer   // nil discards; receives echoed commands and failure messages
 	Quiet    bool        // overrides set quiet when true; also silences the failure message
 	Exec     sys.Process // nil uses the OS implementation from internal/sys
+	// Shell and ShellArgs override the justfile's set shell for every line,
+	// as upstream's --shell and --shell-arg: Shell alone keeps the default
+	// arguments (-cu), ShellArgs alone keeps the default shell (sh). Empty
+	// Shell and nil ShellArgs leave the justfile's setting in force; a
+	// non-nil, empty ShellArgs means no arguments.
+	Shell     string
+	ShellArgs []string
 }
 
 // Call is one requested recipe with the positional arguments for its own
@@ -349,15 +356,33 @@ func renderLine(line ast.Line, scope eval.Scope) (string, error) {
 	return b.String(), nil
 }
 
-// shellArgv returns the argv that runs command: the configured shell and its
-// arguments, or `sh -cu`, followed by command. It is pure.
-func shellArgv(settings ast.Settings, command string) []string {
-	shell := settings.Shell
-	if len(shell) == 0 {
-		shell = []string{defaultShell, defaultShellFlag}
+// shellArgv returns the argv that runs command: the shell and its arguments,
+// followed by command. The shell is chosen as upstream's Settings::shell
+// does: an override (shell, args) wins over the justfile's set shell, which
+// wins over `sh -cu`. It is pure.
+func shellArgv(settings ast.Settings, shell string, args []string, command string) []string {
+	prefix := shellPrefix(settings, shell, args)
+	argv := make([]string, 0, len(prefix)+1)
+	return append(append(argv, prefix...), command)
+}
+
+// shellPrefix returns the shell and its arguments for shellArgv. An empty
+// shell and nil args are no override; either one alone takes the default for
+// the other. It is pure.
+func shellPrefix(settings ast.Settings, shell string, args []string) []string {
+	if shell == "" && args == nil {
+		if len(settings.Shell) != 0 {
+			return settings.Shell
+		}
+		return []string{defaultShell, defaultShellFlag}
 	}
-	argv := make([]string, 0, len(shell)+1)
-	return append(append(argv, shell...), command)
+	if shell == "" {
+		shell = defaultShell
+	}
+	if args == nil {
+		args = []string{defaultShellFlag}
+	}
+	return append([]string{shell}, args...)
 }
 
 // echoes reports whether a line with prefix p is echoed before it runs: not
@@ -497,7 +522,7 @@ func (inv *invocation) startFailure(r *ast.Recipe, line ast.Line, err error) (in
 func (inv *invocation) execLine(command string) (int, error) {
 	p := inv.plan
 	return inv.exec.Run(inv.ctx, sys.ProcessSpec{
-		Argv:   shellArgv(p.Justfile.Settings, command),
+		Argv:   shellArgv(p.Justfile.Settings, p.Shell, p.ShellArgs, command),
 		Dir:    p.WorkDir,
 		Env:    exactEnv(p.Env),
 		Stdin:  p.Stdin,

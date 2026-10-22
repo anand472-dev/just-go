@@ -377,3 +377,39 @@ func BenchmarkRun(b *testing.B) {
 		}
 	}
 }
+
+func TestRunShellOverridesSetShell(t *testing.T) {
+	j := mustParse(t, "set shell := [\"bash\", \"-c\"]\nr:\n\techo hi\n")
+	proc := &sysfake.FakeProcess{}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc, Shell: "zsh"}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if want := []string{"zsh", "-cu", "echo hi"}; !reflect.DeepEqual(proc.Specs[0].Argv, want) {
+		t.Errorf("argv = %q; want %q", proc.Specs[0].Argv, want)
+	}
+}
+
+func TestRunShellArgsOverrideSetShell(t *testing.T) {
+	j := mustParse(t, "set shell := [\"bash\", \"-c\"]\nr:\n\techo hi\n")
+	for _, tc := range []struct {
+		name  string
+		shell string
+		args  []string
+		want  []string
+	}{
+		{"args alone use sh", "", []string{"-e", "-c"}, []string{"sh", "-e", "-c", "echo hi"}},
+		{"shell with args", "zsh", []string{"-c"}, []string{"zsh", "-c", "echo hi"}},
+		{"empty non-nil args", "zsh", []string{}, []string{"zsh", "echo hi"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proc := &sysfake.FakeProcess{}
+			opts := Options{WorkDir: "/w", Exec: proc, Shell: tc.shell, ShellArgs: tc.args}
+			if _, err := j.Run(context.Background(), opts); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if !reflect.DeepEqual(proc.Specs[0].Argv, tc.want) {
+				t.Errorf("argv = %q; want %q", proc.Specs[0].Argv, tc.want)
+			}
+		})
+	}
+}
