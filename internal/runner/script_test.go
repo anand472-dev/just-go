@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -775,6 +776,9 @@ func TestFailureMessagesWithoutALine(t *testing.T) {
 // The script is written and run for real, by the shell of the machine, to see
 // that the pieces fit: the file is executable and its line numbers are right.
 func TestRunScriptEndToEnd(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("runs unix tools from /usr/bin:/bin")
+	}
 	for _, tc := range []struct {
 		name, src string
 		args      []string
@@ -812,6 +816,9 @@ func TestRunScriptEndToEnd(t *testing.T) {
 }
 
 func TestRunScriptEndToEndExitStatus(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("runs unix tools from /usr/bin:/bin")
+	}
 	jf, err := parser.Parse("justfile", []byte("a:\n  #!/usr/bin/env sh\n  code=200\n  x() { return $code; }\n  x\n  x\n"))
 	if err != nil {
 		t.Fatal(err)

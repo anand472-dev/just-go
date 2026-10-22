@@ -3,10 +3,21 @@ package sys
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
+// skipOnWindows skips t on Windows, where these tests' unix paths (such as
+// /run/user/1) are not absolute.
+func skipOnWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("assumes unix paths")
+	}
+}
+
 func TestRuntimeRoot(t *testing.T) {
+	skipOnWindows(t)
 	for _, tc := range []struct {
 		name, goos, xdg, want string
 	}{
@@ -27,6 +38,7 @@ func TestRuntimeRoot(t *testing.T) {
 // Without a directory, a Linux system with a runtime directory makes its
 // scripts there, in a directory called just, as upstream does.
 func TestMkdirTempUsesTheRuntimeDirectory(t *testing.T) {
+	skipOnWindows(t)
 	xdg := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", xdg)
 	dir, err := (OSFS{goos: "linux"}).MkdirTemp("", "just-")
@@ -39,6 +51,7 @@ func TestMkdirTempUsesTheRuntimeDirectory(t *testing.T) {
 }
 
 func TestMkdirTempReportsAnUnusableRuntimeDirectory(t *testing.T) {
+	skipOnWindows(t)
 	file := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(file, nil, 0o600); err != nil {
 		t.Fatal(err)
