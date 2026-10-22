@@ -374,3 +374,15 @@ func BenchmarkLex(b *testing.B) {
 		}
 	}
 }
+
+func TestLexBrackets(t *testing.T) {
+	wantTokens(t, `["a", "b"]`, []lexer.Token{
+		tok(lexer.LBracket, "[", 1, 1),
+		tok(lexer.String, "a", 1, 2),
+		tok(lexer.Comma, ",", 1, 5),
+		tok(lexer.String, "b", 1, 7),
+		tok(lexer.RBracket, "]", 1, 10),
+		tok(lexer.Newline, "", 1, 11),
+		tok(lexer.EOF, "", 1, 11),
+	})
+}

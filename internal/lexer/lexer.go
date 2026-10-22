@@ -31,23 +31,25 @@ type TokenKind int
 
 // Token kinds.
 const (
-	Ident   TokenKind = iota
-	String            // Text is the unescaped contents
-	Assign            // :=
-	Equals            // =
-	Colon             // :
-	Plus              // +
-	LParen            // (
-	RParen            // )
-	Comma             // ,
-	At                // @ prefix
-	Dash              // - prefix
-	Interp            // {{
-	Close             // }}
-	Indent            // leading whitespace of a recipe body line; Text is the exact whitespace
-	Text              // literal text inside a recipe body; Text is the raw text
-	Newline           // "\n"; empty Text when synthesized at the end of the input
-	Comment           // Text is the comment body without '#'
+	Ident    TokenKind = iota
+	String             // Text is the unescaped contents
+	Assign             // :=
+	Equals             // =
+	Colon              // :
+	Plus               // +
+	LParen             // (
+	RParen             // )
+	Comma              // ,
+	At                 // @ prefix
+	Dash               // - prefix
+	Interp             // {{
+	Close              // }}
+	Indent             // leading whitespace of a recipe body line; Text is the exact whitespace
+	Text               // literal text inside a recipe body; Text is the raw text
+	Newline            // "\n"; empty Text when synthesized at the end of the input
+	Comment            // Text is the comment body without '#'
+	LBracket           // [
+	RBracket           // ]
 	EOF
 )
 
@@ -67,7 +69,7 @@ var escapes = map[byte]byte{'n': '\n', 'r': '\r', 't': '\t', '\\': '\\', '"': '"
 
 var puncts = map[byte]TokenKind{
 	':': Colon, '=': Equals, '+': Plus, '(': LParen,
-	')': RParen, ',': Comma, '@': At, '-': Dash,
+	')': RParen, ',': Comma, '@': At, '-': Dash, '[': LBracket, ']': RBracket,
 }
 
 // Lex tokenizes src. Errors are *diag.Error with KindParse; on error no tokens
