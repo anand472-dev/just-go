@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"io/fs"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -21,8 +22,23 @@ func resolveProgram(name string, env []string) (string, error) {
 			return c, nil
 		}
 	}
-	return "", &exec.Error{Name: name, Err: exec.ErrNotFound}
+	return "", &notFoundError{err: &exec.Error{Name: name, Err: exec.ErrNotFound}}
 }
+
+// notFoundError is the error for a program that is not in PATH. It is an
+// *exec.Error for exec.ErrNotFound, and it also matches fs.ErrNotExist, so a
+// caller that may not import os/exec can tell a missing program from other
+// failures, as it can for a missing program named by a path.
+type notFoundError struct{ err *exec.Error }
+
+// Error is the *exec.Error's message. Pure.
+func (e *notFoundError) Error() string { return e.err.Error() }
+
+// Unwrap returns the *exec.Error. Pure.
+func (e *notFoundError) Unwrap() error { return e.err }
+
+// Is reports whether target is fs.ErrNotExist. Pure.
+func (e *notFoundError) Is(target error) bool { return target == fs.ErrNotExist }
 
 // isBare reports whether name has no path separator, so that it must be
 // searched for in PATH. Pure.

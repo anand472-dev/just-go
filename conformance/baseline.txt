@@ -5,6 +5,7 @@ dotenv::dotenv_env_var_default_no_override#1
 dotenv::no_warning#1
 equals::alias_recipe#1
 equals::export_recipe#1
+error_messages::argument_count_mismatch#1
 fallback::doesnt_work_with_justfile#1
 fallback::requires_setting#1
 guards::guard_lines_are_ignored_without_setting#1
@@ -19,6 +20,8 @@ line_prefixes::quiet_after_infallible#1
 list::doc_above_wide_signature#1
 list::empty_doc_comments_are_ignored#1
 markdown::no_code_blocks#1
+misc::argument_mismatch_fewer#1
+misc::argument_mismatch_fewer_with_default#1
 misc::argument_mismatch_more#1
 misc::argument_mismatch_more_with_default#1
 misc::argument_multiple#1
@@ -62,6 +65,7 @@ misc::print#1
 misc::quiet#1
 misc::quiet_recipe#1
 misc::required_after_default#1
+misc::run_suggestion#1
 misc::select#1
 misc::self_dependency#1
 misc::status_passthrough#1
@@ -109,6 +113,7 @@ search::search_stops_at_closest_justfile#1
 search::test_capitalized_justfile_search#1
 search::test_justfile_search#1
 shadowing_parameters::parameter_may_shadow_variable#1
+shell::recipe_shell_not_found_error_message#1
 shell::shell_arg_override#1
 shell::shell_args#1
 shell::shell_override#1

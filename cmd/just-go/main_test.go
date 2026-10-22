@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -190,7 +192,7 @@ func TestRunGroupsArgumentsPerRecipe(t *testing.T) {
 
 func TestRunArgumentCountMismatchExitsOne(t *testing.T) {
 	got := runFake(t, map[string]string{"/w/justfile": "c x:\n  echo\n"}, nil, "c")
-	if want := "error: recipe `c` got 0 positional arguments but takes 1\n"; got.code != 1 || got.stderr != want || len(got.proc.Specs) != 0 {
+	if want := "error: recipe `c` got 0 positional arguments but takes 1\nusage:\n    just c x\n"; got.code != 1 || got.stderr != want || len(got.proc.Specs) != 0 {
 		t.Errorf("run = %d, %q with %d commands; want 1, %q, none", got.code, got.stderr, len(got.proc.Specs), want)
 	}
 }
@@ -368,14 +370,16 @@ func TestSelectRecipesUnknownName(t *testing.T) {
 		name    string
 		words   []string
 		missing string
+		suffix  string
 	}{
-		{"unknown first", []string{"nope"}, "nope"},
-		{"unknown later (corpus misc::argument_mismatch_more)", []string{"a", "1", "2", "3"}, "3"},
-		{"unknown stops at the first", []string{"b", "nope", "worse"}, "nope"},
+		{"unknown first", []string{"nope"}, "nope", ""},
+		// The oracle suggests `a` here, one edit from `3`.
+		{"unknown later (corpus misc::argument_mismatch_more)", []string{"a", "1", "2", "3"}, "3", "\nDid you mean `a`?"},
+		{"unknown stops at the first", []string{"b", "nope", "worse"}, "nope", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := selectRecipes(infos, tc.words)
-			want := "justfile does not contain recipe `" + tc.missing + "`"
+			want := "justfile does not contain recipe `" + tc.missing + "`" + tc.suffix
 			var de *diag.Error
 			if !errors.As(err, &de) || de.Kind != diag.KindUsage || de.Msg != want {
 				t.Errorf("error = %v, want usage error %q", err, want)
@@ -481,6 +485,14 @@ func TestDescribe(t *testing.T) {
 			"past the end\n  ——▶ j:12:1\n   │\n12 │ ab\n   │ ^^"},
 		{located("j", 1, 1, 1, "", "empty"),
 			"empty\n ——▶ j:1:1\n  │\n1 │ \n  │ ^"},
+		// After multibyte text the header counts bytes and the carets
+		// display columns (oracle).
+		{located("justfile", 2, 12, 4, "  echo é {{nope}}", "variable `nope` not defined"),
+			"variable `nope` not defined\n ——▶ justfile:2:13\n  │\n2 │   echo é {{nope}}\n  │            ^^^^"},
+		{located("justfile", 1, 13, 1, `x := "日本" + y`, "variable `y` not defined"),
+			"variable `y` not defined\n ——▶ justfile:1:17\n  │\n1 │ x := \"日本\" + y\n  │               ^"},
+		{located("justfile", 1, 6, 4, `x := "日本"`, "wide"),
+			"wide\n ——▶ justfile:1:6\n  │\n1 │ x := \"日本\"\n  │      ^^^^^^"},
 	} {
 		if got := describe(tc.err); got != tc.want {
 			t.Errorf("describe(%v) = %q, want %q", tc.err, got, tc.want)
@@ -588,7 +600,8 @@ func TestRunPassesDashedArgumentsToTheRecipe(t *testing.T) {
 		}
 	}
 	got := runFake(t, files, nil, "a", "--", "-l")
-	if want := "error: justfile does not contain recipe `-l`\n"; got.code != 1 || got.stderr != want {
+	// The oracle suggests `l`, one edit from `-l`.
+	if want := "error: justfile does not contain recipe `-l`\nDid you mean `l`?\n"; got.code != 1 || got.stderr != want {
 		t.Errorf("run a -- -l = %d, %q; want 1, %q", got.code, got.stderr, want)
 	}
 }
@@ -600,5 +613,64 @@ func TestRunRendersErrorsAsUpstream(t *testing.T) {
 	want := "error: recipe `foo` has unknown dependency `baaaaaaaz`\n ——▶ justfile:3:10\n  │\n3 │ foo: bar baaaaaaaz hello\n  │          ^^^^^^^^^\n"
 	if got.code != 1 || got.stderr != want {
 		t.Errorf("run = %d, %q; want 1, %q", got.code, got.stderr, want)
+	}
+}
+
+// TestErrorColumnCountsRunesThroughRun runs a justfile whose error follows
+// multibyte text and compares stderr with the oracle's, byte for byte.
+func TestErrorColumnCountsRunesThroughRun(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "a:\n  echo é {{nope}}\n"}, nil)
+	want := "error: variable `nope` not defined\n ——▶ justfile:2:13\n  │\n2 │   echo é {{nope}}\n  │            ^^^^\n"
+	if got.code != 1 || got.stderr != want {
+		t.Errorf("run = %d, %q; want 1, %q", got.code, got.stderr, want)
+	}
+}
+
+// TestDescribeSkipsSnippetWithoutSource pins upstream's one-line rendering
+// of a runtime error that has a line but no column, such as a shell that
+// cannot be found (shell::recipe_shell_not_found_error_message).
+func TestDescribeSkipsSnippetWithoutSource(t *testing.T) {
+	de := &diag.Error{Kind: diag.KindRuntime, File: "/w/justfile", Line: 2, Msg: "recipe `a` could not be run"}
+	if got := describe(de); got != de.Msg {
+		t.Errorf("describe = %q, want %q", got, de.Msg)
+	}
+	missing := fmt.Errorf("exec: %q: %w", "nosuchshell", fs.ErrNotExist)
+	proc := &sysfake.FakeProcess{Err: missing}
+	var stdout, stderr bytes.Buffer
+	files := sysfake.FakeFS(map[string]string{"/w/justfile": "a:\n  @echo hi\n"})
+	code := run([]string{"--shell", "nosuchshell"}, nil, "/w", strings.NewReader(""), &stdout, &stderr, files, proc)
+	want := "error: recipe `a` could not be run because just could not find the shell `nosuchshell`: " +
+		missing.Error() + "\n"
+	if code != 1 || stderr.String() != want {
+		t.Errorf("run = %d, %q; want 1, %q", code, stderr.String(), want)
+	}
+}
+
+// TestRunArgumentCountMismatchPrintsUsage pins the usage line upstream adds
+// to a wrong number of arguments (misc::argument_mismatch_fewer_with_default).
+func TestRunArgumentCountMismatchPrintsUsage(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "foo A B C='C':\n  echo\n"}, nil, "foo", "bar")
+	want := "error: recipe `foo` got 1 positional argument but takes at least 2\nusage:\n    just foo A B [C]\n"
+	if got.code != 1 || got.stderr != want {
+		t.Errorf("run = %d, %q; want 1, %q", got.code, got.stderr, want)
+	}
+}
+
+// TestRunUnknownRecipeSuggestsAName pins upstream's suggestion: the public
+// recipe with the smallest edit distance below three, the first by name on
+// a tie, and none when every name is too far (misc::run_suggestion).
+func TestRunUnknownRecipeSuggestsAName(t *testing.T) {
+	for _, tc := range []struct {
+		src, word, want string
+	}{
+		{"hello:\n", "hell", "error: justfile does not contain recipe `hell`\nDid you mean `hello`?\n"},
+		{"abd:\nabc:\n", "ab", "error: justfile does not contain recipe `ab`\nDid you mean `abc`?\n"},
+		{"_hello:\nb:\n", "hello", "error: justfile does not contain recipe `hello`\n"},
+		{"hello:\n", "xyz", "error: justfile does not contain recipe `xyz`\n"},
+	} {
+		got := runFake(t, map[string]string{"/w/justfile": tc.src}, nil, tc.word)
+		if got.code != 1 || got.stderr != tc.want {
+			t.Errorf("%q with %q: run = %d, %q; want 1, %q", tc.src, tc.word, got.code, got.stderr, tc.want)
+		}
 	}
 }

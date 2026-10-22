@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"strings"
 
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -323,15 +324,32 @@ func checkArgCount(r *ast.Recipe, found int) error {
 		return nil
 	}
 	got := fmt.Sprintf("recipe `%s` got %s but", r.Name, count(found, "positional argument"))
+	var takes string
 	switch {
 	case lo == hi && found > hi:
-		return usage("%s only takes %d", got, hi)
+		takes = fmt.Sprintf("only takes %d", hi)
 	case lo == hi:
-		return usage("%s takes %d", got, lo)
+		takes = fmt.Sprintf("takes %d", lo)
 	case found < lo:
-		return usage("%s takes at least %d", got, lo)
+		takes = fmt.Sprintf("takes at least %d", lo)
+	default:
+		takes = fmt.Sprintf("takes at most %d", hi)
 	}
-	return usage("%s takes at most %d", got, hi)
+	return usage("%s %s\nusage:\n    %s", got, takes, usageLine(r))
+}
+
+// usageLine is upstream's short usage of r: "just", the recipe name, and its
+// parameters, each in brackets when it has a default. It is pure.
+func usageLine(r *ast.Recipe) string {
+	words := []string{"just", r.Name}
+	for _, p := range r.Params {
+		if p.Default != nil {
+			words = append(words, "["+p.Name+"]")
+			continue
+		}
+		words = append(words, p.Name)
+	}
+	return strings.Join(words, " ")
 }
 
 // count formats n and noun, adding "s" unless n is 1. It is pure.
@@ -554,14 +572,32 @@ func (inv *invocation) report(msg string, code int) int {
 
 // startFailure turns an error from the process runner into the result of a
 // line: cancellation is returned as is, and any other failure to run the
-// command becomes a located runtime error with exit code 1. It is pure
-// apart from reading the cancellation state of the invocation's context.
+// command becomes a runtime error with exit code 1, worded as upstream's
+// ShellIo error. The error has the line but no column, so it is rendered on
+// one line as upstream's is. It is pure apart from reading the cancellation
+// state of the invocation's context.
 func (inv *invocation) startFailure(r *ast.Recipe, line ast.Line, err error) (int, error) {
 	if ctxErr := inv.ctx.Err(); ctxErr != nil {
 		return 0, ctxErr
 	}
-	return 1, &diag.Error{Kind: diag.KindRuntime, File: inv.plan.Justfile.File, Line: line.Line,
-		Msg: fmt.Sprintf("recipe `%s` could not be run: %v", r.Name, err)}
+	p := inv.plan
+	shell := shellPrefix(p.Justfile.Settings, p.Shell, p.ShellArgs)[0]
+	return 1, &diag.Error{Kind: diag.KindRuntime, File: p.Justfile.File, Line: line.Line,
+		Msg: shellFailure(r.Name, shell, err)}
+}
+
+// shellFailure words a failure to start shell for recipe as upstream does,
+// by whether the shell was missing, not runnable, or failed otherwise. It is
+// pure.
+func shellFailure(recipe, shell string, err error) string {
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return fmt.Sprintf("recipe `%s` could not be run because just could not find the shell `%s`: %v", recipe, shell, err)
+	case errors.Is(err, fs.ErrPermission):
+		return fmt.Sprintf("recipe `%s` could not be run because just could not run the shell `%s`: %v", recipe, shell, err)
+	}
+	return fmt.Sprintf("recipe `%s` could not be run because of an IO error while launching the shell `%s`: %v",
+		recipe, shell, err)
 }
 
 // execLine builds the process spec for command and runs it through the

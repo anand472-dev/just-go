@@ -120,15 +120,18 @@ func report(stderr io.Writer, err error) {
 }
 
 // describe is the message of err. A diagnostic without a location, such as a
-// usage error, is its bare message. A located one is followed, as upstream
-// prints it, by the file name and position and by the source line with the
-// diagnostic underlined (see snippet). Pure.
+// usage error, is its bare message, and so is one with a line but no column,
+// such as a recipe line whose shell could not be started: upstream prints
+// those on one line. A located one is followed, as upstream prints it, by the
+// file name and position and by the source line with the diagnostic
+// underlined (see snippet). A located diagnostic on an empty line still
+// quotes it, as upstream does. Pure.
 func describe(err error) string {
 	var de *diag.Error
 	if !errors.As(err, &de) {
 		return err.Error()
 	}
-	if de.Line == 0 {
+	if de.Line == 0 || de.Col == 0 {
 		return de.Msg
 	}
 	return de.Msg + "\n" + snippet(de)
@@ -142,24 +145,26 @@ func describe(err error) string {
 //	  │         ^
 //
 // The file is named by its base name, which upstream shows for the root
-// justfile (a path relative to its directory). A tab shows as four spaces,
-// and the carets cover de.Width runes from de.Col, at least one. Pure.
+// justfile (a path relative to its directory). The column is upstream's (see
+// diag.Error.Column). A tab shows as four spaces, and the carets cover the
+// display width of de.Width runes from de.Col, at least one. Pure.
 func snippet(de *diag.Error) string {
 	number := strconv.Itoa(de.Line)
 	pad := strings.Repeat(" ", len(number))
 	text, column, width := underline(de.Source, de.Col-1, max(de.Width, 1))
 	return fmt.Sprintf("%s——▶ %s:%d:%d\n%s │\n%s │ %s\n%s │ %s%s",
-		pad, filepath.Base(de.File), de.Line, de.Col, pad, number, text, pad,
+		pad, filepath.Base(de.File), de.Line, de.Column(), pad, number, text, pad,
 		strings.Repeat(" ", column), strings.Repeat("^", max(width, 1)))
 }
 
 // underline returns line with each tab shown as four spaces, and the display
-// column and width of the width runes from rune index col. Pure.
+// column and width of the width runes from rune index col. A tab is four
+// columns wide; any other rune is as wide as diag.DisplayWidth says. Pure.
 func underline(line string, col, width int) (string, int, int) {
 	var b strings.Builder
 	column, span := 0, 0
 	for i, r := range []rune(line) {
-		w := 1
+		w := diag.DisplayWidth(r)
 		if r == '\t' {
 			b.WriteString("    ")
 			w = 4
@@ -382,7 +387,7 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 	for i := 0; i < len(words); {
 		n, ok := params[words[i]]
 		if !ok {
-			return nil, missingRecipe(words[i])
+			return nil, missingRecipe(words[i], infos)
 		}
 		take := min(n, len(words)-i-1)
 		calls = append(calls, just.Call{Recipe: words[i], Args: append([]string(nil), words[i+1:i+1+take]...)})
@@ -392,9 +397,57 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 }
 
 // missingRecipe is the error for a word that names no recipe, worded as
-// upstream's. Pure.
-func missingRecipe(name string) *diag.Error {
-	return usage("justfile does not contain recipe `%s`", name)
+// upstream's, with upstream's suggestion of a recipe it may have meant. Pure.
+func missingRecipe(name string, infos []just.RecipeInfo) *diag.Error {
+	msg := fmt.Sprintf("justfile does not contain recipe `%s`", name)
+	if suggestion, ok := suggest(name, infos); ok {
+		msg += fmt.Sprintf("\nDid you mean `%s`?", suggestion)
+	}
+	return usage("%s", msg)
+}
+
+// maxSuggestionDistance bounds a suggestion: upstream suggests a name only
+// when its edit distance from the word is below this.
+const maxSuggestionDistance = 3
+
+// suggest returns the public recipe whose name is closest to word by edit
+// distance, if one is closer than maxSuggestionDistance. On a tie the first
+// name in byte order wins, as upstream's search over its sorted recipes does.
+// A name that starts with an underscore is private and never suggested. Pure.
+func suggest(word string, infos []just.RecipeInfo) (string, bool) {
+	best, bestDistance := "", maxSuggestionDistance
+	for _, info := range infos {
+		if strings.HasPrefix(info.Name, "_") {
+			continue
+		}
+		d := editDistance(word, info.Name)
+		if d < bestDistance || (d == bestDistance && d < maxSuggestionDistance && info.Name < best) {
+			best, bestDistance = info.Name, d
+		}
+	}
+	return best, best != ""
+}
+
+// editDistance is the Levenshtein distance between a and b, counted in runes
+// as upstream's strsim::levenshtein counts characters. Pure.
+func editDistance(a, b string) int {
+	x, y := []rune(a), []rune(b)
+	row := make([]int, len(y)+1)
+	for j := range row {
+		row[j] = j
+	}
+	for i := 1; i <= len(x); i++ {
+		diagonal := row[0]
+		row[0] = i
+		for j := 1; j <= len(y); j++ {
+			cost := 1
+			if x[i-1] == y[j-1] {
+				cost = 0
+			}
+			diagonal, row[j] = row[j], min(row[j]+1, row[j-1]+1, diagonal+cost)
+		}
+	}
+	return row[len(y)]
 }
 
 const (

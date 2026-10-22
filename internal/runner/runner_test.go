@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"reflect"
 	"strings"
 	"testing"
@@ -361,7 +362,7 @@ func TestRunCallsReportUnknownRecipeAndArgumentMismatch(t *testing.T) {
 	requireDiag(t, err, diag.KindUsage, 0, "justfile does not contain recipe `nope`")
 	plan.Calls = []Call{{Recipe: "c", Args: []string{"1"}}, {Recipe: "c"}}
 	_, err = Run(context.Background(), plan)
-	requireDiag(t, err, diag.KindUsage, 0, "recipe `c` got 0 positional arguments but takes 1")
+	requireDiag(t, err, diag.KindUsage, 0, "recipe `c` got 0 positional arguments but takes 1\nusage:\n    just c x")
 	if len(fake.Specs) != 0 {
 		t.Fatalf("ran %d lines; want none", len(fake.Specs))
 	}
@@ -410,13 +411,28 @@ func TestRunNilExecUsesOS(t *testing.T) {
 	}
 }
 
+// TestRunExecErrorIsRuntimeError pins upstream's ShellIo wording for a
+// command that could not be started, by the kind of the failure, and that the
+// error has a line but no column, so the command prints no snippet.
 func TestRunExecErrorIsRuntimeError(t *testing.T) {
-	boom := errors.New("boom")
-	plan, _, _ := newPlan(t, "r:\n\techo hi\n", &sysfake.FakeProcess{Err: boom})
-	res, err := Run(context.Background(), plan)
-	requireDiag(t, err, diag.KindRuntime, 2, "recipe `r` could not be run: boom")
-	if res.ExitCode != 1 {
-		t.Fatalf("exit = %d; want 1", res.ExitCode)
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{errors.New("boom"),
+			"recipe `r` could not be run because of an IO error while launching the shell `sh`: boom"},
+		{fmt.Errorf("gone: %w", fs.ErrNotExist),
+			"recipe `r` could not be run because just could not find the shell `sh`: gone: file does not exist"},
+		{fmt.Errorf("no: %w", fs.ErrPermission),
+			"recipe `r` could not be run because just could not run the shell `sh`: no: permission denied"},
+	} {
+		plan, _, _ := newPlan(t, "r:\n\techo hi\n", &sysfake.FakeProcess{Err: tc.err})
+		res, err := Run(context.Background(), plan)
+		requireDiag(t, err, diag.KindRuntime, 2, tc.want)
+		var de *diag.Error
+		if errors.As(err, &de); de.Col != 0 || res.ExitCode != 1 {
+			t.Fatalf("col = %d, exit = %d; want 0, 1", de.Col, res.ExitCode)
+		}
 	}
 }
 
@@ -447,15 +463,15 @@ func TestRunErrorsBeforeAnythingRuns(t *testing.T) {
 		{"no recipes", "x := \"1\"\n", nil, nil, diag.KindUsage, 0,
 			"justfile contains no recipes"},
 		{"too few", "r a b:\n\techo\n", nil, []string{"1"}, diag.KindUsage, 0,
-			"recipe `r` got 1 positional argument but takes 2"},
+			"recipe `r` got 1 positional argument but takes 2\nusage:\n    just r a b"},
 		{"too many", "r a:\n\techo\n", nil, []string{"1", "2"}, diag.KindUsage, 0,
-			"recipe `r` got 2 positional arguments but only takes 1"},
+			"recipe `r` got 2 positional arguments but only takes 1\nusage:\n    just r a"},
 		{"at least", "r a b='x':\n\techo\n", nil, nil, diag.KindUsage, 0,
-			"recipe `r` got 0 positional arguments but takes at least 1"},
+			"recipe `r` got 0 positional arguments but takes at least 1\nusage:\n    just r a [b]"},
 		{"at most", "r a='x':\n\techo\n", nil, []string{"1", "2"}, diag.KindUsage, 0,
-			"recipe `r` got 2 positional arguments but takes at most 1"},
+			"recipe `r` got 2 positional arguments but takes at most 1\nusage:\n    just r [a]"},
 		{"dependency needs argument", "r: d\n\techo\nd a:\n\techo\n", nil, nil, diag.KindUsage, 0,
-			"recipe `d` got 0 positional arguments but takes 1"},
+			"recipe `d` got 0 positional arguments but takes 1\nusage:\n    just d a"},
 		{"args with several recipes", "a:\n\techo\nb:\n\techo\n", []string{"a", "b"}, []string{"1"}, diag.KindUsage, 0,
 			"positional arguments need exactly one requested recipe, but 2 were requested"},
 		{"unknown dependency", "r: d\n\techo\n", nil, nil, diag.KindAnalysis, 1,
