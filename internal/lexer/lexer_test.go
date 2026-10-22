@@ -157,11 +157,22 @@ func TestLexRawStringKeepsBackslashes(t *testing.T) {
 	})
 }
 
-func TestLexMultiLineStringNormalizesCRLFAndTracksLines(t *testing.T) {
+func TestLexMultiLineStringKeepsCRLFAndTracksLines(t *testing.T) {
 	wantTokens(t, "'a\r\nb' c\n", []lexer.Token{
-		tok(lexer.String, "a\nb", 1, 1),
+		tok(lexer.String, "a\r\nb", 1, 1),
 		tok(lexer.Ident, "c", 2, 4),
 		tok(lexer.Newline, "\n", 2, 5),
+		tok(lexer.EOF, "", 3, 1),
+	})
+	wantTokens(t, "\"a\r\nb\" c\n", []lexer.Token{
+		tok(lexer.String, "a\r\nb", 1, 1),
+		tok(lexer.Ident, "c", 2, 4),
+		tok(lexer.Newline, "\n", 2, 5),
+		tok(lexer.EOF, "", 3, 1),
+	})
+	wantTokens(t, "'a\nb'\n", []lexer.Token{
+		tok(lexer.String, "a\nb", 1, 1),
+		tok(lexer.Newline, "\n", 2, 3),
 		tok(lexer.EOF, "", 3, 1),
 	})
 }

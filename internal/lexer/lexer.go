@@ -9,9 +9,13 @@
 // line is lexed as code. A line holding only whitespace yields just a Newline.
 //
 // A leading UTF-8 byte order mark is dropped, and "\r\n" is treated as "\n"
-// everywhere, including inside strings. Positions are 1-based and count
-// runes, so a BOM or CRLF never shifts a column. Source that does not end in
-// a newline gets a synthetic Newline (with empty Text) before EOF.
+// for line structure: it ends a line, and the Newline token's Text is "\n".
+// Inside string literals the line break bytes are kept verbatim, so a value
+// spanning lines carries the file's own line endings, as upstream does; only a
+// backslash before a line break is a continuation and yields nothing.
+// Positions are 1-based and count runes, so a BOM or CRLF never shifts a
+// column. Source that does not end in a newline gets a synthetic Newline (with
+// empty Text) before EOF.
 package lexer
 
 import (
@@ -65,8 +69,6 @@ var puncts = map[byte]TokenKind{
 	':': Colon, '=': Equals, '+': Plus, '(': LParen,
 	')': RParen, ',': Comma, '@': At, '-': Dash,
 }
-
-var newline = []byte{'\n'}
 
 // Lex tokenizes src. Errors are *diag.Error with KindParse; on error no tokens
 // are returned.
@@ -134,15 +136,17 @@ func (l *lexer) atInterp() bool {
 	return bytes.HasPrefix(l.src[l.pos:], []byte("{{"))
 }
 
-// bump consumes one rune, or one line break, and returns the bytes it stands
-// for. A line break is always returned as "\n". Invalid UTF-8 is consumed one
-// byte at a time, so no input is lost.
+// bump consumes one rune, or one line break, and returns the source bytes it
+// covers. A line break is returned verbatim ("\n" or "\r\n"), so string
+// values keep the file's line endings as upstream does. Invalid UTF-8 is
+// consumed one byte at a time, so no input is lost.
 func (l *lexer) bump() []byte {
 	if w := l.newlineWidth(); w > 0 {
+		b := l.src[l.pos : l.pos+w]
 		l.pos += w
 		l.line++
 		l.col = 1
-		return newline
+		return b
 	}
 	_, w := utf8.DecodeRune(l.src[l.pos:])
 	b := l.src[l.pos : l.pos+w]
