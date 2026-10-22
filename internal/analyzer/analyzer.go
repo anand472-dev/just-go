@@ -6,7 +6,8 @@
 // variables, calls of undefined functions or with the wrong number of
 // arguments, circular variable definitions, and dependencies that name no
 // recipe, that form a cycle, or that are given too few or too many arguments,
-// expressions in attributes that cannot be evaluated, and a second recipe with
+// expressions in attributes (`[confirm]`, `[doc]`, `[env]`, `[timestamp]` and
+// `[working-directory]`) that cannot be evaluated, and a second recipe with
 // `[default]`.
 //
 // The package is pure: every function reads the syntax tree it is given and
@@ -37,8 +38,10 @@ import (
 // arguments); then the expression settings, evaluated in a const context;
 // then the first use of a feature of `set lists`, unless the file sets it;
 // then, recipe by recipe in source order, a duplicate name (unless
-// allow-duplicate-recipes is set), guard and infallible sigils together, and
-// lines with extra leading whitespace; then the recipes, resolved in name
+// allow-duplicate-recipes is set), and, for a recipe that runs line by line
+// through the shell rather than as a script, guard and infallible sigils
+// together, lines with extra leading whitespace, and an attribute only a
+// script can have; then the recipes, resolved in name
 // order, each after the recipes it depends on (its dependencies, then its
 // parameter defaults, then the arguments of its dependencies, then its body,
 // then the argument counts of its dependencies). The first error decides the
@@ -133,8 +136,9 @@ func parameters(jf *ast.Justfile, r ast.Recipe) *diag.Error {
 }
 
 // checkRecipes takes the recipes in source order and reports the first that
-// redefines an earlier recipe's name, or that has a line starting with more
-// whitespace than its indentation, as upstream's analyzer does. It is pure.
+// redefines an earlier recipe's name, or, if it is not a script, that has a
+// line starting with more whitespace than its indentation or an attribute
+// only a script can have, as upstream's analyzer does. It is pure.
 func checkRecipes(jf *ast.Justfile) *diag.Error {
 	first := make(map[string]int, len(jf.Recipes))
 	for _, r := range jf.Recipes {
@@ -143,11 +147,28 @@ func checkRecipes(jf *ast.Justfile) *diag.Error {
 				"recipe `%s` first defined on line %d is redefined on line %d", r.Name, line, r.Line)
 		}
 		first[r.Name] = r.Line
+		if r.IsScript(jf.Settings) {
+			continue
+		}
 		if err := extraIndent(jf, r); err != nil {
+			return err
+		}
+		if err := scriptAttribute(jf, r); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// scriptAttribute reports the attribute of r that only a script recipe can
+// have, `[extension]`, when r runs line by line through the shell, at the
+// recipe's name. It is pure.
+func scriptAttribute(jf *ast.Justfile, r ast.Recipe) *diag.Error {
+	if r.Attribute(ast.AttrExtension) == nil {
+		return nil
+	}
+	return fail(jf, name(r.Line, r.Col, r.Name),
+		"shell recipe `%s` has script recipe attribute `%s`", r.Name, ast.AttrExtension)
 }
 
 // extraIndent reports the first command of r that has the guard and the

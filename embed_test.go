@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -513,5 +514,67 @@ func TestParseReportsAttributeErrors(t *testing.T) {
 		if !errors.As(err, &d) || d.Msg != msg || d.Source == "" {
 			t.Errorf("Parse(%q) = %+v, want %q with its source line", src, err, msg)
 		}
+	}
+}
+
+func TestParseReportsGroupBAttributeErrors(t *testing.T) {
+	for src, msg := range map[string]string{
+		"[env('A')]\nfoo:\n":                       "attribute `env` got 1 argument but takes 2 arguments",
+		"[env(x, 'a')]\nfoo x:\n":                  "variable `x` not defined",
+		"[continue('SIGTERM')]\nfoo:\n":            "invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+		"[script, shell]\nfoo:\n":                  "recipe `foo` has both `[script]` and `[shell]` attributes",
+		"[extension: '.txt']\nfoo:\n":              "shell recipe `foo` has script recipe attribute `extension`",
+		"[metadata]\nfoo:\n":                       "attribute `metadata` got 0 arguments but takes at least 1 argument",
+		"[timestamp(nope)]\nfoo:\n":                "variable `nope` not defined",
+		"[parallel, parallel]\nfoo:\n":             "attribute `parallel` first used on line 1 is duplicated on line 1",
+		"[linux]\n[windows]\nset nonsense\nfoo:\n": "unknown setting `nonsense`",
+	} {
+		_, err := Parse("justfile", []byte(src))
+		var d *diag.Error
+		if !errors.As(err, &d) || d.Msg != msg || d.Source == "" {
+			t.Errorf("Parse(%q) = %+v, want %q with its source line", src, err, msg)
+		}
+	}
+}
+
+func TestRunTimestampUsesOptionsClock(t *testing.T) {
+	j := mustParse(t, "[timestamp('%Y-%m-%d %H:%M:%S')]\nr:\n\techo hi\n")
+	proc := &sysfake.FakeProcess{}
+	var stderr bytes.Buffer
+	opts := Options{
+		WorkDir: "/w", Stderr: &stderr, Exec: proc,
+		Clock: sysfake.FakeClock{At: sys.Time{Unix: 994518299, UTC: true}},
+	}
+	if _, err := j.Run(context.Background(), opts); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if want := "[2001-07-07 15:04:59] echo hi\n"; stderr.String() != want {
+		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestRunEnvAttributeReachesTheCommand(t *testing.T) {
+	j := mustParse(t, "name := 'world'\n[env('GREETING', 'hello ' + name)]\nr:\n\t@echo $GREETING\n")
+	proc := &sysfake.FakeProcess{}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc, Env: []string{"K=V"}}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if want := []string{"K=V", "GREETING=hello world"}; !reflect.DeepEqual(proc.Specs[0].Env, want) {
+		t.Errorf("environment = %q, want %q", proc.Specs[0].Env, want)
+	}
+}
+
+func TestParseKeepsTheRecipesOfTheHostSystem(t *testing.T) {
+	j := mustParse(t, "[windows]\nw:\n\n[unix]\nu:\n")
+	var names []string
+	for _, r := range j.Recipes() {
+		names = append(names, r.Name)
+	}
+	want := []string{"u"}
+	if runtime.GOOS == "windows" {
+		want = []string{"w"}
+	}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("recipes on %s = %v, want %v", runtime.GOOS, names, want)
 	}
 }

@@ -119,3 +119,17 @@ func exitCode(exitErr *exec.ExitError) (int, error) {
 	}
 	return exitErr.ExitCode(), nil
 }
+
+// OSClock is the Clock backed by the system clock and the local time zone.
+type OSClock struct{}
+
+// Now returns the current local time. Impure: it reads the system clock.
+func (OSClock) Now() Time {
+	return fromTime(time.Now())
+}
+
+// fromTime breaks t down into a Time in t's own zone. Pure.
+func fromTime(t time.Time) Time {
+	_, offset := t.Zone()
+	return Time{Unix: t.Unix(), Nano: t.Nanosecond(), Offset: offset}
+}

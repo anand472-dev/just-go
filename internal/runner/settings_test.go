@@ -445,6 +445,15 @@ func TestRunLazyEvaluatesOnlyWhatIsUsed(t *testing.T) {
 		{"without lazy everything is evaluated", bad + "foo:\n  @echo foo\n", true},
 		{"lazy := false", "set lazy := false\n" + bad + "foo:\n  @echo foo\n", true},
 		{"an unused assignment of another recipe", "set lazy\n" + bad + "foo:\n  @echo foo\nbar:\n  @echo {{x}}\n", false},
+		{"used in an env value", "set lazy\n" + bad + "[env('A', x)]\nfoo:\n", true},
+		{"used in an env name", "set lazy\n" + bad + "[env(x, 'a')]\nfoo:\n", true},
+		{"used in a timestamp format", "set lazy\n" + bad + "[timestamp(x)]\nfoo:\n", true},
+		{"used in a confirm prompt", "set lazy\n" + bad + "[confirm(x)]\nfoo:\n", true},
+		{"used in a working directory", "set lazy\n" + bad + "[working-directory(x)]\nfoo:\n", true},
+		{"used in a doc", "set lazy\n" + bad + "[doc(x)]\nfoo:\n", true},
+		{"a parameter shadows it in a working directory", "set lazy\n" + bad + "[working-directory(x)]\nfoo x='q':\n", false},
+		{"a parameter does not shadow it in an env", "set lazy\n" + bad + "[env('A', x)]\nfoo x='q':\n", true},
+		{"literal attributes use nothing", "set lazy\n" + bad + "[group('x'), env('A', 'b')]\nfoo:\n", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan, _, _ := newPlan(t, tc.src, &sysfake.FakeProcess{})

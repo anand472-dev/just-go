@@ -57,6 +57,9 @@ type Options struct {
 	Prompt io.Writer
 	FS     sys.FS      // nil uses the OS implementation from internal/sys
 	Exec   sys.Process // nil uses the OS implementation from internal/sys
+	// Clock tells the time that a recipe with `[timestamp]` prints; nil uses
+	// the system clock.
+	Clock sys.Clock
 	// Shell and ShellArgs override the justfile's set shell for every recipe
 	// line of the run, as upstream's --shell and --shell-arg do. Shell alone
 	// runs Shell with the default arguments (-cu); ShellArgs alone runs the
@@ -248,6 +251,7 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		Yes:           opts.Yes,
 		Prompt:        opts.Prompt,
 		Exec:          opts.Exec,
+		Clock:         opts.Clock,
 		Shell:         opts.Shell,
 		ShellArgs:     opts.ShellArgs,
 	})

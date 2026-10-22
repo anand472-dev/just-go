@@ -43,8 +43,8 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `module` | Uses `mod` or `import`, or names a `module::recipe` path. |
 | `dotenv` | Has a `.env` file or a `dotenv-*` setting. The settings are parsed and validated; the cases that remain need a file loaded or a command run (Phase 3). |
 | `setting:<name>` | Sets a setting that has no effect yet: `default-script` (needs script recipes, Task 11) and `fallback` (needs the search of parent justfiles, Phase 3). |
-| `attribute` | Uses an attribute the parser does not implement yet: any but `[private]`, `[group]`, `[doc]`, `[confirm]`, `[no-cd]`, `[no-exit-message]`, `[no-quiet]`, `[exit-message]`, `[positional-arguments]`, `[working-directory]` and `[default]` (Task 8). A case that uses only those is sorted by what else it uses. |
-| `shebang` | Has a shebang recipe. |
+| `attribute` | Uses an attribute the parser does not implement yet: `[arg]`, which no task owns yet, or `[cache]`, which is unstable (Tasks 8 and 9 implemented the rest). A case that uses only the others is sorted by what else it uses. |
+| `shebang` | Has a shebang recipe or a `[script]` recipe. |
 | `backtick` | Uses a backtick expression. |
 | `conditional` | Uses an `if` expression. |
 | `builtin:<family>` | Calls a builtin function, or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
@@ -54,23 +54,23 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 
 ## Current counts
 
-From the run recorded in `groups.json`: 329 pass, 1666 fail, 16 skip, of
+From the run recorded in `groups.json`: 360 pass, 1635 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
 |---|---|
 | `cli:*` | 655 |
 | `unstable:*` | 382 |
-| `attribute` | 161 |
+| `attribute` | 112 |
 | `module` | 157 |
-| `grammar` | 73 |
-| `builtin:*` | 61 |
-| `backtick` | 59 |
+| `grammar` | 75 |
+| `builtin:*` | 62 |
+| `backtick` | 62 |
 | `completions` | 40 |
 | `dotenv` | 21 |
-| `setting:*` | 13 |
+| `setting:*` | 12 |
 | `conditional` | 19 |
-| `shebang` | 25 |
+| `shebang` | 38 |
 | `core-defect` | 0 |
 | `other` | 0 |
 

@@ -8,6 +8,8 @@ import (
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/eval"
+	"gitea.com/wimwian/just-go/internal/sys"
+	"gitea.com/wimwian/just-go/internal/timefmt"
 )
 
 // printsExitMessage reports whether the failure of a command of r is
@@ -128,4 +130,88 @@ func readLine(r io.Reader) string {
 			return string(line)
 		}
 	}
+}
+
+// defaultTimestampFormat is the format of the time `[timestamp]` prints when
+// it names none, as upstream's default for --timestamp-format.
+const defaultTimestampFormat = "%H:%M:%S"
+
+// environment returns the variables the commands of r see besides the plan's
+// environment: the exported ones (see exportedEnv), and those of its `[env]`
+// attributes, whose key and value are evaluated in the global scope and which
+// take the place of an exported variable of the same name; of two `[env]`
+// with the same key the later wins. It is nil when there are none. It is
+// pure.
+func (o *orderer) environment(r *ast.Recipe, scope eval.Scope) (map[string]string, error) {
+	env := exportedEnv(o.jf, r, o.exported, o.globals, scope)
+	for _, a := range r.Attributes {
+		if a.Name != ast.AttrEnv {
+			continue
+		}
+		values, err := eval.EvaluateAll(a.Args, o.globals)
+		if err != nil {
+			return nil, locate(err, o.jf.File, a.Line)
+		}
+		if env == nil {
+			env = make(map[string]string, 1)
+		}
+		env[values[0]] = values[1]
+	}
+	return env, nil
+}
+
+// timestamp evaluates the format of the `[timestamp]` attribute of r in scope.
+// It returns nil when r has none. It is pure.
+func (o *orderer) timestamp(r *ast.Recipe, scope eval.Scope) (*string, error) {
+	a := r.Attribute(ast.AttrTimestamp)
+	if a == nil {
+		return nil, nil
+	}
+	format := defaultTimestampFormat
+	if len(a.Args) == 1 {
+		var err error
+		if format, err = eval.Evaluate(a.Args[0], scope); err != nil {
+			return nil, locate(err, o.jf.File, a.Line)
+		}
+	}
+	return &format, nil
+}
+
+// continuesOn reports whether r goes on after a command ran during which the
+// fatal signal caught was caught: `[continue]` alone goes on for SIGINT, and
+// `[continue('SIGHUP', ...)]` for the signals it names. It is pure.
+func continuesOn(r *ast.Recipe, caught int) bool {
+	a := r.Attribute(ast.AttrContinue)
+	if a == nil {
+		return false
+	}
+	if len(a.Args) == 0 {
+		return caught == sys.SIGINT
+	}
+	for _, arg := range a.Args {
+		if n, _ := sys.SignalNumber(arg.(ast.StringLit).Value); n == caught {
+			return true
+		}
+	}
+	return false
+}
+
+// echo writes the command of line to Stderr before it runs, unless the line
+// is quiet. A recipe with `[timestamp]` writes every command, with the time in
+// square brackets before it, and to the prompt stream, as upstream does even
+// when it is quiet. An invalid format fails the run. Impure: it reads the
+// clock and writes to Stderr or the prompt stream.
+func (inv *invocation) echo(s step, line ast.Line, command string) error {
+	if s.timestamp == nil {
+		if echoes(line.Prefix, inv.plan.Quiet || settingQuiet(inv.plan.Justfile.Settings, s.recipe)) {
+			fmt.Fprintln(inv.stderr, command)
+		}
+		return nil
+	}
+	stamp, err := timefmt.Format(inv.clock.Now(), *s.timestamp)
+	if err != nil {
+		return &diag.Error{Kind: diag.KindRuntime, Msg: err.Error()}
+	}
+	fmt.Fprintf(inv.prompt, "[%s] %s\n", stamp, command)
+	return nil
 }

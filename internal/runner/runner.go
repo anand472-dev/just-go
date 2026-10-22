@@ -59,16 +59,19 @@ type Plan struct {
 	Stdin  io.Reader // nil means no input
 	Stdout io.Writer // nil discards
 	Stderr io.Writer // nil discards; receives echoed commands and failure messages
-	// Prompt receives the `[confirm]` prompts. Nil means Stderr. Upstream
-	// writes them to its standard error even when it is quiet, which silences
-	// everything else it writes there, so a host that is quiet gives the
-	// real one here.
+	// Prompt receives the `[confirm]` prompts, and the commands that a recipe
+	// with `[timestamp]` echoes. Nil means Stderr. Upstream writes them to its
+	// standard error even when it is quiet, which silences everything else it
+	// writes there, so a host that is quiet gives the real one here.
 	Prompt io.Writer
 	Quiet  bool // overrides set quiet when true; also silences the failure message
 	// Yes answers every `[confirm]` prompt with yes without asking, as
 	// upstream's --yes does.
 	Yes  bool
 	Exec sys.Process // nil uses the OS implementation from internal/sys
+	// Clock tells the time that `[timestamp]` prints. Nil uses the system
+	// clock.
+	Clock sys.Clock
 	// Shell and ShellArgs override the justfile's set shell for every line,
 	// as upstream's --shell and --shell-arg: Shell alone keeps the default
 	// arguments (-cu), ShellArgs alone keeps the default shell (sh). Empty
@@ -111,6 +114,23 @@ type step struct {
 	// its dependencies.
 	ask    bool
 	prompt string
+	// timestamp is the format of the time `[timestamp]` prints before each
+	// command of the recipe, nil when it has no such attribute.
+	timestamp *string
+	// flow is not nil for a step that is not about a recipe's commands but
+	// about running branches at once (see control).
+	flow *control
+}
+
+// control is what a step does when it runs branches at once.
+type control struct {
+	// fork is the branches, the dependencies of a `[parallel]` recipe, each
+	// one a list of steps. The step ends when they all have.
+	fork [][]step
+	// signal is the gate a step opens when the steps of a recipe that other
+	// branches may be waiting for are done; wait is the gate a step waits
+	// for, because another branch runs the recipe it would have run.
+	signal, wait *gate
 }
 
 // prepared is the outcome of prepare: the steps in run order and the
@@ -118,6 +138,9 @@ type step struct {
 type prepared struct {
 	steps []step
 	set   settings.Resolved
+	// parallel is true when some steps run at once, so that the streams they
+	// write to need a lock.
+	parallel bool
 }
 
 // Run runs plan.Recipes and their dependencies. Each dependency runs before
@@ -136,14 +159,9 @@ func Run(ctx context.Context, plan Plan) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	inv := newInvocation(ctx, plan, pre.set)
-	for _, s := range pre.steps {
-		code, err := inv.step(s)
-		if err != nil || code != 0 {
-			return Result{ExitCode: code}, err
-		}
-	}
-	return Result{}, nil
+	inv := newInvocation(ctx, plan, pre.set, pre.parallel)
+	code, err := inv.sequence(pre.steps)
+	return Result{ExitCode: code}, err
 }
 
 // prepare evaluates the expression settings and resolves the requested
@@ -164,8 +182,8 @@ func prepare(plan Plan) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	steps, err := resolveOrder(jf, calls, globals)
-	return prepared{steps: steps, set: set}, err
+	steps, parallel, err := resolveOrder(jf, calls, globals)
+	return prepared{steps: steps, set: set, parallel: parallel}, err
 }
 
 // requested returns the calls the plan asks for. Plan.Calls when set, else
@@ -283,8 +301,10 @@ func evalPass(file string, pending []ast.Assignment, scope eval.Scope) ([]ast.As
 // recipe that names it. The dependencies after `&&` come after it, and
 // recipes already run do not count for them: they run, with their own
 // dependencies, once per list. A recipe runs once per distinct list of
-// arguments, so `c 1 c 2 c 1` runs `c` twice. It is pure.
-func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, error) {
+// arguments, so `c 1 c 2 c 1` runs `c` twice. The dependencies of a recipe
+// with `[parallel]` are branches that run at once (see fork); the result also
+// says whether there are any. It is pure.
+func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, bool, error) {
 	o := orderer{
 		jf:       jf,
 		globals:  globals,
@@ -295,13 +315,13 @@ func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, e
 	for i := range jf.Recipes {
 		o.byName[jf.Recipes[i].Name] = &jf.Recipes[i]
 	}
-	ran := make(map[string]bool, len(jf.Recipes))
+	ran := make(map[string]*gate, len(jf.Recipes))
 	for _, c := range calls {
 		if err := o.visit(o.byName[c.Recipe], c.Args, ran); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
-	return o.steps, nil
+	return o.steps, o.forked, nil
 }
 
 // orderer holds the state of one resolveOrder walk.
@@ -315,28 +335,47 @@ type orderer struct {
 	// would enter again.
 	active map[string]bool
 	steps  []step
+	// forks is how many branches of forks are being built, and forked is
+	// whether any fork was built.
+	forks  int
+	forked bool
 }
 
 // visit appends the steps of r called with args: its dependencies, the recipe
 // itself, then its subsequents. Nothing is appended if ran, the calls already
-// visited in this list of dependencies, has the call. A call is marked before
-// its dependencies are visited, so a cycle the analyzer missed cannot loop
-// forever. It is pure apart from updating o and ran.
-func (o *orderer) visit(r *ast.Recipe, args []string, ran map[string]bool) error {
+// visited in this list of dependencies, has the call; but when another branch
+// of a fork made the call, a step waits for that branch to be done with it,
+// as upstream's recipe lock makes the second thread do. A call is marked
+// before its dependencies are visited, so a cycle the analyzer missed cannot
+// loop forever. It is pure apart from updating o and ran.
+func (o *orderer) visit(r *ast.Recipe, args []string, ran map[string]*gate) error {
 	key := callKey(r.Name, args)
-	if ran[key] || o.active[key] {
+	if o.active[key] {
 		return nil
 	}
-	ran[key] = true
+	if g, ok := ran[key]; ok {
+		if g != nil {
+			o.steps = append(o.steps, step{flow: &control{wait: g}})
+		}
+		return nil
+	}
+	var g *gate
+	if o.forks > 0 {
+		g = newGate()
+	}
+	ran[key] = g
 	o.active[key] = true
 	err := o.expand(r, args, ran)
 	delete(o.active, key)
+	if g != nil && err == nil {
+		o.steps = append(o.steps, step{flow: &control{signal: g}})
+	}
 	return err
 }
 
 // expand appends the steps of r called with args, for visit. It is pure apart
 // from updating o and ran.
-func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]bool) error {
+func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]*gate) error {
 	scope, positional, err := bindParams(o.jf, r, args, o.globals)
 	if err != nil {
 		return err
@@ -351,36 +390,111 @@ func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]bool) erro
 	if err := o.dependencies(r, r.Deps, scope, ran); err != nil {
 		return err
 	}
+	env, err := o.environment(r, scope)
+	if err != nil {
+		return err
+	}
+	stamp, err := o.timestamp(r, scope)
+	if err != nil {
+		return err
+	}
 	o.steps = append(o.steps, step{
-		recipe: r, scope: scope, positional: positional, workdir: workdir,
-		env: exportedEnv(o.jf, r, o.exported, o.globals, scope),
+		recipe: r, scope: scope, positional: positional, workdir: workdir, env: env, timestamp: stamp,
 	})
-	return o.dependencies(r, r.Subsequents, scope, make(map[string]bool, len(r.Subsequents)))
+	return o.dependencies(r, r.Subsequents, scope, make(map[string]*gate, len(r.Subsequents)))
 }
 
 // dependencies visits deps, the dependencies of from, evaluating each one's
-// arguments in scope, the scope of from. It is pure apart from updating o and
-// ran.
+// arguments in scope, the scope of from. The dependencies of a recipe with
+// `[parallel]` become the branches of a fork, and as upstream does for
+// those, all the arguments are evaluated before any dependency is visited.
+// It is pure apart from updating o and ran.
 //
 // Known divergence, harmless while arguments are pure: this evaluates every
 // argument while the plan is built, before any recipe runs, where upstream
 // evaluates them when the dependency is reached. Once an argument can fail or
 // have effects (backticks, Task 10), a failing argument is reported before
 // the earlier recipes run. Task 10 must make this lazy; its plan step says so.
-func (o *orderer) dependencies(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope, ran map[string]bool) error {
-	for _, d := range deps {
-		callee, ok := o.byName[d.Name]
-		if !ok {
-			return &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: d.Line, Col: d.Col, Width: len(d.Name),
-				Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, d.Name)}
-		}
-		args, err := eval.EvaluateAll(d.Args, scope)
+func (o *orderer) dependencies(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope, ran map[string]*gate) error {
+	if len(deps) > 1 && from.Attribute(ast.AttrParallel) != nil {
+		calls, err := o.evaluate(from, deps, scope)
 		if err != nil {
-			return locate(err, o.jf.File, d.Line)
-		}
-		if err := o.visit(callee, args, ran); err != nil {
 			return err
 		}
+		return o.fork(calls, ran)
+	}
+	for _, d := range deps {
+		c, err := o.resolve(from, d, scope)
+		if err != nil {
+			return err
+		}
+		if err := o.visit(c.callee, c.args, ran); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dependencyCall is a dependency with its arguments evaluated.
+type dependencyCall struct {
+	callee *ast.Recipe
+	args   []string
+}
+
+// evaluate resolves deps, the dependencies of from, to recipes and evaluates
+// their arguments in scope, all of them before any is visited, as upstream
+// does. It is pure.
+func (o *orderer) evaluate(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope) ([]dependencyCall, error) {
+	calls := make([]dependencyCall, 0, len(deps))
+	for _, d := range deps {
+		c, err := o.resolve(from, d, scope)
+		if err != nil {
+			return nil, err
+		}
+		calls = append(calls, c)
+	}
+	return calls, nil
+}
+
+// resolve finds the recipe that d, a dependency of from, names and evaluates
+// its arguments in scope. It is pure.
+func (o *orderer) resolve(from *ast.Recipe, d ast.Dependency, scope eval.Scope) (dependencyCall, error) {
+	callee, ok := o.byName[d.Name]
+	if !ok {
+		return dependencyCall{}, &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: d.Line, Col: d.Col, Width: len(d.Name),
+			Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, d.Name)}
+	}
+	args, err := eval.EvaluateAll(d.Args, scope)
+	if err != nil {
+		return dependencyCall{}, locate(err, o.jf.File, d.Line)
+	}
+	return dependencyCall{callee: callee, args: args}, nil
+}
+
+// fork appends one step that runs calls at once, each with its dependencies
+// and subsequents as a branch of its own. A branch with nothing left to run,
+// because the calls were made already, is left out. It is pure apart from
+// updating o and ran.
+func (o *orderer) fork(calls []dependencyCall, ran map[string]*gate) error {
+	var branches [][]step
+	for _, c := range calls {
+		outer := o.steps
+		o.steps = nil
+		o.forks++
+		err := o.visit(c.callee, c.args, ran)
+		o.forks--
+		branch := o.steps
+		o.steps = outer
+		if err != nil {
+			return err
+		}
+		if len(branch) > 0 {
+			branches = append(branches, branch)
+		}
+	}
+	if len(branches) > 0 {
+		o.steps = append(o.steps, step{flow: &control{fork: branches}})
+		o.forked = true
 	}
 	return nil
 }
@@ -698,8 +812,13 @@ type invocation struct {
 	ctx    context.Context
 	plan   Plan
 	exec   sys.Process
+	clock  sys.Clock
 	stderr io.Writer
-	// prompt is where `[confirm]` prompts are written.
+	// held, when not nil, is where the failure message of a branch of a fork
+	// waits, so that only the first failing branch reports (see fork).
+	held *[]string
+	// prompt is where `[confirm]` prompts and timestamped commands are
+	// written.
 	prompt io.Writer
 	// shell is the shell the justfile asks for, nil for none. dir is the
 	// directory the commands of a recipe run in, base the one a
@@ -712,20 +831,29 @@ type invocation struct {
 }
 
 // newInvocation fills in the defaults for plan's optional fields and picks
-// the shell and directory from the evaluated settings set. It is pure: it
-// only builds a value; sys.OSProcess is not used until a line runs.
-func newInvocation(ctx context.Context, plan Plan, set settings.Resolved) *invocation {
+// the shell and directory from the evaluated settings set. When some steps
+// run at once, parallel, it makes the plan's output streams safe to write to
+// from all of them. It is pure: it only builds a value; sys.OSProcess is not
+// used until a line runs.
+func newInvocation(ctx context.Context, plan Plan, set settings.Resolved, parallel bool) *invocation {
 	goos := plan.OS
 	if goos == "" {
 		goos = runtime.GOOS
 	}
+	if parallel {
+		locked := lockStreams(plan.Stdout, plan.Stderr, plan.Prompt)
+		plan.Stdout, plan.Stderr, plan.Prompt = locked[0], locked[1], locked[2]
+	}
 	inv := &invocation{
-		ctx: ctx, plan: plan, exec: plan.Exec, stderr: plan.Stderr,
+		ctx: ctx, plan: plan, exec: plan.Exec, clock: plan.Clock, stderr: plan.Stderr,
 		shell: justfileShell(plan.Justfile.Settings, set, goos), dir: workingDirectory(plan, set),
 		base: baseDirectory(plan, set), here: invocationDirectory(plan),
 	}
 	if inv.exec == nil {
 		inv.exec = sys.OSProcess{}
+	}
+	if inv.clock == nil {
+		inv.clock = sys.OSClock{}
 	}
 	if inv.stderr == nil {
 		inv.stderr = io.Discard
@@ -737,12 +865,15 @@ func newInvocation(ctx context.Context, plan Plan, set settings.Resolved) *invoc
 	return inv
 }
 
-// step runs s: it asks whether to run its recipe, or runs the recipe. It
-// returns the exit code of the invocation, which is non-zero when the step
-// failed or the recipe was not confirmed. Impure: it reads standard input and
-// runs commands.
+// step runs s: it runs its branches, waits, opens a gate, asks whether to run
+// its recipe, or runs the recipe. It returns the exit code of the invocation,
+// which is non-zero when the step failed or the recipe was not confirmed.
+// Impure: it reads standard input and runs commands.
 func (inv *invocation) step(s step) (int, error) {
-	if s.ask {
+	switch {
+	case s.flow != nil:
+		return inv.flow(s.flow)
+	case s.ask:
 		return inv.confirm(s)
 	}
 	return inv.recipe(s)
@@ -790,8 +921,8 @@ func (inv *invocation) line(s step, line ast.Line) (lineResult, error) {
 	if command == "" {
 		return lineResult{}, nil
 	}
-	if echoes(line.Prefix, inv.plan.Quiet || settingQuiet(inv.plan.Justfile.Settings, s.recipe)) {
-		fmt.Fprintln(inv.stderr, command)
+	if err := inv.echo(s, line, command); err != nil {
+		return lineResult{code: 1}, err
 	}
 	code, err := inv.execLine(s, command)
 	if line.Guard && err == nil {
@@ -836,8 +967,9 @@ func (inv *invocation) outcome(r *ast.Recipe, line ast.Line, code int, err error
 // signaled is the outcome of a command that signals affected, in upstream's
 // order (recipe.rs run_shell): a failing status first, then a signal that
 // terminated the command, then a fatal signal caught while it ran. A line
-// with `-` ignores all three, and the run goes on. Impure: it writes to
-// Stderr.
+// with `-` ignores all three, and the run goes on; so does a recipe with
+// `[continue]` for a signal that was caught while a command ran that ended
+// on its own. Impure: it writes to Stderr.
 func (inv *invocation) signaled(r *ast.Recipe, line ast.Line, code int, sig *sys.SignalError) int {
 	if infallible(line.Prefix) {
 		return 0
@@ -847,6 +979,9 @@ func (inv *invocation) signaled(r *ast.Recipe, line ast.Line, code int, sig *sys
 		return inv.reportExit(r, terminatedMessage(r.Name, line.Line, sig.Signal), 128+sig.Signal)
 	case code != 0:
 		return inv.failed(r, line.Line, code)
+	}
+	if continuesOn(r, sig.Caught) {
+		return 0
 	}
 	return inv.report(fmt.Sprintf("error: interrupted by %s\n", sys.SignalName(sig.Caught)), 128+sig.Caught)
 }
@@ -878,9 +1013,19 @@ func (inv *invocation) reportExit(r *ast.Recipe, msg string, code int) int {
 // silences it, and returns code. Impure: it writes to Stderr.
 func (inv *invocation) report(msg string, code int) int {
 	if !inv.plan.Quiet {
-		fmt.Fprint(inv.stderr, msg)
+		inv.say(msg)
 	}
 	return code
+}
+
+// say writes msg to Stderr, or holds it when this is a branch of a fork.
+// Impure: it writes to Stderr.
+func (inv *invocation) say(msg string) {
+	if inv.held != nil {
+		*inv.held = append(*inv.held, msg)
+		return
+	}
+	fmt.Fprint(inv.stderr, msg)
 }
 
 // startFailure turns an error from the process runner into the result of a

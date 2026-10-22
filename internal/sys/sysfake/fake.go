@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"gitea.com/wimwian/just-go/internal/sys"
 )
@@ -60,11 +61,16 @@ type FakeProcess struct {
 	Errs []error
 	// Specs records each ProcessSpec passed to Run, in order.
 	Specs []sys.ProcessSpec
+
+	mu sync.Mutex
 }
 
 // Run records spec and returns the next scripted result. Pure: it runs no
-// process and mutates only the fake's own records.
+// process and mutates only the fake's own records. It is safe for concurrent
+// use, so a test can run recipes in parallel.
 func (p *FakeProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.Specs = append(p.Specs, spec)
 	if p.Err != nil {
 		return -1, p.Err
@@ -78,4 +84,15 @@ func (p *FakeProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error) 
 		return code, p.Errs[call]
 	}
 	return code, nil
+}
+
+// FakeClock is a sys.Clock that always reports the same time, so that a test
+// can pin the output of anything that prints it.
+type FakeClock struct {
+	At sys.Time
+}
+
+// Now returns the fixed time. Pure: it reads only the fake's own field.
+func (c FakeClock) Now() sys.Time {
+	return c.At
 }

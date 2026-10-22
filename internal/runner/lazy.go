@@ -95,10 +95,10 @@ func reachable(jf *ast.Justfile, calls []Call) []*ast.Recipe {
 }
 
 // recipeVariables returns the names that r's parameter defaults, dependency
-// arguments and body refer to, other than its own parameters: a name that a
-// parameter defines is not the assignment of that name. A default sees only
-// the parameters before it. Comments under set ignore-comments are not read.
-// It is pure.
+// arguments, attributes and body refer to, other than its own parameters: a
+// name that a parameter defines is not the assignment of that name. A default
+// sees only the parameters before it. Comments under set ignore-comments are
+// not read. It is pure.
 func recipeVariables(jf *ast.Justfile, r *ast.Recipe) []string {
 	params := make(map[string]bool, len(r.Params))
 	var names []string
@@ -111,10 +111,33 @@ func recipeVariables(jf *ast.Justfile, r *ast.Recipe) []string {
 	for _, e := range dependencyArguments(r) {
 		names = appendFree(names, ast.Variables(e, nil), params)
 	}
+	for _, a := range r.Attributes {
+		names = appendFree(names, attributeVariables(a), attributeParams(a, params))
+	}
 	for _, e := range bodyParts(jf, r) {
 		names = appendFree(names, ast.Variables(e, nil), params)
 	}
 	return names
+}
+
+// attributeVariables returns the names that the arguments of a refer to. It is
+// pure.
+func attributeVariables(a ast.Attribute) []string {
+	var names []string
+	for _, e := range a.Args {
+		names = ast.Variables(e, names)
+	}
+	return names
+}
+
+// attributeParams returns the parameters of the recipe, params, that the
+// expressions of a see: `[doc]` and `[env]` are evaluated before the
+// parameters are bound, and see none. It is pure.
+func attributeParams(a ast.Attribute, params map[string]bool) map[string]bool {
+	if a.Name == ast.AttrDoc || a.Name == ast.AttrEnv {
+		return nil
+	}
+	return params
 }
 
 // dependencyArguments returns the argument expressions of the dependencies

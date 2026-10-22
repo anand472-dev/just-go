@@ -74,3 +74,24 @@ func BenchmarkParseAttributes(b *testing.B) {
 		}
 	}
 }
+
+// generateGated returns a justfile of n pairs of recipes with the same name,
+// one for Unix and one for Windows, each with an environment variable.
+func generateGated(n int) []byte {
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, "[unix, env('K%d', 'unix')]\nr%d:\n  echo unix\n[windows, env('K%d', 'windows')]\nr%d:\n  echo windows\n", i, i, i, i)
+	}
+	return []byte(b.String())
+}
+
+func BenchmarkParseGated(b *testing.B) {
+	src := generateGated(500)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(src)))
+	for b.Loop() {
+		if _, err := parser.ParseFor("justfile", src, "linux"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

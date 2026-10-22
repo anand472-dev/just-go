@@ -60,12 +60,14 @@ var unstableSettings = map[string]ast.UnstableFeature{
 }
 
 // setting parses a `set` statement, through its line break, and records it in
-// jf.
+// jf, unless an operating-system attribute leaves it out: then it is checked
+// but changes nothing, though upstream still notes that it uses an unstable
+// feature.
 func (p *parser) setting(jf *ast.Justfile, attrs attributeSet) error {
 	p.next() // set
 	name := p.next()
-	field, isBool := boolSettings[name.Text]
-	parse, isValue := valueSettings[name.Text]
+	_, isBool := boolSettings[name.Text]
+	_, isValue := valueSettings[name.Text]
 	if !isBool && !isValue {
 		return p.errAt(name, fmt.Sprintf("unknown setting `%s`", name.Text))
 	}
@@ -76,22 +78,30 @@ func (p *parser) setting(jf *ast.Justfile, attrs attributeSet) error {
 	if feature, ok := unstableSettings[name.Text]; ok {
 		jf.Use(feature)
 	}
-	if isBool {
-		value, err := p.setBool()
-		if err != nil {
-			return err
-		}
-		*field(&jf.Settings), site.Active = value, value
-	} else {
-		if _, err := p.expect(lexer.Assign); err != nil {
-			return err
-		}
-		if err := parse(p, &jf.Settings, name); err != nil {
-			return err
-		}
+	target := jf
+	if !ast.Enabled(attrs.attrs, p.goos) {
+		target = &ast.Justfile{}
 	}
-	jf.Settings.Sites = append(jf.Settings.Sites, site)
+	if err := p.settingValue(&target.Settings, name, &site); err != nil {
+		return err
+	}
+	target.Settings.Sites = append(target.Settings.Sites, site)
 	return p.endLine()
+}
+
+// settingValue parses what follows the name of a setting into s: an optional
+// boolean, or `:=` and a value. site.Active is false for a boolean setting
+// set to false.
+func (p *parser) settingValue(s *ast.Settings, name lexer.Token, site *ast.SettingSite) error {
+	if field, ok := boolSettings[name.Text]; ok {
+		value, err := p.setBool()
+		*field(s), site.Active = value, value
+		return err
+	}
+	if _, err := p.expect(lexer.Assign); err != nil {
+		return err
+	}
+	return valueSettings[name.Text](p, s, name)
 }
 
 // setBool parses the optional `:= true` or `:= false` of a boolean setting,

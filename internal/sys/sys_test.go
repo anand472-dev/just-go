@@ -19,6 +19,8 @@ var (
 	_ sys.FS      = (*sysfake.FakeFS)(nil)
 	_ sys.Process = sys.OSProcess{}
 	_ sys.Process = (*sysfake.FakeProcess)(nil)
+	_ sys.Clock   = sys.OSClock{}
+	_ sys.Clock   = sysfake.FakeClock{}
 )
 
 func wantIsFile(t *testing.T, fsys sys.FS, path string, want bool) {
@@ -251,5 +253,50 @@ func BenchmarkOSProcessRun(b *testing.B) {
 		if _, err := (sys.OSProcess{}).Run(context.Background(), spec); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestOSClockReadsTheSystemClockInTheLocalZone(t *testing.T) {
+	before := time.Now()
+	got := (sys.OSClock{}).Now()
+	after := time.Now()
+	if got.Unix < before.Unix() || got.Unix > after.Unix() {
+		t.Errorf("Now().Unix = %d, want between %d and %d", got.Unix, before.Unix(), after.Unix())
+	}
+	if got.Nano < 0 || got.Nano >= 1_000_000_000 {
+		t.Errorf("Now().Nano = %d, want a fraction of a second", got.Nano)
+	}
+	if _, offset := time.Unix(got.Unix, 0).Zone(); got.Offset != offset || got.UTC {
+		t.Errorf("Now() = %+v, want the local offset %d and not UTC", got, offset)
+	}
+}
+
+func TestFakeClockReportsItsTime(t *testing.T) {
+	at := sys.Time{Unix: 994518299, Nano: 5, Offset: 34200}
+	if got := (sysfake.FakeClock{At: at}).Now(); got != at {
+		t.Errorf("Now() = %+v, want %+v", got, at)
+	}
+}
+
+func TestSignalNumberKnowsTheSignalsContinueNames(t *testing.T) {
+	for name, want := range map[string]int{"SIGHUP": sys.SIGHUP, "SIGINT": sys.SIGINT, "SIGQUIT": sys.SIGQUIT} {
+		if got, ok := sys.SignalNumber(name); !ok || got != want {
+			t.Errorf("SignalNumber(%q) = %d, %v; want %d, true", name, got, ok, want)
+		}
+		if sys.SignalName(want) != name {
+			t.Errorf("SignalName(%d) = %q, want %q", want, sys.SignalName(want), name)
+		}
+	}
+	for _, name := range []string{"", "SIGTERM", "sigint", "INT"} {
+		if got, ok := sys.SignalNumber(name); ok || got != 0 {
+			t.Errorf("SignalNumber(%q) = %d, %v; want 0, false", name, got, ok)
+		}
+	}
+}
+
+func BenchmarkOSClockNow(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		(sys.OSClock{}).Now()
 	}
 }

@@ -66,6 +66,28 @@ func SignalName(sig int) string {
 	return fmt.Sprintf("signal %d", sig)
 }
 
+// Numbers of the fatal signals `[continue]` can name, the same on every Unix
+// system.
+const (
+	SIGHUP  = 1
+	SIGINT  = 2
+	SIGQUIT = 3
+)
+
+// SignalNumber is the number of the signal upstream calls name, one of
+// SIGHUP, SIGINT and SIGQUIT, and whether it is one of them. Pure.
+func SignalNumber(name string) (int, bool) {
+	switch name {
+	case "SIGHUP":
+		return SIGHUP, true
+	case "SIGINT":
+		return SIGINT, true
+	case "SIGQUIT":
+		return SIGQUIT, true
+	}
+	return 0, false
+}
+
 // ProcessSpec describes one program invocation.
 type ProcessSpec struct {
 	// Argv[0] is the program. A bare name (no path separator) is searched
@@ -77,4 +99,27 @@ type ProcessSpec struct {
 	Stdin  io.Reader // nil means no input
 	Stdout io.Writer // nil discards
 	Stderr io.Writer // nil discards
+}
+
+// Time is an instant of wall-clock time, broken down so that pure code can
+// format it without importing the time package: the seconds since the Unix
+// epoch, the nanoseconds past the second, and the offset of the local time
+// zone from UTC at that instant.
+type Time struct {
+	// Unix is the whole seconds since 1970-01-01 00:00:00 UTC.
+	Unix int64
+	// Nano is the nanoseconds past the second, from 0 to 999999999.
+	Nano int
+	// Offset is the seconds the local time is east of UTC.
+	Offset int
+	// UTC is true when the time is expressed in UTC, whose zone name is
+	// "UTC"; otherwise the zone is named by its offset, as upstream's
+	// formatter names a local time zone.
+	UTC bool
+}
+
+// Clock reads the time of day.
+type Clock interface {
+	// Now returns the current time in the local time zone.
+	Now() Time
 }

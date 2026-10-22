@@ -220,17 +220,79 @@ type Recipe struct {
 // the ones with an effect that the runner, analyzer or host reads.
 const (
 	AttrConfirm             = "confirm"
+	AttrContinue            = "continue"
 	AttrDefault             = "default"
 	AttrDoc                 = "doc"
+	AttrEnv                 = "env"
 	AttrExitMessage         = "exit-message"
+	AttrExtension           = "extension"
 	AttrGroup               = "group"
+	AttrMetadata            = "metadata"
 	AttrNoCd                = "no-cd"
 	AttrNoExitMessage       = "no-exit-message"
 	AttrNoQuiet             = "no-quiet"
+	AttrParallel            = "parallel"
 	AttrPositionalArguments = "positional-arguments"
 	AttrPrivate             = "private"
+	AttrScript              = "script"
+	AttrShell               = "shell"
+	AttrTimestamp           = "timestamp"
 	AttrWorkingDirectory    = "working-directory"
 )
+
+// osGates maps the name of each attribute that gates an item to an operating
+// system to a function that says whether a system, as runtime.GOOS names it,
+// is one it enables. `unix` enables every system but Windows that Go has a
+// Unix-like port for.
+var osGates = map[string]func(goos string) bool{
+	"android":   func(goos string) bool { return goos == "android" },
+	"dragonfly": func(goos string) bool { return goos == "dragonfly" },
+	"freebsd":   func(goos string) bool { return goos == "freebsd" },
+	"linux":     func(goos string) bool { return goos == "linux" },
+	"macos":     func(goos string) bool { return goos == "darwin" },
+	"netbsd":    func(goos string) bool { return goos == "netbsd" },
+	"openbsd":   func(goos string) bool { return goos == "openbsd" },
+	"unix":      isUnix,
+	"windows":   func(goos string) bool { return goos == "windows" },
+}
+
+// IsGate reports whether name is one of the attributes that enable an item
+// only on some operating systems: `linux`, `macos`, `unix`, `windows`,
+// `android`, `freebsd`, `netbsd`, `openbsd` and `dragonfly`. It is pure.
+func IsGate(name string) bool {
+	_, ok := osGates[name]
+	return ok
+}
+
+// isUnix reports whether goos is a Unix-like system, which is what upstream's
+// `unix` attribute means. It is pure.
+func isUnix(goos string) bool {
+	switch goos {
+	case "linux", "darwin", "freebsd", "netbsd", "openbsd", "dragonfly", "android", "ios",
+		"solaris", "illumos", "aix":
+		return true
+	}
+	return false
+}
+
+// Enabled reports whether an item with the given attributes is in force on
+// the operating system goos, as runtime.GOOS names it: an item with no
+// operating-system attribute always is, and one with some is only on the
+// systems they name. It is pure.
+func Enabled(attrs []Attribute, goos string) bool {
+	gated := false
+	for _, a := range attrs {
+		gate, ok := osGates[a.Name]
+		if !ok {
+			continue
+		}
+		if gate(goos) {
+			return true
+		}
+		gated = true
+	}
+	return !gated
+}
 
 // Attribute is one attribute of a recipe: `[name]`, `[name(args)]` or
 // `[name: arg]`. Line and Col locate the name, which is ASCII. An Attribute
@@ -252,6 +314,27 @@ func (r *Recipe) Attribute(name string) *Attribute {
 		}
 	}
 	return nil
+}
+
+// IsShebang reports whether the first line of the recipe's body starts with
+// `#!`, which makes the recipe a script. It is pure.
+func (r *Recipe) IsShebang() bool {
+	if len(r.Lines) == 0 || len(r.Lines[0].Parts) == 0 {
+		return false
+	}
+	text, ok := r.Lines[0].Parts[0].(Text)
+	return ok && strings.HasPrefix(text.Value, "#!")
+}
+
+// IsScript reports whether the recipe's body runs as one script rather than
+// line by line through the shell, as upstream's Recipe::is_script decides:
+// never with `[shell]`, else when it has `[script]`, starts with a shebang
+// line, or is in a file that says `set default-script`. It is pure.
+func (r *Recipe) IsScript(set Settings) bool {
+	if r.Attribute(AttrShell) != nil {
+		return false
+	}
+	return r.Attribute(AttrScript) != nil || r.IsShebang() || set.DefaultScript
 }
 
 // Private reports whether the recipe is left out of listings and suggestions:

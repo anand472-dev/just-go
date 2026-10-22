@@ -19,11 +19,9 @@ The groups, in the order the rules are tried (the first that matches wins):
   dotenv             .env loading and the dotenv settings (which are parsed
                      and validated, but nothing loads a file yet)
   setting:<name>     a `set <name>` the parser does not implement
-  attribute          an attribute the parser does not implement (group A is
-                     implemented: private, group, doc, confirm, no-cd,
-                     no-exit-message, no-quiet, exit-message,
-                     positional-arguments, working-directory, default)
-  shebang            a shebang recipe
+  attribute          an attribute the parser does not implement (all are
+                     implemented but `arg`, and `cache`, which is unstable)
+  shebang            a shebang or [script] recipe
   backtick           a backtick expression
   conditional        an `if` expression
   builtin:<family>   a call to a builtin function
@@ -143,9 +141,11 @@ SETTING = re.compile(r"^set\s+(" + IDENT + r")", re.M)
 # that uses only these is sorted by what else it uses; one that uses any other
 # is in the attribute group until the task that implements it.
 SUPPORTED_ATTRIBUTES = {
-    "confirm", "default", "doc", "exit-message", "group", "no-cd",
-    "no-exit-message", "no-quiet", "positional-arguments", "private",
-    "working-directory",
+    "android", "confirm", "continue", "default", "doc", "dragonfly", "env",
+    "exit-message", "extension", "freebsd", "group", "linux", "macos",
+    "metadata", "netbsd", "no-cd", "no-exit-message", "no-quiet", "openbsd",
+    "parallel", "positional-arguments", "private", "script", "shell",
+    "timestamp", "unix", "windows", "working-directory",
 }
 CACHE_ATTRIBUTE = re.compile(r"^\[[^\]]*\bcache\b", re.M)
 MODULE = re.compile(r"^(?:\[[^\]]*\]\s*)?(?:mod|import)\??\s", re.M)
@@ -365,6 +365,8 @@ def syntax_group(sources):
             return "attribute", "uses the [" + name + "] attribute"
     if any(has_shebang(s) for s in sources):
         return "shebang", "has a shebang recipe"
+    if any("script" in attribute_names(s) for s in sources):
+        return "shebang", "has a [script] recipe"
     if "`" in exprs:
         return "backtick", "uses a backtick"
     if re.search(r"(?<![A-Za-z0-9_-])if\s", exprs):

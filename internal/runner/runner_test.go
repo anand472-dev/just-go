@@ -680,7 +680,7 @@ func chain(n int) *ast.Justfile {
 }
 
 func TestResolveOrderChain(t *testing.T) {
-	order, err := resolveOrder(chain(200), []Call{{Recipe: "r0"}}, eval.Scope{})
+	order, _, err := resolveOrder(chain(200), []Call{{Recipe: "r0"}}, eval.Scope{})
 	if err != nil {
 		t.Fatalf("resolveOrder: %v", err)
 	}
@@ -695,7 +695,7 @@ func BenchmarkResolveOrder(b *testing.B) {
 	calls := []Call{{Recipe: "r0"}}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
+		if _, _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -719,7 +719,7 @@ func BenchmarkResolveOrderArguments(b *testing.B) {
 	calls := []Call{{Recipe: "r0"}}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
+		if _, _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
 			b.Fatal(err)
 		}
 	}

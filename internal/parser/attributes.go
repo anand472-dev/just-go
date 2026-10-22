@@ -13,7 +13,7 @@ import (
 // takes, whether they are expressions or string literals, and whether it may
 // appear more than once. A spec that is not supported is known, so that a
 // misspelling is reported as unknown, but it is refused: its effect is not
-// implemented yet.
+// implemented yet (`arg`, and `cache`, which is unstable).
 type attributeSpec struct {
 	name       string
 	min, max   int
@@ -29,35 +29,35 @@ const unbounded = math.MaxInt
 // AttributeKind, which is the order upstream sorts a set of them in and so the
 // order its checks meet them in (attribute.rs). It is read-only.
 var attributeSpecs = []attributeSpec{
-	{name: "android"},
+	{name: "android", supported: true},
 	{name: "arg", min: 1, max: 1, repeatable: true},
 	{name: "cache"},
 	{name: ast.AttrConfirm, max: 1, expression: true, supported: true},
-	{name: "continue", max: unbounded},
+	{name: ast.AttrContinue, max: unbounded, supported: true},
 	{name: ast.AttrDefault, supported: true},
 	{name: ast.AttrDoc, max: 1, expression: true, supported: true},
-	{name: "dragonfly"},
-	{name: "env", min: 2, max: 2, expression: true, repeatable: true},
+	{name: "dragonfly", supported: true},
+	{name: ast.AttrEnv, min: 2, max: 2, expression: true, repeatable: true, supported: true},
 	{name: ast.AttrExitMessage, supported: true},
-	{name: "extension", min: 1, max: 1},
-	{name: "freebsd"},
+	{name: ast.AttrExtension, min: 1, max: 1, supported: true},
+	{name: "freebsd", supported: true},
 	{name: ast.AttrGroup, min: 1, max: 1, repeatable: true, supported: true},
-	{name: "linux"},
-	{name: "macos"},
-	{name: "metadata", min: 1, max: unbounded, repeatable: true},
-	{name: "netbsd"},
+	{name: "linux", supported: true},
+	{name: "macos", supported: true},
+	{name: ast.AttrMetadata, min: 1, max: unbounded, repeatable: true, supported: true},
+	{name: "netbsd", supported: true},
 	{name: ast.AttrNoCd, supported: true},
 	{name: ast.AttrNoExitMessage, supported: true},
 	{name: ast.AttrNoQuiet, supported: true},
-	{name: "openbsd"},
-	{name: "parallel"},
+	{name: "openbsd", supported: true},
+	{name: ast.AttrParallel, supported: true},
 	{name: ast.AttrPositionalArguments, supported: true},
 	{name: ast.AttrPrivate, supported: true},
-	{name: "script", max: unbounded},
-	{name: "shell"},
-	{name: "timestamp", max: 1, expression: true},
-	{name: "unix"},
-	{name: "windows"},
+	{name: ast.AttrScript, max: unbounded, supported: true},
+	{name: ast.AttrShell, supported: true},
+	{name: ast.AttrTimestamp, max: 1, expression: true, supported: true},
+	{name: "unix", supported: true},
+	{name: "windows", supported: true},
 	{name: ast.AttrWorkingDirectory, min: 1, max: 1, expression: true, supported: true},
 }
 
@@ -216,6 +216,11 @@ func (p *parser) checkAttribute(spec attributeSpec, name lexer.Token, args []att
 	if err := p.checkLiterals(spec, args); err != nil {
 		return err
 	}
+	if spec.name == ast.AttrContinue {
+		if err := p.checkSignals(args); err != nil {
+			return err
+		}
+	}
 	if first := set.find(spec.name); first != nil && !spec.repeatable {
 		return p.errAt(name, fmt.Sprintf("attribute `%s` first used on line %d is duplicated on line %d",
 			spec.name, first.Line, name.Line))
@@ -236,6 +241,23 @@ func (p *parser) checkLiterals(spec attributeSpec, args []attributeArg) error {
 	for _, arg := range args {
 		if arg.token.Kind != lexer.String || arg.tokens != 1 {
 			return p.errAt(arg.token, fmt.Sprintf("attribute `%s` arguments must be string literals", spec.name))
+		}
+	}
+	return nil
+}
+
+// signals are the names `[continue]` accepts, the fatal signals a terminal
+// sends to the commands it runs.
+var signals = [...]string{"SIGHUP", "SIGINT", "SIGQUIT"}
+
+// checkSignals reports the first argument of a `[continue]` that is not the
+// name of a signal, at the argument. It is pure.
+func (p *parser) checkSignals(args []attributeArg) error {
+	for _, arg := range args {
+		name := arg.expr.(ast.StringLit).Value
+		if !slices.Contains(signals[:], name) {
+			return p.errAt(arg.token, fmt.Sprintf(
+				"invalid signal `%s`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`", name))
 		}
 	}
 	return nil
@@ -294,7 +316,7 @@ func (p *parser) extraneous(set attributeSet) error {
 func (p *parser) checkItemAttributes(set attributeSet, kind string, name lexer.Token, valid string) error {
 	worst := -1
 	for i, a := range set.attrs {
-		if a.Name != valid && (worst < 0 || specRank(a.Name) < specRank(set.attrs[worst].Name)) {
+		if a.Name != valid && !ast.IsGate(a.Name) && (worst < 0 || specRank(a.Name) < specRank(set.attrs[worst].Name)) {
 			worst = i
 		}
 	}
@@ -312,6 +334,9 @@ func (p *parser) checkRecipeAttributes(set attributeSet, name lexer.Token) error
 	}
 	if set.find(ast.AttrExitMessage) != nil && set.find(ast.AttrNoExitMessage) != nil {
 		return p.errAt(name, fmt.Sprintf("recipe `%s` has both `[exit-message]` and `[no-exit-message]` attributes", name.Text))
+	}
+	if set.find(ast.AttrScript) != nil && set.find(ast.AttrShell) != nil {
+		return p.errAt(name, fmt.Sprintf("recipe `%s` has both `[script]` and `[shell]` attributes", name.Text))
 	}
 	return nil
 }

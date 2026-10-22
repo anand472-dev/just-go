@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Differential check of settings behaviour: runs each case in cases*.json
 (Task 6 in cases.json, Task 7 in cases-unstable.json, Task 8 in
-cases-attributes.json) against the oracle and against bin/just-go, and
-compares exit status, stdout and stderr (the temporary directory is masked as
-$D). A case may set "env", added to the environment of both, "cwd", the
-directory under the temporary one to run in, and "stdin", the input of both.
+cases-attributes.json, Task 9 in cases-attributes-b.json) against the oracle
+and against bin/just-go, and compares exit status, stdout and stderr (the
+temporary directory is masked as $D). A case may set "env", added to the
+environment of both, "cwd", the directory under the temporary one to run in,
+"stdin", the input of both, and "mask_time", which masks the times that
+`[timestamp]` prints (`[12:34:56]`, with any fraction) as `[T]`.
 
 Usage: ORACLE=oracle/bin/just MINE=bin/just-go python3 conformance/differential/run.py
 Both default to the paths above, relative to the repository root. Exit status
@@ -15,6 +17,7 @@ it needs the oracle binary, which is built by scripts/build-oracle.sh.
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -23,6 +26,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ORACLE = os.path.abspath(os.environ.get("ORACLE", os.path.join(ROOT, "oracle/bin/just")))
 MINE = os.path.abspath(os.environ.get("MINE", os.path.join(ROOT, "bin/just-go")))
 CASES = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cases*.json")))
+
+
+TIME = re.compile(r"\[\d\d:\d\d:\d\d(\.\d+)?\]")
 
 
 def run(binary, case):
@@ -39,7 +45,10 @@ def run(binary, case):
             cwd=wd, capture_output=True, text=True, input=case.get("stdin", ""),
             env={"PATH": "/usr/bin:/bin", "HOME": d, **case.get("env", {})},
         )
-        return (r.returncode, r.stdout.replace(d, "$D"), r.stderr.replace(d, "$D"))
+        stderr = r.stderr.replace(d, "$D")
+        if case.get("mask_time"):
+            stderr = TIME.sub("[T]", stderr)
+        return (r.returncode, r.stdout.replace(d, "$D"), stderr)
 
 
 def main():

@@ -6,7 +6,9 @@
 // (also written `export` or `eager`), and recipes with parameters (also
 // written `$name`), defaults, dependencies (with arguments, and after `&&`)
 // and a body. Each may be preceded by attributes (see attributes.go): a
-// recipe takes any, an assignment `[private]`, a setting none.
+// recipe takes any, an assignment `[private]`, a setting none, and any of
+// them the operating-system attributes (`[linux]`, `[unix]`, ...), which leave
+// the item out of the result on the systems they do not name (see ParseFor).
 //
 // Expressions include list literals, which belong to the unstable `lists`
 // setting: the parser records where they and the list-only functions are used
@@ -24,6 +26,7 @@ package parser
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -33,15 +36,25 @@ import (
 	"gitea.com/wimwian/just-go/internal/lexer"
 )
 
-// Parse parses src, the contents of the justfile named file. Errors are
+// Parse parses src, the contents of the justfile named file, for the
+// operating system the program runs on (see ParseFor). Errors are
 // *diag.Error with KindParse, whether they come from lexing or parsing. Parse
-// is pure.
+// is pure: the operating system is a constant of the build.
 func Parse(file string, src []byte) (*ast.Justfile, error) {
+	return ParseFor(file, src, runtime.GOOS)
+}
+
+// ParseFor is Parse for the operating system goos, as runtime.GOOS names it.
+// An item with an operating-system attribute (`[linux]`, `[unix]`, ...) that
+// does not enable goos is parsed, so that its errors are reported, and then
+// left out of the result, as upstream leaves it out before it analyzes
+// anything. ParseFor is pure.
+func ParseFor(file string, src []byte, goos string) (*ast.Justfile, error) {
 	toks, err := lexer.Lex(file, src)
 	if err != nil {
 		return nil, err
 	}
-	p := &parser{file: file, toks: toks}
+	p := &parser{file: file, toks: toks, goos: goos}
 	jf, err := p.justfile()
 	if err != nil {
 		return nil, err
@@ -52,7 +65,7 @@ func Parse(file string, src []byte) (*ast.Justfile, error) {
 	if jf.Settings.IgnoreComments == p.ignoreComments && jf.Settings.Guards == p.guards {
 		return jf, nil
 	}
-	p = &parser{file: file, toks: toks, ignoreComments: jf.Settings.IgnoreComments, guards: jf.Settings.Guards}
+	p = &parser{file: file, toks: toks, goos: goos, ignoreComments: jf.Settings.IgnoreComments, guards: jf.Settings.Guards}
 	return p.justfile()
 }
 
@@ -60,6 +73,8 @@ type parser struct {
 	file string
 	toks []lexer.Token // always ends with EOF
 	pos  int
+	// goos is the operating system whose items the result keeps.
+	goos string
 	// expected holds a bit for each token kind the grammar has looked for
 	// since it last consumed a token. As upstream does, an unexpected token
 	// is reported with this set.
@@ -345,10 +360,12 @@ func (p *parser) assignment(jf *ast.Justfile, attrs attributeSet, keyword string
 	if err := p.checkItemAttributes(attrs, "assignment", name, ast.AttrPrivate); err != nil {
 		return err
 	}
-	jf.Assignments = append(jf.Assignments, ast.Assignment{
-		Name: name.Text, Value: value, Exported: keyword == "export", Eager: keyword == "eager",
-		Private: attrs.find(ast.AttrPrivate) != nil, Line: name.Line, Col: name.Col,
-	})
+	if ast.Enabled(attrs.attrs, p.goos) {
+		jf.Assignments = append(jf.Assignments, ast.Assignment{
+			Name: name.Text, Value: value, Exported: keyword == "export", Eager: keyword == "eager",
+			Private: attrs.find(ast.AttrPrivate) != nil, Line: name.Line, Col: name.Col,
+		})
+	}
 	return p.endLine()
 }
 
@@ -515,7 +532,9 @@ func (p *parser) recipe(jf *ast.Justfile, attrs attributeSet) error {
 	if quiet {
 		silence(r.Lines)
 	}
-	jf.Recipes = append(jf.Recipes, r)
+	if ast.Enabled(attrs.attrs, p.goos) {
+		jf.Recipes = append(jf.Recipes, r)
+	}
 	return nil
 }
 

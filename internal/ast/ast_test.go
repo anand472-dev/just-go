@@ -2,6 +2,7 @@ package ast
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -126,5 +127,105 @@ func BenchmarkUniqueRecipes(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = jf.UniqueRecipes()
+	}
+}
+
+func attrs(names ...string) []Attribute {
+	out := make([]Attribute, len(names))
+	for i, n := range names {
+		out[i].Name = n
+	}
+	return out
+}
+
+var gateNames = []string{"android", "dragonfly", "freebsd", "linux", "macos", "netbsd", "openbsd", "unix", "windows"}
+
+// checkGates checks which of the gates enable an item on goos: those in on.
+func checkGates(t *testing.T, goos string, on []string) {
+	t.Helper()
+	for _, gate := range gateNames {
+		want := slices.Contains(on, gate)
+		if got := Enabled(attrs(gate), goos); got != want {
+			t.Errorf("Enabled([%s], %s) = %v, want %v", gate, goos, got, want)
+		}
+	}
+	if !Enabled(nil, goos) || !Enabled(attrs("private", "doc"), goos) {
+		t.Errorf("an item without a gate is not enabled on %s", goos)
+	}
+	if got := Enabled(attrs(gateNames...), goos); got != (len(on) > 0) {
+		t.Errorf("Enabled(every gate, %s) = %v, want %v", goos, got, len(on) > 0)
+	}
+}
+
+func TestEnabledByTheOperatingSystemAttributes(t *testing.T) {
+	for goos, on := range map[string][]string{
+		"linux":     {"linux", "unix"},
+		"darwin":    {"macos", "unix"},
+		"windows":   {"windows"},
+		"freebsd":   {"freebsd", "unix"},
+		"netbsd":    {"netbsd", "unix"},
+		"openbsd":   {"openbsd", "unix"},
+		"dragonfly": {"dragonfly", "unix"},
+		"android":   {"android", "unix"},
+		"ios":       {"unix"},
+		"solaris":   {"unix"},
+		"illumos":   {"unix"},
+		"aix":       {"unix"},
+		"plan9":     nil,
+	} {
+		checkGates(t, goos, on)
+	}
+}
+
+func TestEnabledIgnoresOtherAttributes(t *testing.T) {
+	if !Enabled(attrs("private", "windows", "unix"), "linux") || Enabled(attrs("private", "windows"), "linux") {
+		t.Error("another attribute changes whether a gate enables the item")
+	}
+	for _, gate := range gateNames {
+		if !IsGate(gate) {
+			t.Errorf("IsGate(%q) = false", gate)
+		}
+	}
+	if IsGate("private") || IsGate("") {
+		t.Error("IsGate accepts what is no gate")
+	}
+}
+
+func TestRecipeScriptness(t *testing.T) {
+	shebang := []Line{{Parts: []Expr{Text{Value: "#!/bin/sh"}}}}
+	for _, tc := range []struct {
+		name    string
+		recipe  Recipe
+		set     Settings
+		shebang bool
+		script  bool
+	}{
+		{"a plain recipe", Recipe{Lines: []Line{{Parts: []Expr{Text{Value: "echo"}}}}}, Settings{}, false, false},
+		{"an empty recipe", Recipe{}, Settings{}, false, false},
+		{"a line with no parts", Recipe{Lines: []Line{{}}}, Settings{}, false, false},
+		{"a line that begins with an interpolation", Recipe{Lines: []Line{{Parts: []Expr{Var{Name: "x"}}}}}, Settings{}, false, false},
+		{"a shebang", Recipe{Lines: shebang}, Settings{}, true, true},
+		{"a shebang only on the first line", Recipe{Lines: []Line{{Parts: []Expr{Text{Value: "echo"}}}, shebang[0]}}, Settings{}, false, false},
+		{"a script attribute", Recipe{Attributes: attrs(AttrScript)}, Settings{}, false, true},
+		{"default-script", Recipe{}, Settings{DefaultScript: true}, false, true},
+		{"shell beats a shebang", Recipe{Attributes: attrs(AttrShell), Lines: shebang}, Settings{}, true, false},
+		{"shell beats default-script", Recipe{Attributes: attrs(AttrShell)}, Settings{DefaultScript: true}, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.recipe.IsShebang(); got != tc.shebang {
+				t.Errorf("IsShebang() = %v, want %v", got, tc.shebang)
+			}
+			if got := tc.recipe.IsScript(tc.set); got != tc.script {
+				t.Errorf("IsScript() = %v, want %v", got, tc.script)
+			}
+		})
+	}
+}
+
+func BenchmarkEnabled(b *testing.B) {
+	a := attrs("private", "windows", "unix", "doc")
+	b.ReportAllocs()
+	for b.Loop() {
+		Enabled(a, "linux")
 	}
 }

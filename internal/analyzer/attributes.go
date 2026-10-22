@@ -12,35 +12,48 @@ import (
 // expressionAttributes are the attributes of a recipe that take expressions
 // and have an effect, in the order upstream resolves them: it keeps a
 // recipe's attributes sorted by name.
-var expressionAttributes = [...]string{ast.AttrConfirm, ast.AttrDoc, ast.AttrWorkingDirectory}
+var expressionAttributes = [...]string{
+	ast.AttrConfirm, ast.AttrDoc, ast.AttrEnv, ast.AttrTimestamp, ast.AttrWorkingDirectory,
+}
 
 // attributeExpressions checks the expressions in the attributes of r, after
 // its parameters and dependency arguments and before its body, as upstream
-// does. A `[confirm]` or `[working-directory]` expression sees the globals
-// and every parameter, since it is evaluated when the recipe runs. A `[doc]`
-// sees only the globals, and is evaluated now, in a const context: the
-// variables it names must be const. It is pure.
+// does. A `[confirm]`, `[timestamp]` or `[working-directory]` expression sees
+// the globals and every parameter, since it is evaluated when the recipe
+// runs. A `[doc]` and an `[env]` see only the globals: the first is
+// evaluated now, in a const context, so the variables it names must be
+// const, and the second is evaluated before the parameters are bound. It is
+// pure.
 func attributeExpressions(jf *ast.Justfile, r *ast.Recipe, globals, params map[string]struct{}) *diag.Error {
 	for _, name := range expressionAttributes {
-		a := r.Attribute(name)
-		if a == nil {
-			continue
-		}
 		locals := params
-		if name == ast.AttrDoc {
+		if name == ast.AttrDoc || name == ast.AttrEnv {
 			locals = nil
 		}
-		check := func(ref ast.Expr) *diag.Error { return checkReference(jf, ref, globals, locals) }
-		for _, arg := range a.Args {
-			if err := references(arg, check); err != nil {
+		for i := range r.Attributes {
+			if r.Attributes[i].Name != name {
+				continue
+			}
+			if err := attributeReferences(jf, &r.Attributes[i], globals, locals); err != nil {
 				return err
 			}
 		}
-		if name == ast.AttrDoc && len(a.Args) == 1 {
-			if err := constError(settings.ConstValue(jf, a.Args[0])); err != nil {
-				return err
-			}
+	}
+	return nil
+}
+
+// attributeReferences checks that the variables in the arguments of a are
+// defined, in globals or locals, and for a `[doc]` that its value is const.
+// It is pure.
+func attributeReferences(jf *ast.Justfile, a *ast.Attribute, globals, locals map[string]struct{}) *diag.Error {
+	check := func(ref ast.Expr) *diag.Error { return checkReference(jf, ref, globals, locals) }
+	for _, arg := range a.Args {
+		if err := references(arg, check); err != nil {
+			return err
 		}
+	}
+	if a.Name == ast.AttrDoc && len(a.Args) == 1 {
+		return constError(settings.ConstValue(jf, a.Args[0]))
 	}
 	return nil
 }
