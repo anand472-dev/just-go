@@ -38,36 +38,17 @@ func takesPositional(set ast.Settings, r *ast.Recipe) bool {
 	return set.PositionalArguments || r.Attribute(ast.AttrPositionalArguments) != nil
 }
 
-// confirmation appends the step that asks whether to run r, if r has a
-// `[confirm]` attribute. The prompt is the attribute's expression, evaluated
-// in scope, the scope of the recipe, or else "Run recipe `r`?". It is pure
-// apart from updating o.
-func (o *orderer) confirmation(r *ast.Recipe, scope eval.Scope) error {
-	a := r.Attribute(ast.AttrConfirm)
-	if a == nil {
-		return nil
-	}
-	prompt := fmt.Sprintf("Run recipe `%s`?", r.Name)
-	if len(a.Args) == 1 {
-		var err error
-		if prompt, err = eval.Evaluate(a.Args[0], scope); err != nil {
-			return locate(err, o.jf.File, a.Line)
-		}
-	}
-	o.steps = append(o.steps, step{recipe: r, ask: true, prompt: prompt})
-	return nil
-}
-
 // workingDirectory evaluates the `[working-directory]` attribute of r in
-// scope. It returns nil when r has none. It is pure.
-func (o *orderer) workingDirectory(r *ast.Recipe, scope eval.Scope) (*string, error) {
+// scope. It returns nil when r has none. Backticks are run by cmd. It is pure
+// apart from what cmd does.
+func (inv *invocation) workingDirectory(r *ast.Recipe, scope eval.Scope, cmd eval.Commander) (*string, error) {
 	a := r.Attribute(ast.AttrWorkingDirectory)
 	if a == nil {
 		return nil, nil
 	}
-	dir, err := eval.Evaluate(a.Args[0], scope)
+	dir, err := eval.EvaluateWith(a.Args[0], scope, cmd)
 	if err != nil {
-		return nil, locate(err, o.jf.File, a.Line)
+		return nil, locate(err, inv.plan.Justfile.File, a.Line)
 	}
 	return &dir, nil
 }
@@ -87,21 +68,30 @@ func (inv *invocation) directory(s step) string {
 	return inv.dir
 }
 
-// confirm asks whether to run the recipe of s: it writes the prompt to Prompt
-// and reads the answer from the plan's standard input, one line, as upstream
-// does. Anything but "y" or "yes", in any case, refuses, and so does the end
-// of the input. It returns the invocation's exit code and the error of a
-// refusal. A plan that says yes asks nothing. Impure: it writes to Prompt and
-// reads Stdin.
-func (inv *invocation) confirm(s step) (int, error) {
-	if inv.plan.Yes {
+// confirm asks whether to run r, if it has a `[confirm]` attribute: it
+// evaluates the prompt in the scope of f, or else words one, writes it to
+// Prompt and reads the answer from the plan's standard input, one line, as
+// upstream does. Anything but "y" or "yes", in any case, refuses, and so does
+// the end of the input. A plan that says yes evaluates and asks nothing. It
+// returns the invocation's exit code and the error of a refusal. Impure: it
+// runs backticks, writes to Prompt and reads Stdin.
+func (inv *invocation) confirm(r *ast.Recipe, f frame) (int, error) {
+	a := r.Attribute(ast.AttrConfirm)
+	if a == nil || inv.plan.Yes {
 		return 0, nil
 	}
-	fmt.Fprint(inv.prompt, s.prompt+" ")
+	prompt := fmt.Sprintf("Run recipe `%s`?", r.Name)
+	if len(a.Args) == 1 {
+		var err error
+		if prompt, err = eval.EvaluateWith(a.Args[0], f.scope, inv.commander(f.exported, nil)); err != nil {
+			return 0, locate(err, inv.plan.Justfile.File, a.Line)
+		}
+	}
+	fmt.Fprint(inv.prompt, prompt+" ")
 	if isYes(readLine(inv.plan.Stdin)) {
 		return 0, nil
 	}
-	return 1, &diag.Error{Kind: diag.KindRuntime, Msg: fmt.Sprintf("recipe `%s` was not confirmed", s.recipe.Name)}
+	return 1, &diag.Error{Kind: diag.KindRuntime, Msg: fmt.Sprintf("recipe `%s` was not confirmed", r.Name)}
 }
 
 // isYes reports whether line, an answer to a prompt, is "y" or "yes" in any
@@ -136,21 +126,19 @@ func readLine(r io.Reader) string {
 // it names none, as upstream's default for --timestamp-format.
 const defaultTimestampFormat = "%H:%M:%S"
 
-// environment returns the variables the commands of r see besides the plan's
-// environment: the exported ones (see exportedEnv), and those of its `[env]`
-// attributes, whose key and value are evaluated in the global scope and which
-// take the place of an exported variable of the same name; of two `[env]`
-// with the same key the later wins. It is nil when there are none. It is
-// pure.
-func (o *orderer) environment(r *ast.Recipe, scope eval.Scope) (map[string]string, error) {
-	env := exportedEnv(o.jf, r, o.exported, o.globals, scope)
+// attributeEnv evaluates the `[env]` attributes of r, whose key and value are
+// evaluated in the global scope. Each is evaluated with the ones before it,
+// and the exported globals, base, visible to its backticks. A later attribute
+// with the same key wins. It is nil when r has none. Impure: it runs backticks.
+func (inv *invocation) attributeEnv(r *ast.Recipe, base map[string]string) (map[string]string, error) {
+	var env map[string]string
 	for _, a := range r.Attributes {
 		if a.Name != ast.AttrEnv {
 			continue
 		}
-		values, err := eval.EvaluateAll(a.Args, o.globals)
+		values, err := eval.EvaluateAllWith(a.Args, inv.globals, inv.commander(base, env))
 		if err != nil {
-			return nil, locate(err, o.jf.File, a.Line)
+			return nil, locate(err, inv.plan.Justfile.File, a.Line)
 		}
 		if env == nil {
 			env = make(map[string]string, 1)
@@ -161,8 +149,9 @@ func (o *orderer) environment(r *ast.Recipe, scope eval.Scope) (map[string]strin
 }
 
 // timestamp evaluates the format of the `[timestamp]` attribute of r in scope.
-// It returns nil when r has none. It is pure.
-func (o *orderer) timestamp(r *ast.Recipe, scope eval.Scope) (*string, error) {
+// It returns nil when r has none. Backticks are run by cmd. It is pure apart
+// from what cmd does.
+func (inv *invocation) timestamp(r *ast.Recipe, scope eval.Scope, cmd eval.Commander) (*string, error) {
 	a := r.Attribute(ast.AttrTimestamp)
 	if a == nil {
 		return nil, nil
@@ -170,8 +159,8 @@ func (o *orderer) timestamp(r *ast.Recipe, scope eval.Scope) (*string, error) {
 	format := defaultTimestampFormat
 	if len(a.Args) == 1 {
 		var err error
-		if format, err = eval.Evaluate(a.Args[0], scope); err != nil {
-			return nil, locate(err, o.jf.File, a.Line)
+		if format, err = eval.EvaluateWith(a.Args[0], scope, cmd); err != nil {
+			return nil, locate(err, inv.plan.Justfile.File, a.Line)
 		}
 	}
 	return &format, nil

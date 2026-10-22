@@ -29,7 +29,7 @@ type triage struct {
 }
 
 // groupName is the closed set of group names scripts/triage.py assigns.
-var groupName = regexp.MustCompile(`^(grammar|attribute|backtick|conditional|shebang|` +
+var groupName = regexp.MustCompile(`^(grammar|attribute|conditional|shebang|` +
 	`module|dotenv|completions|core-defect|other|(setting|builtin|cli|unstable):[a-z0-9-]+)$`)
 
 // parseTriage decodes groups.json, rejecting unknown fields. Pure.

@@ -14,7 +14,6 @@ import (
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
-	"gitea.com/wimwian/just-go/internal/eval"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/sys"
 	"gitea.com/wimwian/just-go/internal/sys/sysfake"
@@ -465,19 +464,24 @@ func TestRunTerminatesOnACycleTheAnalyzerMissed(t *testing.T) {
 	}
 }
 
-// TestRunDependencyArgumentErrorsComeBeforeAnything checks that an argument
-// that cannot be evaluated, or does not fit the dependency, stops the run
-// before any command runs.
-func TestRunDependencyArgumentErrorsComeBeforeAnything(t *testing.T) {
+// TestRunDependencyArgumentErrorsComeBeforeTheirDependencies checks that an
+// argument that cannot be evaluated stops the run before any of the
+// dependencies in its list runs, as upstream evaluates the arguments of a
+// list first; and that the number of arguments of a call is checked when the
+// call is made, since the analyzer checks it ahead of time.
+func TestRunDependencyArgumentErrorsComeBeforeTheirDependencies(t *testing.T) {
 	fake := &sysfake.FakeProcess{}
 	plan, _, _ := newPlan(t, "a: b (c nope)\nb:\n\techo b\nc y:\n\techo c\n", fake)
 	_, err := Run(context.Background(), plan)
 	requireDiag(t, err, diag.KindRuntime, 1, "variable `nope` not defined")
+	if len(fake.Specs) != 0 {
+		t.Fatalf("ran %d lines; want none", len(fake.Specs))
+	}
 	plan, _, _ = newPlan(t, "a: b (c 'x' 'y')\nb:\n\techo b\nc y:\n\techo c\n", fake)
 	_, err = Run(context.Background(), plan)
 	requireDiag(t, err, diag.KindUsage, 0, "recipe `c` got 2 positional arguments but only takes 1\nusage:\n    just c y")
-	if len(fake.Specs) != 0 {
-		t.Fatalf("ran %d lines; want none", len(fake.Specs))
+	if want := []string{"echo b"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
 	}
 }
 
@@ -666,11 +670,13 @@ func TestLocateLeavesOtherErrors(t *testing.T) {
 	}
 }
 
-// chain returns a justfile of n recipes in which each depends on the next.
+// chain returns a justfile of n recipes in which each depends on the next and
+// echoes its own name.
 func chain(n int) *ast.Justfile {
 	jf := &ast.Justfile{File: "justfile"}
 	for i := 0; i < n; i++ {
-		r := ast.Recipe{Name: fmt.Sprintf("r%d", i), Line: i + 1}
+		name := fmt.Sprintf("r%d", i)
+		r := ast.Recipe{Name: name, Line: i + 1, Lines: []ast.Line{{Prefix: ast.PrefixAt, Parts: []ast.Expr{ast.Text{Value: name}}, Line: i + 2}}}
 		if i+1 < n {
 			r.Deps = []ast.Dependency{{Name: fmt.Sprintf("r%d", i+1)}}
 		}
@@ -679,32 +685,30 @@ func chain(n int) *ast.Justfile {
 	return jf
 }
 
-func TestResolveOrderChain(t *testing.T) {
-	order, _, err := resolveOrder(chain(200), []Call{{Recipe: "r0"}}, eval.Scope{})
-	if err != nil {
-		t.Fatalf("resolveOrder: %v", err)
-	}
-	if len(order) != 200 || order[0].recipe.Name != "r199" || order[199].recipe.Name != "r0" {
-		t.Fatalf("order has %d recipes from %s to %s; want 200 from r199 to r0",
-			len(order), order[0].recipe.Name, order[len(order)-1].recipe.Name)
+func TestRunChain(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan := Plan{Justfile: chain(200), Recipes: []string{"r0"}, WorkDir: t.TempDir(), Exec: fake}
+	mustRun(t, plan)
+	got := commands(fake)
+	if len(got) != 200 || got[0] != "r199" || got[199] != "r0" {
+		t.Fatalf("ran %d commands from %s to %s; want 200 from r199 to r0", len(got), got[0], got[len(got)-1])
 	}
 }
 
-func BenchmarkResolveOrder(b *testing.B) {
-	jf := chain(200)
-	calls := []Call{{Recipe: "r0"}}
+func BenchmarkRunChain(b *testing.B) {
+	plan := Plan{Justfile: chain(200), Recipes: []string{"r0"}, WorkDir: b.TempDir(), Exec: &sysfake.FakeProcess{}}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
+		if _, err := Run(context.Background(), plan); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-// BenchmarkResolveOrderArguments walks a chain in which each recipe passes
-// its parameter on to the next, and has one subsequent. Every recipe has two
-// different calls of the next, so the walk is 2^n steps long and n is small.
-func BenchmarkResolveOrderArguments(b *testing.B) {
+// BenchmarkRunArguments walks a chain in which each recipe passes its
+// parameter on to the next, and has one subsequent. Every recipe has two
+// different calls of the next, so the walk is 2^n calls long and n is small.
+func BenchmarkRunArguments(b *testing.B) {
 	const n = 10
 	jf := &ast.Justfile{File: "justfile"}
 	for i := 0; i < n; i++ {
@@ -716,10 +720,10 @@ func BenchmarkResolveOrderArguments(b *testing.B) {
 		}
 		jf.Recipes = append(jf.Recipes, r)
 	}
-	calls := []Call{{Recipe: "r0"}}
+	plan := Plan{Justfile: jf, Recipes: []string{"r0"}, WorkDir: b.TempDir(), Exec: &sysfake.FakeProcess{}}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
+		if _, err := Run(context.Background(), plan); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -733,7 +737,7 @@ func BenchmarkRenderLine(b *testing.B) {
 	scope := map[string]string{"a": "alpha", "b": "beta"}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := renderLine(line, scope); err != nil {
+		if _, err := renderLine(line, scope, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

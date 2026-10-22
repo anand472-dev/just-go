@@ -141,6 +141,15 @@ func TestResolveErrorsMatchUpstream(t *testing.T) {
 			"variable `foo` not defined", 1, 24, 3},
 		{"settings::undefined_variable_in_dotenv_path", "set dotenv-path := foo\n",
 			"variable `foo` not defined", 1, 20, 3},
+		{"settings::backtick", "set working-directory := `pwd`\n",
+			"cannot call backticks in const context", 1, 26, 5},
+		{"settings::non_const_variable with a backtick", "foo := `pwd`\n\nset working-directory := foo\n",
+			"cannot access non-const variable `foo` in const context", 3, 26, 3},
+		{"assignment::non_const_variables_shadowing_constants_are_an_error_in_const_contexts",
+			"HEX := `echo foo`\n\nset tempdir := HEX\n",
+			"cannot access non-const variable `HEX` in const context", 3, 16, 3},
+		{"a backtick inside a list", "set shell := ['a', ```x\n y```]\n",
+			"cannot call backticks in const context", 1, 20, 10},
 		{"a variable inside a list", "set dotenv-path := ['a', foo]\n",
 			"variable `foo` not defined", 1, 26, 3},
 		{"a call inside a list", "set shell := ['a', arch()]\n",
@@ -221,7 +230,7 @@ func BenchmarkResolve(b *testing.B) {
 
 // ConstValue is the evaluation upstream applies to a `[doc]` attribute.
 func TestConstValue(t *testing.T) {
-	jf := parse(t, "a := b + 'x'\nb := 'y'\nc := uppercase('z')\nd := c\n")
+	jf := parse(t, "a := b + 'x'\nb := 'y'\nc := uppercase('z')\nd := c\ne := `pwd`\n")
 	for _, tc := range []struct {
 		src  string
 		want string
@@ -235,7 +244,10 @@ func TestConstValue(t *testing.T) {
 	for _, tc := range []struct{ src, msg string }{
 		{"c", "cannot access non-const variable `c` in const context"},
 		{"d", "cannot access non-const variable `d` in const context"},
+		{"e", "cannot access non-const variable `e` in const context"},
 		{"uppercase('a')", "cannot call functions in const context"},
+		{"`pwd`", "cannot call backticks in const context"},
+		{"'a' + `pwd`", "cannot call backticks in const context"},
 		{"nope", "variable `nope` not defined"},
 	} {
 		e := parse(t, "x := "+tc.src+"\n").Assignments[0].Value

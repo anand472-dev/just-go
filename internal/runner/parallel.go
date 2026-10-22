@@ -45,56 +45,82 @@ type branchResult struct {
 // failed reports whether the branch did not succeed. It is pure.
 func (b branchResult) failed() bool { return b.err != nil || b.code != 0 }
 
-// sequence runs steps in order and returns the exit code of the first that
-// fails, with its error. Whatever happens, the gates of the steps that signal
-// are done with when it returns, so a branch that waits for them does not
-// wait forever. Impure: it runs commands.
-func (inv *invocation) sequence(steps []step) (int, error) {
-	defer abandonGates(steps)
-	for _, s := range steps {
-		if code, err := inv.step(s); err != nil || code != 0 {
-			return code, err
+// ran records the calls made in one list of dependencies, and the calls that
+// were requested: a call that is made again is not run again, but waited
+// for, since another branch of a fork may still be running it. It is safe for
+// the branches of a fork to share one.
+type ran struct {
+	mu    sync.Mutex
+	gates map[string]*gate
+}
+
+// newRan returns a ran with no calls in it. It is pure.
+func newRan() *ran { return &ran{gates: make(map[string]*gate)} }
+
+// claim takes the call called key if no one has, and says so; the gate is the
+// one its owner opens or abandons when it is done with the call, and so is the
+// one that anyone else who makes the call waits at. Impure: it takes a lock.
+func (r *ran) claim(key string) (g *gate, mine bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if g, ok := r.gates[key]; ok {
+		return g, false
+	}
+	g = newGate()
+	r.gates[key] = g
+	return g, true
+}
+
+// callChain is the calls that are being run on the way to a call, the
+// innermost first. A call made again within itself is a cycle the analyzer
+// missed, and is not run again. The zero chain is empty.
+type callChain struct {
+	key string
+	up  *callChain
+}
+
+// has reports whether the call called key is in the chain. It is pure.
+func (c *callChain) has(key string) bool {
+	for ; c != nil; c = c.up {
+		if c.key == key {
+			return true
 		}
 	}
-	return 0, nil
+	return false
 }
 
-// abandonGates abandons the gate of each step of steps that has one to
-// signal and has not opened it. Impure: it wakes other goroutines.
-func abandonGates(steps []step) {
-	for _, s := range steps {
-		if s.flow != nil && s.flow.signal != nil {
-			s.flow.signal.abandon()
-		}
-	}
+// claimed is a call of a fork's branch, taken in order before any branch
+// starts, so that the first branch to name a recipe is the one that runs it.
+type claimed struct {
+	call dependencyCall
+	key  string
+	gate *gate
+	mine bool
+	// cycle is true for a call that is already being run on the way here.
+	cycle bool
 }
 
-// flow runs a step that is about branches: it runs them, waits for a gate, or
-// opens one. Impure: it runs commands.
-func (inv *invocation) flow(c *control) (int, error) {
-	switch {
-	case c.fork != nil:
-		return inv.fork(c.fork)
-	case c.wait != nil:
-		return inv.await(c.wait)
-	}
-	c.signal.open()
-	return 0, nil
-}
-
-// fork runs the branches at once, each in a goroutine of its own, and waits
-// for all of them, as upstream joins its threads. A branch that fails does not
+// fork runs the calls at once, each in a goroutine of its own, and waits for
+// all of them, as upstream joins its threads. A branch that fails does not
 // stop the others. The result is that of the first branch, in order, that
 // failed, and only its failure message is written: upstream returns that
 // error alone. Impure: it runs commands.
-func (inv *invocation) fork(branches [][]step) (int, error) {
-	results := make([]branchResult, len(branches))
-	started := make([]chan struct{}, len(branches))
+func (inv *invocation) fork(calls []dependencyCall, shared *ran, chain *callChain) (int, error) {
+	taken := make([]claimed, len(calls))
+	for i, c := range calls {
+		key := callKey(c.callee.Name, c.args)
+		taken[i] = claimed{call: c, key: key, cycle: chain.has(key)}
+		if !taken[i].cycle {
+			taken[i].gate, taken[i].mine = shared.claim(key)
+		}
+	}
+	results := make([]branchResult, len(taken))
+	started := make([]chan struct{}, len(taken))
 	for i := range started {
 		started[i] = make(chan struct{})
 	}
 	var wg sync.WaitGroup
-	for i, steps := range branches {
+	for i, c := range taken {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -104,7 +130,7 @@ func (inv *invocation) fork(branches [][]step) (int, error) {
 			close(started[i])
 			branch := *inv
 			branch.held = new([]string)
-			code, err := branch.sequence(steps)
+			code, err := branch.branch(c, shared, chain)
 			results[i] = branchResult{code: code, err: err, held: *branch.held}
 		}()
 	}
@@ -118,6 +144,19 @@ func (inv *invocation) fork(branches [][]step) (int, error) {
 		}
 	}
 	return 0, nil
+}
+
+// branch runs one call of a fork, if it owns it, and else waits for the
+// branch that does. Impure: it runs commands.
+func (inv *invocation) branch(c claimed, shared *ran, chain *callChain) (int, error) {
+	switch {
+	case c.cycle:
+		return 0, nil
+	case !c.mine:
+		return inv.await(c.gate)
+	}
+	code, err := inv.execute(c.call.callee, c.call.args, shared, &callChain{key: c.key, up: chain})
+	return settle(c.gate, code, err)
 }
 
 // await waits for g to open, or for the invocation to be cancelled. A gate

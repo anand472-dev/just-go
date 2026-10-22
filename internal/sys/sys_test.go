@@ -154,6 +154,68 @@ func TestFakeProcessRecordsSpec(t *testing.T) {
 	}
 }
 
+func TestFakeProcessWritesScriptedOutput(t *testing.T) {
+	p := &sysfake.FakeProcess{Outputs: []string{"one\n", "two"}}
+	var out bytes.Buffer
+	wantRun(t, p, sys.ProcessSpec{Stdout: &out}, 0)
+	wantRun(t, p, sys.ProcessSpec{Stdout: &out}, 0)
+	wantRun(t, p, sys.ProcessSpec{Stdout: &out}, 0) // script exhausted: nothing
+	wantRun(t, p, sys.ProcessSpec{}, 0)             // no stream to write to
+	if out.String() != "one\ntwo" {
+		t.Errorf("output = %q, want %q", out.String(), "one\ntwo")
+	}
+}
+
+func TestCaptureCollectsStandardOutput(t *testing.T) {
+	p := &sysfake.FakeProcess{Outputs: []string{"hello\n"}, Codes: []int{3}}
+	var ignored bytes.Buffer
+	got, err := sys.Capture(context.Background(), p, sys.ProcessSpec{Argv: []string{"x"}, Stdout: &ignored})
+	if err != nil || string(got.Stdout) != "hello\n" || got.ExitCode != 3 || got.Signal != 0 || got.Caught != 0 {
+		t.Errorf("Capture = %+v, %v; want the output and status 3", got, err)
+	}
+	if ignored.Len() != 0 || p.Specs[0].Argv[0] != "x" {
+		t.Errorf("the caller's Stdout got %q, spec %+v; want it replaced and the rest kept", ignored.String(), p.Specs[0])
+	}
+}
+
+func TestCaptureReportsSignalsAsResults(t *testing.T) {
+	for _, sig := range []*sys.SignalError{{Signal: 9}, {Caught: 2}} {
+		p := &sysfake.FakeProcess{Err: sig}
+		got, err := sys.Capture(context.Background(), p, sys.ProcessSpec{})
+		if err != nil || got.Signal != sig.Signal || got.Caught != sig.Caught || got.ExitCode != -1 {
+			t.Errorf("Capture with %+v = %+v, %v", sig, got, err)
+		}
+	}
+}
+
+func TestCaptureReturnsOtherErrors(t *testing.T) {
+	boom := errors.New("boom")
+	if _, err := sys.Capture(context.Background(), &sysfake.FakeProcess{Err: boom}, sys.ProcessSpec{}); !errors.Is(err, boom) {
+		t.Errorf("Capture error = %v, want boom", err)
+	}
+}
+
+func TestCaptureRunsARealProgram(t *testing.T) {
+	got, err := sys.Capture(context.Background(), sys.OSProcess{}, sys.ProcessSpec{
+		Argv: []string{"sh", "-c", "printf out; exit 4"}, Env: []string{"PATH=/usr/bin:/bin"},
+	})
+	if err != nil || string(got.Stdout) != "out" || got.ExitCode != 4 {
+		t.Errorf("Capture = %+v, %v; want out and status 4", got, err)
+	}
+}
+
+func BenchmarkCapture(b *testing.B) {
+	p := &sysfake.FakeProcess{Outputs: []string{"some output\n"}}
+	spec := sys.ProcessSpec{Argv: []string{"x"}}
+	b.ReportAllocs()
+	for b.Loop() {
+		p.Specs = p.Specs[:0]
+		if _, err := sys.Capture(context.Background(), p, spec); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestFakeProcessReturnsScriptedError(t *testing.T) {
 	boom := errors.New("boom")
 	p := &sysfake.FakeProcess{Err: boom}

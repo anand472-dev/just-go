@@ -4,6 +4,7 @@ package sysfake
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"path/filepath"
 	"sort"
@@ -59,6 +60,9 @@ type FakeProcess struct {
 	// Errs are errors returned by successive calls together with the matching
 	// entry of Codes; a nil or missing entry means none.
 	Errs []error
+	// Outputs are what successive calls write to the spec's Stdout, when it
+	// has one; a call past the end of the list writes nothing.
+	Outputs []string
 	// Specs records each ProcessSpec passed to Run, in order.
 	Specs []sys.ProcessSpec
 
@@ -76,6 +80,9 @@ func (p *FakeProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error) 
 		return -1, p.Err
 	}
 	call := len(p.Specs) - 1
+	if call < len(p.Outputs) && spec.Stdout != nil {
+		_, _ = io.WriteString(spec.Stdout, p.Outputs[call])
+	}
 	code := 0
 	if call < len(p.Codes) {
 		code = p.Codes[call]

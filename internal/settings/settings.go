@@ -188,6 +188,8 @@ func (c *consts) expr(e ast.Expr) (string, error) {
 		return c.elements(e)
 	case ast.Call:
 		return "", c.fail(e.Line, e.Col, e.Name, "cannot call functions in const context")
+	case ast.Backtick:
+		return "", c.failWidth(e.Line, e.Col, e.Width, "cannot call backticks in const context")
 	}
 	return "", c.fail(0, 0, "", "cannot evaluate expression of type %T in a setting", e)
 }
@@ -264,8 +266,14 @@ func (c *consts) assignment(a ast.Assignment) constValue {
 // fail builds an analysis error located at the name that starts at line and
 // col. It is pure.
 func (c *consts) fail(line, col int, name, format string, args ...any) *diag.Error {
+	return c.failWidth(line, col, len(name), format, args...)
+}
+
+// failWidth builds an analysis error located at the width runes that start at
+// line and col. It is pure.
+func (c *consts) failWidth(line, col, width int, format string, args ...any) *diag.Error {
 	return &diag.Error{
-		Kind: diag.KindAnalysis, File: c.jf.File, Line: line, Col: col, Width: len(name),
+		Kind: diag.KindAnalysis, File: c.jf.File, Line: line, Col: col, Width: width,
 		Msg: fmt.Sprintf(format, args...),
 	}
 }

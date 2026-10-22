@@ -132,11 +132,22 @@ const (
 	exitUsage   = 2
 )
 
-// fail reports err on stderr, unless quiet, and returns exitFailure. Impure:
-// it writes to stderr.
+// fail reports err on stderr, unless quiet, and returns the status the run
+// ends with: the one the error carries, such as the exit status of a backtick
+// that failed, else exitFailure. Impure: it writes to stderr.
 func fail(stderr io.Writer, quiet bool, err error) int {
 	if !quiet {
 		report(stderr, err)
+	}
+	return statusOf(err)
+}
+
+// statusOf is the status the run ends with for err: the exit code its
+// diagnostic carries, or exitFailure. Pure.
+func statusOf(err error) int {
+	var de *diag.Error
+	if errors.As(err, &de) && de.ExitCode != 0 {
+		return de.ExitCode
 	}
 	return exitFailure
 }

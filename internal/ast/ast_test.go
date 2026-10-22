@@ -9,7 +9,7 @@ import (
 // TestExprNodes checks that every expression type is an Expr. The marker
 // methods have empty bodies, so calling them is the only way to cover them.
 func TestExprNodes(t *testing.T) {
-	for _, e := range []Expr{Text{Value: "t"}, StringLit{Value: "a"}, Var{Name: "x"}, Concat{Left: Var{Name: "x"}, Right: StringLit{}}, Call{Name: "f", Args: []Expr{Var{Name: "x"}}}, List{Elements: []Expr{Var{Name: "x"}}}} {
+	for _, e := range []Expr{Text{Value: "t"}, StringLit{Value: "a"}, Backtick{Command: "ls"}, Var{Name: "x"}, Concat{Left: Var{Name: "x"}, Right: StringLit{}}, Call{Name: "f", Args: []Expr{Var{Name: "x"}}}, List{Elements: []Expr{Var{Name: "x"}}}} {
 		e.exprNode()
 	}
 }
@@ -60,6 +60,9 @@ func TestVariablesListsEachInOrder(t *testing.T) {
 	}
 	if got := Variables(StringLit{Value: "x"}, nil); got != nil {
 		t.Errorf("Variables of a string = %v", got)
+	}
+	if got := Variables(Backtick{Command: "echo $x"}, nil); got != nil {
+		t.Errorf("Variables of a backtick = %v; a command's text is not read for names", got)
 	}
 }
 

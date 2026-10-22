@@ -914,3 +914,46 @@ func TestRunConfirm(t *testing.T) {
 		})
 	}
 }
+
+// A backtick that fails ends the run with the status of its command, and the
+// error quotes the backtick.
+func TestRunBacktickFailureEndsWithTheCommandsStatus(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "foo:\n echo hello\n echo {{`exit 123`}}\n"}, []int{0, 123})
+	want := "echo hello\nerror: backtick failed with exit code 123\n ——▶ justfile:3:9\n  │\n3 │  echo {{`exit 123`}}\n  │         ^^^^^^^^^^\n"
+	if got.code != 123 || got.stderr != want {
+		t.Errorf("run = %d, %q; want 123, %q", got.code, got.stderr, want)
+	}
+}
+
+func TestRunBacktickFailureStaysQuietWhenQuiet(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "a := `exit 100`\nfoo:\n"}, []int{100}, "--quiet")
+	if got.code != 100 || got.stderr != "" {
+		t.Errorf("run = %d, %q; want 100 and nothing written", got.code, got.stderr)
+	}
+}
+
+// The error of a justfile that is run, not only one that is read, quotes the
+// line it is about.
+func TestRunBacktickAssignmentFailureQuotesItsLine(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "foo:\n echo hello\na := `exit 222`"}, []int{222})
+	want := "error: backtick failed with exit code 222\n ——▶ justfile:3:6\n  │\n3 │ a := `exit 222`\n  │      ^^^^^^^^^^\n"
+	if got.code != 222 || got.stderr != want || len(got.proc.Specs) != 1 {
+		t.Errorf("run = %d, %q after %d commands; want 222, %q after one", got.code, got.stderr, len(got.proc.Specs), want)
+	}
+}
+
+func TestStatusOf(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want int
+	}{
+		{errors.New("plain"), exitFailure},
+		{usage("no good"), exitFailure},
+		{&diag.Error{Kind: diag.KindRuntime, Msg: "x", ExitCode: 7}, 7},
+		{fmt.Errorf("wrapped: %w", &diag.Error{Kind: diag.KindRuntime, ExitCode: 130}), 130},
+	} {
+		if got := statusOf(tc.err); got != tc.want {
+			t.Errorf("statusOf(%v) = %d, want %d", tc.err, got, tc.want)
+		}
+	}
+}

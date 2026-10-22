@@ -40,7 +40,7 @@ type Options struct {
 	// run under set no-cd. Empty means WorkDir.
 	InvocationDir string
 	Env           []string  // exact environment, "KEY=VALUE"; nil means empty, never the process environment
-	Stdin         io.Reader // nil means no input
+	Stdin         io.Reader // nil means no input; commands, and the commands of backticks, read it
 	Stdout        io.Writer // nil discards
 	Stderr        io.Writer // nil discards; receives echoed commands and failure messages
 	Recipes       []string  // recipes to run; empty means the first recipe in the file
@@ -166,6 +166,7 @@ func Parse(name string, src []byte) (*Justfile, error) {
 	if err := analyzer.Analyze(tree); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
+	tree.Source = src
 	return &Justfile{tree: tree}, nil
 }
 
@@ -218,7 +219,11 @@ func (j *Justfile) Fallback() bool {
 }
 
 // Run runs opts.Recipes, or the first recipe when none are named, with their
-// dependencies. A justfile that uses an unstable feature is refused, before
+// dependencies. A backtick runs its command through opts.Exec, in the
+// shell of the justfile, when its expression is evaluated: the assignments
+// before any recipe, the rest as the recipe that holds them is reached. A
+// failing one is a *diag.Error whose ExitCode is the status the command line
+// ends with. A justfile that uses an unstable feature is refused, before
 // anything runs, unless opts.Unstable or `set unstable` enables them. The
 // children see exactly opts.Env and run in opts.WorkDir,
 // or in the justfile's directory when WorkDir is empty. A justfile from

@@ -46,6 +46,29 @@ func TestEmbedCapturesStdoutWithoutOSStdout(t *testing.T) {
 	}
 }
 
+// A backtick runs through the Exec of the options, and a failing one is an
+// error that carries the exit status and quotes the line of the justfile.
+func TestEmbedBacktickFailureCarriesItsStatusAndLine(t *testing.T) {
+	j := mustParse(t, "foo:\n echo {{`exit 9`}}\n")
+	proc := &sysfake.FakeProcess{Codes: []int{9}}
+	_, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc})
+	var de *diag.Error
+	if !errors.As(err, &de) || de.ExitCode != 9 || de.Source != " echo {{`exit 9`}}" || de.Msg != "backtick failed with exit code 9" {
+		t.Errorf("Run error = %+v, want a failed backtick with status 9 that quotes its line", err)
+	}
+}
+
+func TestEmbedBacktickValueIsItsOutput(t *testing.T) {
+	j := mustParse(t, "x := `who`\nfoo:\n @echo {{x}}\n")
+	proc := &sysfake.FakeProcess{Outputs: []string{"me\n"}}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc}); err != nil {
+		t.Fatal(err)
+	}
+	if got := proc.Specs[1].Argv[2]; got != "echo me" {
+		t.Errorf("command = %q, want %q", got, "echo me")
+	}
+}
+
 func TestEmbedDoesNotInheritEnv(t *testing.T) {
 	t.Setenv("JUST_GO_PROBE", "1")
 	j := mustParse(t, "r:\n\t@echo ${JUST_GO_PROBE-unset}\n")

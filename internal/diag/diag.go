@@ -40,6 +40,10 @@ type Error struct {
 	// Source is the text of line Line of File, without its line break, for a
 	// renderer to quote; empty when unknown. WithSource fills it in.
 	Source string
+	// ExitCode is the status the command line ends with for a failure that
+	// has one of its own, such as a backtick that exits with a status, or is
+	// ended by a signal. Zero means the usual status for a failure, 1.
+	ExitCode int
 }
 
 // Error formats the diagnostic as "<file>:<line>:<col>: <msg>", with the

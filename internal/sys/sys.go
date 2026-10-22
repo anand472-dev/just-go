@@ -6,7 +6,9 @@
 package sys
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -122,4 +124,35 @@ type Time struct {
 type Clock interface {
 	// Now returns the current time in the local time zone.
 	Now() Time
+}
+
+// Captured is how a program that Capture ran ended, and what it wrote to its
+// standard output.
+type Captured struct {
+	// Stdout is everything the program wrote to its standard output.
+	Stdout []byte
+	// ExitCode is the program's exit status, or -1 when it ended without one.
+	ExitCode int
+	// Signal is the signal that terminated the program, or 0 when it exited.
+	Signal int
+	// Caught is a fatal signal the runner caught while the program ran, or 0.
+	Caught int
+}
+
+// Capture runs spec through p with its Stdout replaced by a buffer, and
+// returns what the program wrote and how it ended. A signal that ended the
+// program, or that the runner caught while it ran, is not an error but a
+// field of the result; an error is a failure to start the program or the end
+// of ctx. Impure: it runs a program through p.
+func Capture(ctx context.Context, p Process, spec ProcessSpec) (Captured, error) {
+	var out bytes.Buffer
+	spec.Stdout = &out
+	code, err := p.Run(ctx, spec)
+	got := Captured{Stdout: out.Bytes(), ExitCode: code}
+	var sig *SignalError
+	if errors.As(err, &sig) {
+		got.Signal, got.Caught = sig.Signal, sig.Caught
+		return got, nil
+	}
+	return got, err
 }

@@ -1,8 +1,8 @@
 // Package ast defines the syntax tree for the core justfile subset.
 //
 // It is pure: it holds data and performs no I/O. Expression nodes are value
-// types, so a consumer switches on ast.Text, ast.StringLit, ast.Var,
-// ast.Concat, ast.Call and ast.List.
+// types, so a consumer switches on ast.Text, ast.StringLit, ast.Backtick,
+// ast.Var, ast.Concat, ast.Call and ast.List.
 //
 // Positions are 1-based lines and rune columns of the token they describe, as
 // in diag.Error. A name's width is its length, since names are ASCII.
@@ -19,6 +19,10 @@ type Justfile struct {
 	Settings    Settings
 	Assignments []Assignment
 	Recipes     []Recipe
+	// Source is the text the tree was parsed from. The loader sets it, so
+	// that an error found while a recipe runs can quote its line. It is nil
+	// for a tree that was built by hand.
+	Source []byte
 	// Unstable lists the unstable features the file uses, each once, in the
 	// order upstream checks them (see UnstableFeature). Running the file
 	// needs them enabled, by `set unstable` or by the host.
@@ -497,7 +501,8 @@ func Variables(e Expr, names []string) []string {
 	return names
 }
 
-// Expr is an expression node: Text, StringLit, Var, Concat, Call or List.
+// Expr is an expression node: Text, StringLit, Backtick, Var, Concat, Call or
+// List.
 type Expr interface{ exprNode() }
 
 // Text is literal source text of a recipe line, outside any interpolation.
@@ -506,6 +511,18 @@ type Text struct{ Value string }
 
 // StringLit is a string literal of an expression.
 type StringLit struct{ Value string }
+
+// Backtick is a command in backticks, whose output is its value. Command is
+// the text between the delimiters, with the indentation of an indented
+// backtick removed. Line and Col locate the opening delimiter and Width is the
+// width of the whole backtick, delimiters included, in runes. Evaluating one
+// runs the command through the shell.
+type Backtick struct {
+	Command string
+	Line    int
+	Col     int
+	Width   int
+}
 
 // Var is a reference to a variable or parameter. Line and Col locate the
 // name.
@@ -542,6 +559,7 @@ type List struct {
 // an empty function body is reported as 0% by the Go cover tool.
 func (Text) exprNode()      { return }
 func (StringLit) exprNode() { return }
+func (Backtick) exprNode()  { return }
 func (Var) exprNode()       { return }
 func (Concat) exprNode()    { return }
 func (Call) exprNode()      { return }

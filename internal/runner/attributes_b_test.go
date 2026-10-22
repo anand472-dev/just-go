@@ -318,10 +318,18 @@ func TestRunParallelSubsequents(t *testing.T) {
 	}
 }
 
-func TestRunParallelOneDependencyIsNotForked(t *testing.T) {
-	_, forked, err := resolveOrder(parse(t, "[parallel]\nall: a\na:\n  @echo a\n"), []Call{{Recipe: "all"}}, nil)
-	if err != nil || forked {
-		t.Errorf("resolveOrder forked = %v, error %v; want no fork for one dependency", forked, err)
+func TestForksNeedsTwoDependenciesAndTheAttribute(t *testing.T) {
+	for src, want := range map[string]bool{
+		"[parallel]\nall: a\na:\n  @echo a\n":          false,
+		"[parallel]\nall: a b\na:\n  @echo a\nb:\n":    true,
+		"[parallel]\nall: && a b\na:\n  @echo a\nb:\n": true,
+		"[parallel]\nall: a && b\na:\n  @echo a\nb:\n": false,
+		"all: a b\na:\n  @echo a\nb:\n":                false,
+		"a:\n  @echo a\n":                              false,
+	} {
+		if got := forks(parse(t, src)); got != want {
+			t.Errorf("forks(%q) = %v, want %v", src, got, want)
+		}
 	}
 }
 
@@ -425,20 +433,48 @@ func TestRunParallelOutputIsNotTorn(t *testing.T) {
 	}
 }
 
+// The arguments of every dependency are evaluated, and the dependencies are
+// found, before any of them runs; but a call's own argument count is checked
+// when it is made.
 func TestRunParallelPlanErrors(t *testing.T) {
-	jf := parse(t, "[parallel]\nall: a (b)\na:\n  @echo a\nb x:\n  @echo b\n")
-	_, _, err := resolveOrder(jf, []Call{{Recipe: "all"}}, nil)
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "[parallel]\nall: a (b)\na:\n  @echo a\nb x:\n  @echo b\n", fake)
+	_, err := Run(t.Context(), plan)
 	if err == nil || !strings.Contains(err.Error(), "recipe `b` got 0 positional arguments") {
-		t.Errorf("resolveOrder error = %v, want the argument count of b", err)
+		t.Errorf("Run error = %v, want the argument count of b", err)
 	}
-	jf = parse(t, "[parallel]\nall: a (b nope())\na:\n  @echo a\nb x:\n  @echo b\n")
-	if _, _, err = resolveOrder(jf, []Call{{Recipe: "all"}}, nil); err == nil {
-		t.Error("resolveOrder succeeded with an argument that cannot be evaluated")
+	fake = &sysfake.FakeProcess{}
+	plan, _, _ = newPlan(t, "[parallel]\nall: a (b nope())\na:\n  @echo a\nb x:\n  @echo b\n", fake)
+	if _, err = Run(t.Context(), plan); err == nil || len(fake.Specs) != 0 {
+		t.Errorf("Run error = %v after %d commands; want an argument that cannot be evaluated to stop everything", err, len(fake.Specs))
 	}
-	jf = parse(t, "[parallel]\nall: a b\na:\n  @echo a\n")
-	jf.Recipes[0].Deps[1].Name = "missing"
-	if _, _, err = resolveOrder(jf, []Call{{Recipe: "all"}}, nil); err == nil || !strings.Contains(err.Error(), "unknown dependency") {
-		t.Errorf("resolveOrder error = %v, want an unknown dependency", err)
+	fake = &sysfake.FakeProcess{}
+	plan, _, _ = newPlan(t, "[parallel]\nall: a b\na:\n  @echo a\n", fake)
+	plan.Justfile.Recipes[0].Deps[1].Name = "missing"
+	if _, err = Run(t.Context(), plan); err == nil || !strings.Contains(err.Error(), "unknown dependency") || len(fake.Specs) != 0 {
+		t.Errorf("Run error = %v after %d commands; want an unknown dependency", err, len(fake.Specs))
+	}
+}
+
+// A recipe named twice in a list that runs at once is run by the first branch,
+// and the second waits for it and does not run it again.
+func TestRunParallelRecipeNamedTwiceRunsOnce(t *testing.T) {
+	proc := &timedProcess{delay: map[string]time.Duration{"echo a": slow}}
+	plan, _, _ := newPlan(t, "[parallel]\nall: a a\n  @echo all\na:\n  @echo a\n", proc)
+	mustRun(t, plan)
+	if n := proc.count("start echo a"); n != 1 || proc.index("start echo all") < proc.index("end echo a") {
+		t.Errorf("a ran %d times, or all started before it was done: %v", n, proc.events)
+	}
+}
+
+// A dependency that names a recipe already being run is a cycle the analyzer
+// would have refused; the fork leaves it out rather than wait for itself.
+func TestRunParallelLeavesOutACycle(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "[parallel]\na: b a\n  @echo a\nb:\n  @echo b\n", fake)
+	mustRun(t, plan)
+	if got := commands(fake); len(got) != 2 || got[0] != "echo b" || got[1] != "echo a" {
+		t.Errorf("commands = %q, want b and then a", got)
 	}
 }
 
@@ -486,16 +522,59 @@ func TestLockStreams(t *testing.T) {
 	}
 }
 
-func TestStepOpensItsGate(t *testing.T) {
+func TestSettleOpensTheGateOfACallThatSucceeded(t *testing.T) {
 	g := newGate()
-	inv := &invocation{ctx: t.Context()}
-	if code, err := inv.step(step{flow: &control{signal: g}}); code != 0 || err != nil {
-		t.Fatalf("step = %d, %v", code, err)
+	if code, err := settle(g, 0, nil); code != 0 || err != nil {
+		t.Fatalf("settle = %d, %v", code, err)
 	}
-	select {
-	case <-g.done:
-	default:
-		t.Error("the gate is shut")
+	inv := &invocation{ctx: t.Context()}
+	if code, err := inv.await(g); code != 0 || err != nil {
+		t.Errorf("await = %d, %v; want the gate open", code, err)
+	}
+}
+
+func TestSettleAbandonsTheGateOfACallThatFailed(t *testing.T) {
+	boom := errors.New("boom")
+	inv := &invocation{ctx: t.Context()}
+	for name, result := range map[string]struct {
+		code int
+		err  error
+	}{"a status": {3, nil}, "an error": {0, boom}} {
+		g := newGate()
+		code, err := settle(g, result.code, result.err)
+		if code != result.code || err != result.err {
+			t.Errorf("%s: settle = %d, %v; want the call's result", name, code, err)
+		}
+		if code, err := inv.await(g); code != 1 || err != nil {
+			t.Errorf("%s: await = %d, %v; want a gate that fails its waiters", name, code, err)
+		}
+	}
+}
+
+func TestRanGivesACallToTheFirstWhoClaimsIt(t *testing.T) {
+	r := newRan()
+	g, mine := r.claim("a")
+	if !mine || g == nil {
+		t.Fatal("the first claim is not mine")
+	}
+	if again, mine := r.claim("a"); mine || again != g {
+		t.Errorf("the second claim = %p, %v; want the first one's gate, not mine", again, mine)
+	}
+	if other, mine := r.claim("b"); !mine || other == g {
+		t.Errorf("claim of another call = %p, %v; want a gate of its own", other, mine)
+	}
+}
+
+func TestCallChainFindsTheCallsOnTheWayHere(t *testing.T) {
+	var none *callChain
+	chain := &callChain{key: "b", up: &callChain{key: "a"}}
+	for key, want := range map[string]bool{"a": true, "b": true, "c": false} {
+		if got := chain.has(key); got != want {
+			t.Errorf("has(%q) = %v, want %v", key, got, want)
+		}
+	}
+	if none.has("a") {
+		t.Error("the empty chain has a call")
 	}
 }
 

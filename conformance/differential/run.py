@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Differential check of settings behaviour: runs each case in cases*.json
 (Task 6 in cases.json, Task 7 in cases-unstable.json, Task 8 in
-cases-attributes.json, Task 9 in cases-attributes-b.json) against the oracle
+cases-attributes.json, Task 9 in cases-attributes-b.json, Task 10 in
+cases-backticks.json) against the oracle
 and against bin/just-go, and compares exit status, stdout and stderr (the
 temporary directory is masked as $D). A case may set "env", added to the
 environment of both, "cwd", the directory under the temporary one to run in,

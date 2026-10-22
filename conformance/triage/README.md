@@ -45,8 +45,7 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `setting:<name>` | Sets a setting that has no effect yet: `default-script` (needs script recipes, Task 11) and `fallback` (needs the search of parent justfiles, Phase 3). |
 | `attribute` | Uses an attribute the parser does not implement yet: `[arg]`, which no task owns yet, or `[cache]`, which is unstable (Tasks 8 and 9 implemented the rest). A case that uses only the others is sorted by what else it uses. |
 | `shebang` | Has a shebang recipe or a `[script]` recipe. |
-| `backtick` | Uses a backtick expression. |
-| `conditional` | Uses an `if` expression. |
+| `conditional` | Uses an `if` expression. A case that also uses a backtick is here: backticks are implemented (Task 10), so only the `if` keeps it failing. |
 | `builtin:<family>` | Calls a builtin function, or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
 | `grammar` | Uses other syntax outside the implemented subset (`alias`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
 | `core-defect` | Uses only the implemented subset and still fails. Must be empty. |
@@ -54,7 +53,7 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 
 ## Current counts
 
-From the run recorded in `groups.json`: 360 pass, 1635 fail, 16 skip, of
+From the run recorded in `groups.json`: 415 pass, 1580 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
@@ -63,13 +62,12 @@ From the run recorded in `groups.json`: 360 pass, 1635 fail, 16 skip, of
 | `unstable:*` | 382 |
 | `attribute` | 112 |
 | `module` | 157 |
-| `grammar` | 75 |
-| `builtin:*` | 62 |
-| `backtick` | 62 |
+| `grammar` | 76 |
+| `builtin:*` | 63 |
 | `completions` | 40 |
 | `dotenv` | 21 |
 | `setting:*` | 12 |
-| `conditional` | 19 |
+| `conditional` | 24 |
 | `shebang` | 38 |
 | `core-defect` | 0 |
 | `other` | 0 |

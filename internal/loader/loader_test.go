@@ -215,6 +215,15 @@ func TestLoadReportsAnalysisError(t *testing.T) {
 	}
 }
 
+// The tree keeps the text it was read from, so that a failure while a recipe
+// runs can quote its line.
+func TestLoadKeepsTheSource(t *testing.T) {
+	jf, err := Load(sysfake.FakeFS{"/p/justfile": "x := `pwd`\n"}, "/p/justfile")
+	if err != nil || string(jf.Source) != "x := `pwd`\n" {
+		t.Errorf("Load = %v, %v; want a tree that holds the text", jf, err)
+	}
+}
+
 func TestLoadReturnsAnalyzedTree(t *testing.T) {
 	fsys := sysfake.FakeFS{"/p/justfile": "x := 'v'\na:\n\techo {{x}}\n"}
 	jf, err := Load(fsys, "/p/justfile")

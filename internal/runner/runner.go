@@ -1,12 +1,13 @@
 // Package runner runs the recipes of an analyzed justfile.
 //
-// Its helpers are split by purity. The pure ones (prepare, targets,
-// globalScope, resolveOrder, bindParams, renderLine, shellArgv, the choice of
-// shell and directory from the settings, the environment a recipe exports and
-// the small formatting helpers) read only their arguments. The impure ones (Run, the
-// invocation methods and execLine) write to the plan's streams and run
-// commands through the plan's sys.Process; none of them calls os/exec, reads
-// the environment, or touches the filesystem directly.
+// Its helpers are split by purity. The pure ones (prepare, evaluationOrder,
+// renderLine, shellArgv, the choice of shell and directory from the settings,
+// the environment a recipe exports and the small formatting helpers) read
+// only their arguments. The impure ones (Run, the invocation methods, which
+// walk the recipes and evaluate what they hold as upstream does, and execLine
+// and the commands of backticks) write to the plan's streams and run commands
+// through the plan's sys.Process; none of them calls os/exec, reads the
+// environment, or touches the filesystem directly.
 package runner
 
 import (
@@ -103,71 +104,65 @@ type step struct {
 	// order: the arguments set positional-arguments passes to a command.
 	positional []string
 	// env holds the variables the recipe's commands see besides the plan's
-	// environment: those exported with `export`, `$` or set export. It is nil
-	// when there are none.
+	// environment: those exported with `export`, `$` or set export, and those
+	// of its `[env]` attributes. It is nil when there are none.
 	env map[string]string
+	// cmd runs the backticks of the recipe's lines, in the environment env
+	// describes.
+	cmd eval.Commander
 	// workdir is the value of the recipe's `[working-directory]` attribute,
 	// nil when it has none.
 	workdir *string
-	// ask is true for a step that asks whether to run the recipe, with the
-	// prompt text, instead of running it. A `[confirm]` recipe has one before
-	// its dependencies.
-	ask    bool
-	prompt string
 	// timestamp is the format of the time `[timestamp]` prints before each
 	// command of the recipe, nil when it has no such attribute.
 	timestamp *string
-	// flow is not nil for a step that is not about a recipe's commands but
-	// about running branches at once (see control).
-	flow *control
 }
 
-// control is what a step does when it runs branches at once.
-type control struct {
-	// fork is the branches, the dependencies of a `[parallel]` recipe, each
-	// one a list of steps. The step ends when they all have.
-	fork [][]step
-	// signal is the gate a step opens when the steps of a recipe that other
-	// branches may be waiting for are done; wait is the gate a step waits
-	// for, because another branch runs the recipe it would have run.
-	signal, wait *gate
-}
-
-// prepared is the outcome of prepare: the steps in run order and the
-// evaluated expression settings.
+// prepared is the outcome of prepare: what the plan asks for and the settings
+// it runs under, all known before anything runs.
 type prepared struct {
-	steps []step
+	calls []Call
 	set   settings.Resolved
-	// parallel is true when some steps run at once, so that the streams they
-	// write to need a lock.
+	// only holds the names of the assignments to evaluate, nil meaning all of
+	// them (see usedAssignments).
+	only map[string]bool
+	// parallel is true when some recipe has dependencies that run at once, so
+	// that the streams they write to need a lock.
 	parallel bool
 }
 
 // Run runs plan.Recipes and their dependencies. Each dependency runs before
 // the recipe that names it, or after it when it follows `&&`, at most once
-// per invocation and list of arguments. Argument counts,
-// assignments and parameter defaults are checked before any command runs;
-// such failures are returned as a *diag.Error and nothing is written.
+// per invocation and list of arguments. The argument counts of the requested
+// recipes and the settings are checked before any command runs; such
+// failures are returned as a *diag.Error and nothing is written.
+//
+// Evaluation happens when upstream's does, so that a backtick runs, and can
+// fail, at that point and not before. The assignments are evaluated first, in
+// the order upstream does; then, for each recipe when it is reached, its
+// `[env]` attributes and the defaults of its parameters, its `[confirm]`
+// prompt, the arguments of its dependencies, and, as each is run, its
+// `[working-directory]`, `[timestamp]` and lines.
 //
 // A command that exits non-zero, without a `-` prefix, stops the invocation:
 // the failure message is written to plan.Stderr and Result.ExitCode is the
-// command's status. Cancelling ctx kills the running child and Run returns
-// ctx.Err(). Impure: it writes to the plan's streams and runs processes
-// through plan.Exec.
+// command's status. A backtick that fails is an error that carries the status
+// to end with (diag.Error.ExitCode). Cancelling ctx kills the running child and
+// Run returns ctx.Err(). Impure: it writes to the plan's streams and runs
+// processes through plan.Exec.
 func Run(ctx context.Context, plan Plan) (Result, error) {
 	pre, err := prepare(plan)
 	if err != nil {
-		return Result{}, err
+		return Result{}, withSource(plan.Justfile, err)
 	}
-	inv := newInvocation(ctx, plan, pre.set, pre.parallel)
-	code, err := inv.sequence(pre.steps)
-	return Result{ExitCode: code}, err
+	inv := newInvocation(ctx, plan, pre)
+	code, err := inv.main(pre)
+	return Result{ExitCode: code}, withSource(plan.Justfile, err)
 }
 
-// prepare evaluates the expression settings and resolves the requested
-// recipes into steps in run order, binding every recipe's parameters and
-// evaluating the arguments of its dependencies. With set lazy it evaluates
-// only the assignments that are used. It is pure.
+// prepare resolves the requested recipes, evaluates the expression settings,
+// and checks that each requested recipe is given a number of arguments it
+// takes. It is pure.
 func prepare(plan Plan) (prepared, error) {
 	jf := plan.Justfile
 	calls, err := requested(plan)
@@ -178,12 +173,36 @@ func prepare(plan Plan) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	globals, err := globalScope(jf, usedAssignments(jf, calls))
-	if err != nil {
-		return prepared{}, err
+	for _, c := range calls {
+		if err := checkArgCount(findRecipe(jf, c.Recipe), len(c.Args)); err != nil {
+			return prepared{}, err
+		}
 	}
-	steps, parallel, err := resolveOrder(jf, calls, globals)
-	return prepared{steps: steps, set: set, parallel: parallel}, err
+	return prepared{calls: calls, set: set, only: usedAssignments(jf, calls), parallel: forks(jf)}, nil
+}
+
+// forks reports whether some recipe of jf has more than one dependency, or
+// more than one subsequent, and `[parallel]`, so that it runs them at once. It
+// is pure.
+func forks(jf *ast.Justfile) bool {
+	for i := range jf.Recipes {
+		r := &jf.Recipes[i]
+		if (len(r.Deps) > 1 || len(r.Subsequents) > 1) && r.Attribute(ast.AttrParallel) != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// withSource gives a located error of the justfile jf the line of source it is
+// on, so that it can be quoted. Any other error is returned unchanged. It is
+// pure apart from updating err.
+func withSource(jf *ast.Justfile, err error) error {
+	var de *diag.Error
+	if err == nil || jf.Source == nil || !errors.As(err, &de) || de.Source != "" || de.File != jf.File {
+		return err
+	}
+	return diag.WithSource(err, jf.Source)
 }
 
 // requested returns the calls the plan asks for. Plan.Calls when set, else
@@ -256,183 +275,37 @@ func findRecipe(jf *ast.Justfile, name string) *ast.Recipe {
 	return nil
 }
 
-// globalScope evaluates the assignments of jf: all of them when only is nil,
-// else those whose names are in only. Of assignments that share a name, which
-// allow-duplicate-variables lets a justfile have, the last wins. An
-// assignment may refer to one defined later in the file, so assignments are
-// evaluated in passes until none is left; a pass that makes no progress
-// reports the first failure. It is pure.
-func globalScope(jf *ast.Justfile, only map[string]bool) (eval.Scope, error) {
-	scope := make(eval.Scope, len(jf.Assignments))
-	pending := wanted(jf.UniqueAssignments(), only)
-	for len(pending) > 0 {
-		rest, err := evalPass(jf.File, pending, scope)
-		if len(rest) == len(pending) {
-			return nil, err
+// evaluationOrder returns assignments in the order upstream evaluates them:
+// by name, each after the assignments it uses. assignments are the last of
+// each name (see ast.Justfile.UniqueAssignments). It is pure.
+func evaluationOrder(assignments []ast.Assignment) []ast.Assignment {
+	byName := make(map[string]ast.Assignment, len(assignments))
+	names := make([]string, 0, len(assignments))
+	for _, a := range assignments {
+		byName[a.Name] = a
+		names = append(names, a.Name)
+	}
+	sort.Strings(names)
+	done := make(map[string]bool, len(assignments))
+	order := make([]ast.Assignment, 0, len(assignments))
+	var visit func(name string)
+	visit = func(name string) {
+		a, ok := byName[name]
+		if !ok || done[name] {
+			return
 		}
-		pending = rest
-	}
-	return scope, nil
-}
-
-// evalPass evaluates each assignment whose variables are all in scope, adding
-// it to scope. It returns the assignments still pending and the error of the
-// first of them. It is pure apart from writing to scope.
-func evalPass(file string, pending []ast.Assignment, scope eval.Scope) ([]ast.Assignment, error) {
-	var rest []ast.Assignment
-	var first error
-	for _, a := range pending {
-		v, err := eval.Evaluate(a.Value, scope)
-		if err == nil {
-			scope[a.Name] = v
-			continue
+		// Marked before its uses are visited, so that a cycle the analyzer
+		// missed cannot loop forever.
+		done[name] = true
+		for _, used := range ast.Variables(a.Value, nil) {
+			visit(used)
 		}
-		if first == nil {
-			first = locate(err, file, a.Line)
-		}
-		rest = append(rest, a)
+		order = append(order, a)
 	}
-	return rest, first
-}
-
-// resolveOrder returns the steps that run calls and their dependencies, in
-// run order, as upstream runs them. A recipe's dependencies come before it,
-// in declaration order, each with the arguments evaluated in the scope of the
-// recipe that names it. The dependencies after `&&` come after it, and
-// recipes already run do not count for them: they run, with their own
-// dependencies, once per list. A recipe runs once per distinct list of
-// arguments, so `c 1 c 2 c 1` runs `c` twice. The dependencies of a recipe
-// with `[parallel]` are branches that run at once (see fork); the result also
-// says whether there are any. It is pure.
-func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, bool, error) {
-	o := orderer{
-		jf:       jf,
-		globals:  globals,
-		exported: exportedGlobals(jf),
-		byName:   make(map[string]*ast.Recipe, len(jf.Recipes)),
-		active:   make(map[string]bool),
+	for _, name := range names {
+		visit(name)
 	}
-	for i := range jf.Recipes {
-		o.byName[jf.Recipes[i].Name] = &jf.Recipes[i]
-	}
-	ran := make(map[string]*gate, len(jf.Recipes))
-	for _, c := range calls {
-		if err := o.visit(o.byName[c.Recipe], c.Args, ran); err != nil {
-			return nil, false, err
-		}
-	}
-	return o.steps, o.forked, nil
-}
-
-// orderer holds the state of one resolveOrder walk.
-type orderer struct {
-	jf      *ast.Justfile
-	globals eval.Scope
-	// exported lists the globals that every recipe's commands see.
-	exported []string
-	byName   map[string]*ast.Recipe
-	// active holds the calls being visited, which a cycle the analyzer missed
-	// would enter again.
-	active map[string]bool
-	steps  []step
-	// forks is how many branches of forks are being built, and forked is
-	// whether any fork was built.
-	forks  int
-	forked bool
-}
-
-// visit appends the steps of r called with args: its dependencies, the recipe
-// itself, then its subsequents. Nothing is appended if ran, the calls already
-// visited in this list of dependencies, has the call; but when another branch
-// of a fork made the call, a step waits for that branch to be done with it,
-// as upstream's recipe lock makes the second thread do. A call is marked
-// before its dependencies are visited, so a cycle the analyzer missed cannot
-// loop forever. It is pure apart from updating o and ran.
-func (o *orderer) visit(r *ast.Recipe, args []string, ran map[string]*gate) error {
-	key := callKey(r.Name, args)
-	if o.active[key] {
-		return nil
-	}
-	if g, ok := ran[key]; ok {
-		if g != nil {
-			o.steps = append(o.steps, step{flow: &control{wait: g}})
-		}
-		return nil
-	}
-	var g *gate
-	if o.forks > 0 {
-		g = newGate()
-	}
-	ran[key] = g
-	o.active[key] = true
-	err := o.expand(r, args, ran)
-	delete(o.active, key)
-	if g != nil && err == nil {
-		o.steps = append(o.steps, step{flow: &control{signal: g}})
-	}
-	return err
-}
-
-// expand appends the steps of r called with args, for visit. It is pure apart
-// from updating o and ran.
-func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]*gate) error {
-	scope, positional, err := bindParams(o.jf, r, args, o.globals)
-	if err != nil {
-		return err
-	}
-	if err := o.confirmation(r, scope); err != nil {
-		return err
-	}
-	workdir, err := o.workingDirectory(r, scope)
-	if err != nil {
-		return err
-	}
-	if err := o.dependencies(r, r.Deps, scope, ran); err != nil {
-		return err
-	}
-	env, err := o.environment(r, scope)
-	if err != nil {
-		return err
-	}
-	stamp, err := o.timestamp(r, scope)
-	if err != nil {
-		return err
-	}
-	o.steps = append(o.steps, step{
-		recipe: r, scope: scope, positional: positional, workdir: workdir, env: env, timestamp: stamp,
-	})
-	return o.dependencies(r, r.Subsequents, scope, make(map[string]*gate, len(r.Subsequents)))
-}
-
-// dependencies visits deps, the dependencies of from, evaluating each one's
-// arguments in scope, the scope of from. The dependencies of a recipe with
-// `[parallel]` become the branches of a fork, and as upstream does for
-// those, all the arguments are evaluated before any dependency is visited.
-// It is pure apart from updating o and ran.
-//
-// Known divergence, harmless while arguments are pure: this evaluates every
-// argument while the plan is built, before any recipe runs, where upstream
-// evaluates them when the dependency is reached. Once an argument can fail or
-// have effects (backticks, Task 10), a failing argument is reported before
-// the earlier recipes run. Task 10 must make this lazy; its plan step says so.
-func (o *orderer) dependencies(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope, ran map[string]*gate) error {
-	if len(deps) > 1 && from.Attribute(ast.AttrParallel) != nil {
-		calls, err := o.evaluate(from, deps, scope)
-		if err != nil {
-			return err
-		}
-		return o.fork(calls, ran)
-	}
-	for _, d := range deps {
-		c, err := o.resolve(from, d, scope)
-		if err != nil {
-			return err
-		}
-		if err := o.visit(c.callee, c.args, ran); err != nil {
-			return err
-		}
-	}
-	return nil
+	return order
 }
 
 // dependencyCall is a dependency with its arguments evaluated.
@@ -441,96 +314,11 @@ type dependencyCall struct {
 	args   []string
 }
 
-// evaluate resolves deps, the dependencies of from, to recipes and evaluates
-// their arguments in scope, all of them before any is visited, as upstream
-// does. It is pure.
-func (o *orderer) evaluate(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope) ([]dependencyCall, error) {
-	calls := make([]dependencyCall, 0, len(deps))
-	for _, d := range deps {
-		c, err := o.resolve(from, d, scope)
-		if err != nil {
-			return nil, err
-		}
-		calls = append(calls, c)
-	}
-	return calls, nil
-}
-
-// resolve finds the recipe that d, a dependency of from, names and evaluates
-// its arguments in scope. It is pure.
-func (o *orderer) resolve(from *ast.Recipe, d ast.Dependency, scope eval.Scope) (dependencyCall, error) {
-	callee, ok := o.byName[d.Name]
-	if !ok {
-		return dependencyCall{}, &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: d.Line, Col: d.Col, Width: len(d.Name),
-			Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, d.Name)}
-	}
-	args, err := eval.EvaluateAll(d.Args, scope)
-	if err != nil {
-		return dependencyCall{}, locate(err, o.jf.File, d.Line)
-	}
-	return dependencyCall{callee: callee, args: args}, nil
-}
-
-// fork appends one step that runs calls at once, each with its dependencies
-// and subsequents as a branch of its own. A branch with nothing left to run,
-// because the calls were made already, is left out. It is pure apart from
-// updating o and ran.
-func (o *orderer) fork(calls []dependencyCall, ran map[string]*gate) error {
-	var branches [][]step
-	for _, c := range calls {
-		outer := o.steps
-		o.steps = nil
-		o.forks++
-		err := o.visit(c.callee, c.args, ran)
-		o.forks--
-		branch := o.steps
-		o.steps = outer
-		if err != nil {
-			return err
-		}
-		if len(branch) > 0 {
-			branches = append(branches, branch)
-		}
-	}
-	if len(branches) > 0 {
-		o.steps = append(o.steps, step{flow: &control{fork: branches}})
-		o.forked = true
-	}
-	return nil
-}
-
 // callKey identifies a recipe called with args. The argument count and a NUL
 // separator, which no argument contains, keep distinct calls distinct (`c`
 // and `c ""` among them). It is pure.
 func callKey(name string, args []string) string {
 	return fmt.Sprintf("%s\x00%d\x00%s", name, len(args), strings.Join(args, "\x00"))
-}
-
-// bindParams returns globals extended with r's parameters: each takes the
-// next argument, or else its default, which may refer to earlier parameters.
-// It also returns the value of each parameter, in order. It is pure.
-func bindParams(jf *ast.Justfile, r *ast.Recipe, args []string, globals eval.Scope) (eval.Scope, []string, error) {
-	if err := checkArgCount(r, len(args)); err != nil {
-		return nil, nil, err
-	}
-	scope := make(eval.Scope, len(globals)+len(r.Params))
-	for k, v := range globals {
-		scope[k] = v
-	}
-	values := make([]string, len(r.Params))
-	for i, p := range r.Params {
-		v := ""
-		if i < len(args) {
-			v = args[i]
-		} else {
-			var err error
-			if v, err = eval.Evaluate(p.Default, scope); err != nil {
-				return nil, nil, locate(err, jf.File, r.Line)
-			}
-		}
-		scope[p.Name], values[i] = v, v
-	}
-	return scope, values, nil
 }
 
 // requiredParams counts the parameters of r that have no default. It is pure.
@@ -590,11 +378,11 @@ func count(n int, noun string) string {
 }
 
 // renderLine evaluates the parts of line in scope and joins them into the
-// command text. It is pure.
-func renderLine(line ast.Line, scope eval.Scope) (string, error) {
+// command text. A backtick is run by cmd. It is pure apart from what cmd does.
+func renderLine(line ast.Line, scope eval.Scope, cmd eval.Commander) (string, error) {
 	var b strings.Builder
 	for _, part := range line.Parts {
-		s, err := eval.Evaluate(part, scope)
+		s, err := eval.EvaluateWith(part, scope, cmd)
 		if err != nil {
 			return "", err
 		}
@@ -703,21 +491,35 @@ func exportedGlobals(jf *ast.Justfile) []string {
 // or all of them under set export. A global that was not evaluated, under set
 // lazy, is left out. It is nil when there are none. It is pure.
 func exportedEnv(jf *ast.Justfile, r *ast.Recipe, exported []string, globals, scope eval.Scope) map[string]string {
+	return paramEnv(jf, r, scope, globalEnv(exported, globals, len(r.Params)))
+}
+
+// globalEnv returns the exported globals, those of exported that globals has,
+// as variables. It makes room for extra more. It is nil when there are none.
+// It is pure.
+func globalEnv(exported []string, globals eval.Scope, extra int) map[string]string {
 	var env map[string]string
-	add := func(name, value string) {
-		if env == nil {
-			env = make(map[string]string, len(exported)+len(r.Params))
-		}
-		env[name] = value
-	}
 	for _, name := range exported {
 		if v, ok := globals[name]; ok {
-			add(name, v)
+			if env == nil {
+				env = make(map[string]string, len(exported)+extra)
+			}
+			env[name] = v
 		}
 	}
+	return env
+}
+
+// paramEnv adds to env the parameters of r that are exported, with the values
+// scope gives them, and returns it. A nil env stays nil when there is nothing
+// to add. It is pure apart from updating env.
+func paramEnv(jf *ast.Justfile, r *ast.Recipe, scope eval.Scope, env map[string]string) map[string]string {
 	for _, p := range r.Params {
 		if p.Exported || jf.Settings.Export {
-			add(p.Name, scope[p.Name])
+			if env == nil {
+				env = make(map[string]string, len(r.Params))
+			}
+			env[p.Name] = scope[p.Name]
 		}
 	}
 	return env
@@ -828,26 +630,39 @@ type invocation struct {
 	dir   string
 	base  string
 	here  string
+	// globals is the value of each assignment that was evaluated, and
+	// exported the names of those whose value the commands see. Neither
+	// changes once the assignments are evaluated.
+	globals  eval.Scope
+	exported []string
+	// recipes maps a name to the recipe of that name, the last of them when a
+	// justfile has several.
+	recipes map[string]*ast.Recipe
 }
 
 // newInvocation fills in the defaults for plan's optional fields and picks
-// the shell and directory from the evaluated settings set. When some steps
-// run at once, parallel, it makes the plan's output streams safe to write to
-// from all of them. It is pure: it only builds a value; sys.OSProcess is not
-// used until a line runs.
-func newInvocation(ctx context.Context, plan Plan, set settings.Resolved, parallel bool) *invocation {
+// the shell and directory from the evaluated settings of pre. When some
+// recipes run their dependencies at once, it makes the plan's output streams
+// safe to write to from all of them. It is pure: it only builds a value;
+// sys.OSProcess is not used until a line runs.
+func newInvocation(ctx context.Context, plan Plan, pre prepared) *invocation {
 	goos := plan.OS
 	if goos == "" {
 		goos = runtime.GOOS
 	}
-	if parallel {
+	if pre.parallel {
 		locked := lockStreams(plan.Stdout, plan.Stderr, plan.Prompt)
 		plan.Stdout, plan.Stderr, plan.Prompt = locked[0], locked[1], locked[2]
 	}
+	jf := plan.Justfile
 	inv := &invocation{
 		ctx: ctx, plan: plan, exec: plan.Exec, clock: plan.Clock, stderr: plan.Stderr,
-		shell: justfileShell(plan.Justfile.Settings, set, goos), dir: workingDirectory(plan, set),
-		base: baseDirectory(plan, set), here: invocationDirectory(plan),
+		shell: justfileShell(jf.Settings, pre.set, goos), dir: workingDirectory(plan, pre.set),
+		base: baseDirectory(plan, pre.set), here: invocationDirectory(plan),
+		exported: exportedGlobals(jf), recipes: make(map[string]*ast.Recipe, len(jf.Recipes)),
+	}
+	for i := range jf.Recipes {
+		inv.recipes[jf.Recipes[i].Name] = &jf.Recipes[i]
 	}
 	if inv.exec == nil {
 		inv.exec = sys.OSProcess{}
@@ -863,20 +678,6 @@ func newInvocation(ctx context.Context, plan Plan, set settings.Resolved, parall
 		inv.prompt = inv.stderr
 	}
 	return inv
-}
-
-// step runs s: it runs its branches, waits, opens a gate, asks whether to run
-// its recipe, or runs the recipe. It returns the exit code of the invocation,
-// which is non-zero when the step failed or the recipe was not confirmed.
-// Impure: it reads standard input and runs commands.
-func (inv *invocation) step(s step) (int, error) {
-	switch {
-	case s.flow != nil:
-		return inv.flow(s.flow)
-	case s.ask:
-		return inv.confirm(s)
-	}
-	return inv.recipe(s)
 }
 
 // recipe runs the lines of s in order. It returns the exit code of the
@@ -914,7 +715,7 @@ func (inv *invocation) line(s step, line ast.Line) (lineResult, error) {
 	if err := inv.ctx.Err(); err != nil {
 		return lineResult{}, err
 	}
-	command, err := renderLine(line, s.scope)
+	command, err := renderLine(line, s.scope, s.cmd)
 	if err != nil {
 		return lineResult{}, locate(err, inv.plan.Justfile.File, line.Line)
 	}

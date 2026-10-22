@@ -22,7 +22,6 @@ The groups, in the order the rules are tried (the first that matches wins):
   attribute          an attribute the parser does not implement (all are
                      implemented but `arg`, and `cache`, which is unstable)
   shebang            a shebang or [script] recipe
-  backtick           a backtick expression
   conditional        an `if` expression
   builtin:<family>   a call to a builtin function
   grammar            any other syntax outside the implemented subset, or a
@@ -367,8 +366,6 @@ def syntax_group(sources):
         return "shebang", "has a shebang recipe"
     if any("script" in attribute_names(s) for s in sources):
         return "shebang", "has a [script] recipe"
-    if "`" in exprs:
-        return "backtick", "uses a backtick"
     if re.search(r"(?<![A-Za-z0-9_-])if\s", exprs):
         return "conditional", "uses an if expression"
     builtin = builtin_group(exprs)

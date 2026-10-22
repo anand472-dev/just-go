@@ -408,7 +408,8 @@ func (p *parser) operand() (ast.Expr, error) {
 	return v, err
 }
 
-// value parses a string, a variable, a call, or a parenthesised expression.
+// value parses a string, a backtick, a variable, a call, or a parenthesised
+// expression.
 func (p *parser) value() (ast.Expr, error) {
 	p.expected |= valueStart
 	t := p.peek()
@@ -419,6 +420,9 @@ func (p *parser) value() (ast.Expr, error) {
 			return nil, err
 		}
 		return ast.StringLit{Value: value}, nil
+	case lexer.Backtick:
+		p.next()
+		return p.backtick(t)
 	case lexer.Ident:
 		p.next()
 		if p.is(lexer.LParen) {
@@ -433,6 +437,21 @@ func (p *parser) value() (ast.Expr, error) {
 		return p.list(t)
 	}
 	return nil, p.unexpected()
+}
+
+// backtick makes the expression for the backtick token t, already consumed. As
+// upstream does, an indented backtick (three backticks) loses its common
+// indentation, as an indented string does, and a command that begins with `#!`
+// is refused, because it would be a script. No escapes are processed.
+func (p *parser) backtick(t lexer.Token) (ast.Expr, error) {
+	command := t.Text
+	if strings.HasPrefix(t.Raw, "```") {
+		command = lexer.Unindent(command)
+	}
+	if strings.HasPrefix(command, "#!") {
+		return nil, p.errAt(t, "backticks may not start with `#!`")
+	}
+	return ast.Backtick{Command: command, Line: t.Line, Col: t.Col, Width: tokenWidth(t)}, nil
 }
 
 // listFunctions maps the builtin functions that exist only for lists to the
@@ -658,12 +677,12 @@ func (p *parser) param() (ast.Param, error) {
 }
 
 // defaultText spells the tokens of a parameter default as upstream displays
-// an expression: strings as written, `+` between spaces. Pure.
+// an expression: strings and backticks as written, `+` between spaces. Pure.
 func defaultText(toks []lexer.Token) string {
 	var b strings.Builder
 	for _, t := range toks {
 		switch t.Kind {
-		case lexer.String:
+		case lexer.String, lexer.Backtick:
 			b.WriteString(t.Raw)
 		case lexer.Plus:
 			b.WriteString(" + ")

@@ -189,34 +189,24 @@ func TestReadLineStopsAtTheLineBreak(t *testing.T) {
 	}
 }
 
-func TestStepsOfAConfirmRecipeAskBeforeTheDependencies(t *testing.T) {
-	plan, _, _ := newPlan(t, "[confirm('Go?')]\nbar: foo\nfoo:\n", &sysfake.FakeProcess{})
-	pre, err := prepare(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	type shown struct {
-		name   string
-		ask    bool
-		prompt string
-	}
-	var got []shown
-	for _, s := range pre.steps {
-		got = append(got, shown{s.recipe.Name, s.ask, s.prompt})
-	}
-	want := []shown{{"bar", true, "Go?"}, {"foo", false, ""}, {"bar", false, ""}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("steps = %+v, want %+v", got, want)
-	}
-}
-
-func TestPrepareReportsAFailingConfirmExpression(t *testing.T) {
-	plan, _, _ := newPlan(t, "[confirm(x)]\nfoo:\n", &sysfake.FakeProcess{})
-	_, err := prepare(plan)
+func TestRunReportsAFailingConfirmExpression(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "[confirm(x)]\nfoo:\n", fake)
+	_, err := Run(t.Context(), plan)
 	var de *diag.Error
 	if !errors.As(err, &de) || de.Msg != "variable `x` not defined" || de.Line != 1 || de.File != "justfile" {
 		t.Errorf("err = %+v", err)
 	}
+	if len(fake.Specs) != 0 {
+		t.Errorf("%d commands ran, want none", len(fake.Specs))
+	}
+}
+
+// Upstream asks nothing under --yes, and so does not evaluate the prompt.
+func TestRunConfirmYesDoesNotEvaluateThePrompt(t *testing.T) {
+	plan, _, _ := newPlan(t, "[confirm(x)]\nfoo:\n", &sysfake.FakeProcess{})
+	plan.Yes = true
+	mustRun(t, plan)
 }
 
 // The cases below are the corpus's no_exit_message group.

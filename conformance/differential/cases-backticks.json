@@ -1,0 +1,817 @@
+[
+ {
+  "name": "backtick: trailing newline",
+  "files": {
+   "justfile": "x := `printf 'a\\n'`\nfoo:\n  @echo '[{{x}}]'\n"
+  }
+ },
+ {
+  "name": "backtick: two newlines",
+  "files": {
+   "justfile": "x := `printf 'a\\n\\n'`\nfoo:\n  @printf '[%s]' '{{x}}'\n"
+  }
+ },
+ {
+  "name": "backtick: crlf",
+  "files": {
+   "justfile": "x := `printf 'a\\r\\n'`\nfoo:\n  @printf '[%s]' '{{x}}' | od -c\n"
+  }
+ },
+ {
+  "name": "backtick: lone cr",
+  "files": {
+   "justfile": "x := `printf 'a\\r'`\nfoo:\n  @printf '[%s]' '{{x}}' | od -c\n"
+  }
+ },
+ {
+  "name": "backtick: empty output",
+  "files": {
+   "justfile": "x := `true`\nfoo:\n  @echo '[{{x}}]'\n"
+  }
+ },
+ {
+  "name": "backtick: only a newline",
+  "files": {
+   "justfile": "x := `echo`\nfoo:\n  @echo '[{{x}}]'\n"
+  }
+ },
+ {
+  "name": "backtick: no newline",
+  "files": {
+   "justfile": "x := `printf abc`\nfoo:\n  @echo '[{{x}}]'\n"
+  }
+ },
+ {
+  "name": "backtick: multiline output",
+  "files": {
+   "justfile": "x := `printf 'a\\nb\\n'`\nfoo:\n  @printf '[%s]' '{{x}}'\n"
+  }
+ },
+ {
+  "name": "backtick: concatenation",
+  "files": {
+   "justfile": "x := `echo a` + 'b' + `echo c`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: unicode output",
+  "files": {
+   "justfile": "x := `echo \u65e5\u672c\u2713`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: indented backtick",
+  "files": {
+   "justfile": "x := ```\n  echo one\n  echo two\n  ```\nfoo:\n  @echo '{{x}}'\n"
+  }
+ },
+ {
+  "name": "backtick: multiline backtick",
+  "files": {
+   "justfile": "x := `echo a\necho b\n`\nfoo:\n  @echo '{{x}}'\n"
+  }
+ },
+ {
+  "name": "backtick: backslashes are kept",
+  "files": {
+   "justfile": "x := `printf '%s' '\\n'`\nfoo:\n  @echo '{{x}}'\n"
+  }
+ },
+ {
+  "name": "backtick: backtick in a line twice",
+  "files": {
+   "justfile": "foo:\n  @echo {{`echo a`}} {{`echo b`}}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick with spaces in braces",
+  "files": {
+   "justfile": "foo:\n  @echo {{  `echo a`  }}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick in a dependency argument",
+  "files": {
+   "justfile": "foo: (bar `echo a`)\nbar x:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick in a default",
+  "files": {
+   "justfile": "foo x=`echo d`:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: default given",
+  "files": {
+   "justfile": "foo x=`exit 3`:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo",
+   "given"
+  ]
+ },
+ {
+  "name": "backtick: default sees an earlier parameter",
+  "files": {
+   "justfile": "foo a b=(a + `echo !`):\n  @echo {{b}}\n"
+  },
+  "args": [
+   "foo",
+   "x"
+  ]
+ },
+ {
+  "name": "backtick: backtick in a list of defaults",
+  "files": {
+   "justfile": "foo a=`echo 1` b=`echo 2`:\n  @echo {{a}} {{b}}\n"
+  }
+ },
+ {
+  "name": "backtick: exit status",
+  "files": {
+   "justfile": "x := `exit 7`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: exit status in a line",
+  "files": {
+   "justfile": "foo:\n  @echo before\n  @echo {{`exit 7`}}\n"
+  }
+ },
+ {
+  "name": "backtick: exit status 255",
+  "files": {
+   "justfile": "foo:\n  @echo {{`exit 255`}}\n"
+  }
+ },
+ {
+  "name": "backtick: signal",
+  "files": {
+   "justfile": "foo:\n  @echo {{`kill -9 $$`}}\n"
+  }
+ },
+ {
+  "name": "backtick: signal term",
+  "files": {
+   "justfile": "foo:\n  @echo {{`kill -15 $$`}}\n"
+  }
+ },
+ {
+  "name": "backtick: failure in a default",
+  "files": {
+   "justfile": "foo x=`exit 3`:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: failure in a dependency argument",
+  "files": {
+   "justfile": "foo: (bar `exit 4`)\nbar x:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: failure of a later assignment",
+  "files": {
+   "justfile": "a := `exit 1`\nb := `exit 2`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: failure by name, not by source order",
+  "files": {
+   "justfile": "z := `exit 1`\na := `exit 2`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: failure of a dependency's use",
+  "files": {
+   "justfile": "b := a\na := `exit 9`\nc := `exit 8`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: not utf-8",
+  "files": {
+   "justfile": "x := `printf '\\377'`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: not utf-8 later",
+  "files": {
+   "justfile": "x := `printf 'ab\\200'`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: not utf-8 three bytes",
+  "files": {
+   "justfile": "x := `printf '\\342\\202('`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: incomplete utf-8",
+  "files": {
+   "justfile": "x := `printf 'a\\342\\202'`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: stdout and a failure",
+  "files": {
+   "justfile": "x := `echo out; exit 2`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: stderr passes through",
+  "files": {
+   "justfile": "x := `echo err >&2; echo out`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: stderr is silenced by quiet",
+  "files": {
+   "justfile": "x := `echo err >&2; echo out`\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "--quiet"
+  ]
+ },
+ {
+  "name": "backtick: failure under quiet",
+  "files": {
+   "justfile": "x := `exit 5`\nfoo:\n"
+  },
+  "args": [
+   "--quiet"
+  ]
+ },
+ {
+  "name": "backtick: no such shell",
+  "files": {
+   "justfile": "set shell := ['no-such-shell-xyz', '-c']\nx := `echo a`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: no such shell in a line",
+  "files": {
+   "justfile": "set shell := ['no-such-shell-xyz', '-c']\nfoo:\n  @echo {{`echo a`}}\n"
+  }
+ },
+ {
+  "name": "backtick: assignments by name, each after its uses",
+  "files": {
+   "justfile": "z := `echo z >&2; echo z`\nb := a + `echo b >&2; echo b`\na := `echo a >&2; echo a`\nc := `echo c >&2; echo c`\nfoo:\n  @echo {{b}}{{c}}{{z}}\n"
+  }
+ },
+ {
+  "name": "backtick: lazy skips the unused",
+  "files": {
+   "justfile": "set lazy\nx := `echo x >&2; echo x`\ny := `echo y >&2; echo y`\nfoo:\n  @echo {{y}}\n"
+  }
+ },
+ {
+  "name": "backtick: lazy failure when used",
+  "files": {
+   "justfile": "set lazy\nx := `exit 3`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: lazy transitive",
+  "files": {
+   "justfile": "set lazy\nx := `echo x >&2; echo x`\ny := x\nz := `exit 1`\nfoo:\n  @echo {{y}}\n"
+  }
+ },
+ {
+  "name": "backtick: eager under lazy",
+  "files": {
+   "justfile": "set lazy\neager x := `echo x >&2; echo x`\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: exported under lazy",
+  "files": {
+   "justfile": "set lazy\nexport x := `echo x >&2; echo x`\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: assignments before recipes",
+  "files": {
+   "justfile": "a := `echo a >&2; echo a`\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "backtick: argument fails after an earlier recipe",
+  "files": {
+   "justfile": "first:\n  @echo first\nsecond: (third `exit 1`)\nthird x:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "first",
+   "second"
+  ]
+ },
+ {
+  "name": "backtick: default fails after an earlier recipe",
+  "files": {
+   "justfile": "first:\n  @echo first\nsecond x=`exit 1`:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "first",
+   "second"
+  ]
+ },
+ {
+  "name": "backtick: all arguments of a list come first",
+  "files": {
+   "justfile": "top: (one `echo a >&2; echo a`) (two `echo b >&2; echo b`)\none x:\n  @echo one {{x}}\ntwo x:\n  @echo two {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: a failing argument stops the list",
+  "files": {
+   "justfile": "top: (one `echo a >&2; echo a`) (two `exit 3`)\none x:\n  @echo one {{x}}\ntwo x:\n  @echo two {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: parallel arguments come first",
+  "files": {
+   "justfile": "[parallel]\ntop: (one `echo a >&2; echo a`) (two `exit 3`)\none x:\n  @echo one {{x}}\ntwo x:\n  @echo two {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: a recipe's own dependency before its body",
+  "files": {
+   "justfile": "foo: (bar `echo arg >&2; echo arg`)\n  @echo foo\nbar x:\n  @echo bar {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: a subsequent's argument comes after the body",
+  "files": {
+   "justfile": "foo: && (bar `echo arg >&2; echo arg`)\n  @echo foo\nbar x:\n  @echo bar {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: a failing subsequent argument",
+  "files": {
+   "justfile": "foo: && (bar `exit 6`)\n  @echo foo\nbar x:\n  @echo bar {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: defaults per call",
+  "files": {
+   "justfile": "top: one (one 'x') one\none a=`echo d >&2; echo d`:\n  @echo {{a}}\n"
+  }
+ },
+ {
+  "name": "backtick: the same argument twice runs once",
+  "files": {
+   "justfile": "foo: (bar `echo a`) (bar `echo a`)\nbar x:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: lines are evaluated as they run",
+  "files": {
+   "justfile": "foo:\n  @echo one\n  @echo {{`exit 4`}}\n  @echo three\n"
+  }
+ },
+ {
+  "name": "backtick: a dash does not forgive a backtick",
+  "files": {
+   "justfile": "foo:\n  -@echo {{`exit 4`}}\n  @echo three\n"
+  }
+ },
+ {
+  "name": "backtick: global sees nothing exported",
+  "files": {
+   "justfile": "export A := 'a'\nx := `echo ${A-unset}`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: line sees an exported global",
+  "files": {
+   "justfile": "export A := 'a'\nfoo:\n  @echo {{`echo ${A-unset}`}}\n"
+  }
+ },
+ {
+  "name": "backtick: line does not see an unexported global",
+  "files": {
+   "justfile": "A := 'a'\nfoo:\n  @echo {{`echo ${A-unset}`}}\n"
+  }
+ },
+ {
+  "name": "backtick: set export",
+  "files": {
+   "justfile": "set export\nA := 'a'\nfoo:\n  @echo {{`echo ${A-unset}`}}\n"
+  }
+ },
+ {
+  "name": "backtick: set export for a global",
+  "files": {
+   "justfile": "set export\nA := 'a'\nx := `echo ${A-unset}`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: set export for a default",
+  "files": {
+   "justfile": "set export\nA := 'a'\nfoo x=`echo ${A-unset}`:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: exported parameter in a line",
+  "files": {
+   "justfile": "foo $P Q:\n  @echo {{`echo ${P-unset} ${Q-unset}`}}\n"
+  },
+  "args": [
+   "foo",
+   "p",
+   "q"
+  ]
+ },
+ {
+  "name": "backtick: exported parameter in a default",
+  "files": {
+   "justfile": "foo $P Q=`echo ${P-unset}`:\n  @echo {{Q}}\n"
+  },
+  "args": [
+   "foo",
+   "p"
+  ]
+ },
+ {
+  "name": "backtick: exported parameter in a dependency argument",
+  "files": {
+   "justfile": "foo $P: (bar `echo ${P-unset}`)\nbar x:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo",
+   "p"
+  ]
+ },
+ {
+  "name": "backtick: set export parameter in a line",
+  "files": {
+   "justfile": "set export\nfoo P:\n  @echo {{`echo ${P-unset}`}}\n"
+  },
+  "args": [
+   "foo",
+   "p"
+  ]
+ },
+ {
+  "name": "backtick: env attribute in a line",
+  "files": {
+   "justfile": "[env('E', 'e')]\nfoo:\n  @echo {{`echo ${E-unset}`}}\n"
+  }
+ },
+ {
+  "name": "backtick: env attribute in a default",
+  "files": {
+   "justfile": "[env('E', 'e')]\nfoo x=`echo ${E-unset}`:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: env attribute in a dependency argument",
+  "files": {
+   "justfile": "[env('E', 'e')]\nfoo: (bar `echo ${E-unset}`)\nbar x:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: env attribute replaces an export",
+  "files": {
+   "justfile": "export E := 'old'\n[env('E', 'new')]\nfoo:\n  @echo {{`echo $E`}}\n"
+  }
+ },
+ {
+  "name": "backtick: an env attribute sees the one before",
+  "files": {
+   "justfile": "[env('A', 'a'), env('B', `echo ${A-unset}`)]\nfoo:\n  @echo $B\n"
+  }
+ },
+ {
+  "name": "backtick: env attribute of another recipe",
+  "files": {
+   "justfile": "[env('E', 'e')]\nfoo:\n  @echo hi\nbar:\n  @echo {{`echo ${E-unset}`}}\n"
+  },
+  "args": [
+   "foo",
+   "bar"
+  ]
+ },
+ {
+  "name": "backtick: env attribute in a confirm",
+  "files": {
+   "justfile": "[env('E', 'e'), confirm(`echo ${E-unset}?`)]\nfoo:\n  @echo hi\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "backtick: env attribute in a working directory",
+  "files": {
+   "justfile": "[env('E', 'sub'), working-directory(`echo $E`)]\nfoo:\n  @pwd | sed 's|.*/||'\n",
+   "sub/x": ""
+  }
+ },
+ {
+  "name": "backtick: plan environment",
+  "files": {
+   "justfile": "foo:\n  @echo {{`echo $MARK`}}\n"
+  },
+  "env": {
+   "MARK": "m"
+  }
+ },
+ {
+  "name": "backtick: plan environment in a global",
+  "files": {
+   "justfile": "x := `echo $MARK`\nfoo:\n  @echo {{x}}\n"
+  },
+  "env": {
+   "MARK": "m"
+  }
+ },
+ {
+  "name": "backtick: stdin",
+  "files": {
+   "justfile": "x := `cat`\nfoo:\n  @echo {{x}}\n"
+  },
+  "stdin": "input\n"
+ },
+ {
+  "name": "backtick: stdin read twice",
+  "files": {
+   "justfile": "a := `read A && echo $A`\nb := `read B && echo $B`\nfoo:\n  @echo {{a}} {{b}}\n"
+  },
+  "stdin": "one\ntwo\n"
+ },
+ {
+  "name": "backtick: stdin in a default",
+  "files": {
+   "justfile": "foo a=`read A && echo $A`:\n  @echo {{a}}\n"
+  },
+  "stdin": "in\n"
+ },
+ {
+  "name": "backtick: stdin to a confirm after a backtick",
+  "files": {
+   "justfile": "x := `read A && echo $A`\n[confirm]\nfoo:\n  @echo {{x}}\n"
+  },
+  "stdin": "one\ny\n"
+ },
+ {
+  "name": "backtick: working-directory setting",
+  "files": {
+   "justfile": "set working-directory := 'sub'\nx := `pwd | sed 's|.*/||'`\nfoo:\n  @echo {{x}}\n",
+   "sub/x": ""
+  }
+ },
+ {
+  "name": "backtick: no-cd",
+  "files": {
+   "justfile": "set no-cd\nx := `ls | tr '\\n' ' '`\nfoo:\n  @ls | tr '\\n' ' '\n  @echo {{x}}\n",
+   "marker": ""
+  },
+  "cwd": "inv"
+ },
+ {
+  "name": "backtick: no-cd line",
+  "files": {
+   "justfile": "set no-cd\nfoo:\n  @echo {{`ls | tr '\\n' ' '`}}\n",
+   "marker": ""
+  },
+  "cwd": "inv"
+ },
+ {
+  "name": "backtick: recipe working-directory does not apply to backticks",
+  "files": {
+   "justfile": "[working-directory('sub')]\nfoo:\n  @echo {{`ls | tr '\\n' ' '`}}\n  @ls | tr '\\n' ' '\n",
+   "sub/x": ""
+  }
+ },
+ {
+  "name": "backtick: working-directory attribute is a backtick",
+  "files": {
+   "justfile": "[working-directory(`echo sub`)]\nfoo:\n  @pwd | sed 's|.*/||'\n",
+   "sub/x": ""
+  }
+ },
+ {
+  "name": "backtick: cat a file in the justfile directory",
+  "files": {
+   "justfile": "x := `cat data.txt`\nfoo:\n  @echo {{x}}\n",
+   "data.txt": "DATA"
+  },
+  "cwd": "inv"
+ },
+ {
+  "name": "backtick: confirm with a backtick prompt",
+  "files": {
+   "justfile": "[confirm(`echo Sure?`)]\nfoo:\n  @echo hi\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "backtick: confirm refused",
+  "files": {
+   "justfile": "[confirm(`echo Sure?`)]\nfoo:\n  @echo hi\n"
+  },
+  "stdin": "n\n"
+ },
+ {
+  "name": "backtick: confirm under --yes does not run the prompt",
+  "files": {
+   "justfile": "[confirm(`exit 3`)]\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "--yes"
+  ]
+ },
+ {
+  "name": "backtick: failing confirm prompt",
+  "files": {
+   "justfile": "[confirm(`exit 3`)]\nfoo:\n  @echo hi\n"
+  },
+  "stdin": "y\n"
+ },
+ {
+  "name": "backtick: timestamp format is a backtick",
+  "files": {
+   "justfile": "[timestamp(`echo %Y`)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: failing timestamp format",
+  "files": {
+   "justfile": "[timestamp(`exit 3`)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: failing env attribute",
+  "files": {
+   "justfile": "[env('A', `exit 3`)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: doc attribute is a backtick",
+  "files": {
+   "justfile": "[doc(`echo x`)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: doc attribute names a backtick variable",
+  "files": {
+   "justfile": "bar := `echo BAR`\n[doc(bar)]\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: setting is a backtick",
+  "files": {
+   "justfile": "set working-directory := `pwd`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: setting names a backtick variable",
+  "files": {
+   "justfile": "foo := `pwd`\n\nset working-directory := foo\nbar:\n"
+  }
+ },
+ {
+  "name": "backtick: shell setting names a backtick variable",
+  "files": {
+   "justfile": "x := `echo bash`\nset shell := [x, '-c']\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: tempdir names a backtick variable",
+  "files": {
+   "justfile": "HEX := `echo foo`\n\nset tempdir := HEX\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: set shell used by backticks",
+  "files": {
+   "justfile": "set shell := ['bash', '-c', '-e']\nx := `echo $0`\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: set shell with echo",
+  "files": {
+   "justfile": "set shell := ['echo', '-n']\nx := `bar`\nfoo:\n  echo {{x}}\n  echo foo\n"
+  }
+ },
+ {
+  "name": "backtick: positional-arguments",
+  "files": {
+   "justfile": "set positional-arguments\nfoo a:\n  @echo {{`echo $0`}} $1\n"
+  },
+  "args": [
+   "foo",
+   "x"
+  ]
+ },
+ {
+  "name": "backtick: shebang backtick",
+  "files": {
+   "justfile": "x := `#!/usr/bin/env sh`\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: shebang in an indented backtick",
+  "files": {
+   "justfile": "x := ```\n  #!sh\n```\nfoo:\n"
+  }
+ },
+ {
+  "name": "backtick: unterminated backtick",
+  "files": {
+   "justfile": "foo a=\t`echo blaaaaaah:\n  echo {{a}}\n"
+  }
+ },
+ {
+  "name": "backtick: unterminated indented backtick",
+  "files": {
+   "justfile": "foo a=\t```echo blaaaaaah:\n  echo {{a}}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick in an unknown place",
+  "files": {
+   "justfile": "foo:\n  @echo {{ ` }}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick as a recipe name",
+  "files": {
+   "justfile": "`x`:\n"
+  }
+ },
+ {
+  "name": "backtick: backtick in a doc comment is just text",
+  "files": {
+   "justfile": "# `exit 1`\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: backtick in a recipe line without braces is text for the shell",
+  "files": {
+   "justfile": "foo:\n  @echo `echo hi`\n"
+  }
+ },
+ {
+  "name": "backtick: backtick error column after multibyte text",
+  "files": {
+   "justfile": "foo:\n  @echo \ud83d\ude2c\u938c\u9f2c{{`exit 3`}}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick error with tabs",
+  "files": {
+   "justfile": "foo:\n\t@echo {{\t`exit\t\t3`}}\n"
+  }
+ },
+ {
+  "name": "backtick: backtick error in an interpolation after a continuation",
+  "files": {
+   "justfile": "foo:\n  @echo a \\\n    {{`exit 3`}}\n"
+  }
+ },
+ {
+  "name": "backtick: list shows the default",
+  "files": {
+   "justfile": "foo x=`echo d` y=(`echo e` + 'f'):\n  @echo hi\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "backtick: backtick as dependency argument across subsequent",
+  "files": {
+   "justfile": "a: (b `echo 1`) && (b `echo 2`)\n  @echo a\nb x:\n  @echo b{{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: variable shadows",
+  "files": {
+   "justfile": "x := `echo g`\nfoo x=`echo p`:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "backtick: recipe with failing global and --list",
+  "files": {
+   "justfile": "x := `exit 1`\nfoo:\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "backtick: unused assignment failure without lazy",
+  "files": {
+   "justfile": "x := `exit 1`\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "backtick: sibling recipe not run",
+  "files": {
+   "justfile": "x := 'v'\nfoo:\n  @echo hi\nbar:\n  @echo {{`exit 1`}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ }
+]
