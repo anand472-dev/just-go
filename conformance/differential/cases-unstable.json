@@ -189,35 +189,30 @@
   "files": {
    "justfile": "set dotenv-load := false\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
   },
-  "known": "dotenv-command is run by the oracle; loading is Task 23",
   "name": "conflict dotenv-load := false | dotenv-command := 'true'"
  },
  {
   "files": {
    "justfile": "set dotenv-required := false\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
   },
-  "known": "dotenv-command is run by the oracle; loading is Task 23",
   "name": "conflict dotenv-required := false | dotenv-command := 'true'"
  },
  {
   "files": {
    "justfile": "set dotenv-override\nset dotenv-command := 'true'\nfoo:\n  @echo hi\n"
   },
-  "known": "dotenv-command is run by the oracle; loading is Task 23",
   "name": "conflict dotenv-override | dotenv-command := 'true'"
  },
  {
   "files": {
    "justfile": "set dotenv-command := 'true'\nset dotenv-override := true\nfoo:\n  @echo hi\n"
   },
-  "known": "dotenv-command is run by the oracle; loading is Task 23",
   "name": "conflict dotenv-command := 'true' | dotenv-override := true"
  },
  {
   "files": {
    "justfile": "set dotenv-command := 'true'\nset dotenv-load := false\nfoo:\n  @echo hi\n"
   },
-  "known": "dotenv-command is run by the oracle; loading is Task 23",
   "name": "conflict dotenv-command := 'true' | dotenv-load := false"
  },
  {
