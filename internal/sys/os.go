@@ -33,6 +33,20 @@ func (OSFS) IsFile(path string) (bool, error) {
 	return info.Mode().IsRegular(), nil
 }
 
+// ReadDir returns the sorted names of the entries in the directory at path.
+// Impure: it touches the real filesystem.
+func (OSFS) ReadDir(path string) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name()
+	}
+	return names, nil
+}
+
 // OSProcess is the Process backed by os/exec.
 type OSProcess struct{}
 

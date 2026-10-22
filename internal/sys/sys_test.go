@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -173,6 +174,50 @@ func TestFakeFSMissingFileIsError(t *testing.T) {
 	}
 	if ok, _ := fsys.IsFile("missing"); ok {
 		t.Fatal("IsFile(missing) = true")
+	}
+}
+
+func TestOSFSReadDirListsSortedNames(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"b", ".a", "JUSTFILE"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := (sys.OSFS{}).ReadDir(dir)
+	want := []string{".a", "JUSTFILE", "b", "sub"}
+	if err != nil || !slices.Equal(got, want) {
+		t.Fatalf("ReadDir = %v, %v; want %v", got, err, want)
+	}
+}
+
+func TestOSFSReadDirMissingIsError(t *testing.T) {
+	_, err := (sys.OSFS{}).ReadDir(filepath.Join(t.TempDir(), "missing"))
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("err = %v, want ErrNotExist", err)
+	}
+}
+
+func TestFakeFSReadDirListsDirectChildren(t *testing.T) {
+	fsys := sysfake.FakeFS{"/p/b": "", "/p/a": "", "/p/sub/c": "", "/q/d": "", "top": ""}
+	cases := []struct {
+		dir  string
+		want []string
+	}{
+		{"/p", []string{"a", "b"}},
+		{"/p/", []string{"a", "b"}},
+		{"/p/sub", []string{"c"}},
+		{".", []string{"top"}},
+		{"/none", nil},
+	}
+	for _, c := range cases {
+		got, err := fsys.ReadDir(c.dir)
+		if err != nil || !slices.Equal(got, c.want) {
+			t.Errorf("ReadDir(%q) = %v, %v; want %v", c.dir, got, err, c.want)
+		}
 	}
 }
 

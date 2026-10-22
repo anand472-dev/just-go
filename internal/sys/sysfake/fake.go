@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"path/filepath"
+	"sort"
 
 	"gitea.com/wimwian/just-go/internal/sys"
 )
@@ -27,6 +29,22 @@ func (f FakeFS) ReadFile(path string) ([]byte, error) {
 func (f FakeFS) IsFile(path string) (bool, error) {
 	_, ok := f[path]
 	return ok, nil
+}
+
+// ReadDir returns the sorted base names of the files whose parent directory
+// is path. The fake has no directory entries of its own, so a directory that
+// holds no files lists as empty rather than as an error. Pure: it reads only
+// the in-memory map.
+func (f FakeFS) ReadDir(path string) ([]string, error) {
+	dir := filepath.Clean(path)
+	var names []string
+	for p := range f {
+		if filepath.Dir(p) == dir {
+			names = append(names, filepath.Base(p))
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 // FakeProcess is a sys.Process that runs nothing. It records every spec and

@@ -14,6 +14,10 @@ type FS interface {
 	ReadFile(path string) ([]byte, error)
 	// IsFile reports whether path exists and is a regular file.
 	IsFile(path string) (bool, error)
+	// ReadDir returns the names of the entries directly inside the directory
+	// at path, sorted by name. An unreadable or missing directory is an
+	// error.
+	ReadDir(path string) ([]string, error)
 }
 
 // Process runs external programs.
