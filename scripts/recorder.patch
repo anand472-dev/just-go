@@ -1,0 +1,179 @@
+--- a/tests/test.rs
++++ b/tests/test.rs
+@@ -231,6 +231,8 @@
+     };
+ 
+     let stderr = unindent(&self.stderr);
++
++    let recorded_files = recorder::snapshot(self.tempdir.path());
+ 
+     let mut command = just();
+ 
+@@ -265,6 +267,8 @@
+     let output_stdout = str::from_utf8(&output.stdout).unwrap();
+     let output_stderr = str::from_utf8(&output.stderr).unwrap();
+ 
++    recorder::record(&self, recorded_files, status, &stdout, &stderr);
++
+     if let Some(stdout_regex) = &self.stdout_regex {
+       assert!(
+         stdout_regex.is_match(output_stdout),
+@@ -309,6 +313,158 @@
+       pid,
+       stdout: output_stdout.into(),
+       tempdir: self.tempdir,
++    }
++  }
++}
++
++// Corpus recorder. Does nothing unless JUST_RECORD_FILE is set.
++mod recorder {
++  use {
++    super::*,
++    std::{cell::Cell, sync::Mutex},
++  };
++
++  static LOCK: Mutex<()> = Mutex::new(());
++
++  thread_local! {
++    static COUNTER: Cell<u32> = const { Cell::new(0) };
++  }
++
++  fn record_file() -> Option<PathBuf> {
++    env::var_os("JUST_RECORD_FILE").map(PathBuf::from)
++  }
++
++  fn base64(bytes: &[u8]) -> String {
++    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
++    let mut out = String::new();
++    for chunk in bytes.chunks(3) {
++      let n = (u32::from(chunk[0]) << 16)
++        | (u32::from(*chunk.get(1).unwrap_or(&0)) << 8)
++        | u32::from(*chunk.get(2).unwrap_or(&0));
++      for i in 0..4 {
++        if i <= chunk.len() {
++          out.push(TABLE[((n >> (18 - 6 * i)) & 63) as usize] as char);
++        } else {
++          out.push('=');
++        }
++      }
++    }
++    out
++  }
++
++  fn walk(root: &Path, dir: &Path, files: &mut BTreeMap<String, String>) {
++    let Ok(entries) = fs::read_dir(dir) else {
++      return;
++    };
++    for entry in entries.flatten() {
++      let path = entry.path();
++      let Ok(metadata) = fs::symlink_metadata(&path) else {
++        continue;
++      };
++      if metadata.is_dir() {
++        walk(root, &path, files);
++      } else if metadata.is_file() {
++        // Files whose name or content is not valid UTF-8 cannot be
++        // represented in the corpus and are left out.
++        let relative = path.strip_prefix(root).unwrap().to_str().map(str::to_owned);
++        if let (Some(relative), Ok(content)) = (relative, fs::read_to_string(&path)) {
++          files.insert(relative.replace('\\', "/"), content);
++        }
++      }
++    }
++  }
++
++  // Captures the files in the tempdir as they are before just runs.
++  pub(super) fn snapshot(root: &Path) -> Option<BTreeMap<String, String>> {
++    record_file()?;
++    let mut files = BTreeMap::new();
++    walk(root, root, &mut files);
++    Some(files)
++  }
++
++  pub(super) fn record(
++    test: &Test,
++    files: Option<BTreeMap<String, String>>,
++    status: i32,
++    stdout: &str,
++    stderr: &str,
++  ) {
++    let (Some(file), Some(files)) = (record_file(), files) else {
++      return;
++    };
++
++    let Some(cwd) = test.current_dir.to_str() else {
++      return;
++    };
++
++    let thread = thread::current();
++    let counter = COUNTER.with(|counter| {
++      counter.set(counter.get() + 1);
++      counter.get()
++    });
++    let id = format!("{}#{counter}", thread.name().unwrap_or("unnamed"));
++
++    // `Test::path` stores an absolute path inside the tempdir. Record it
++    // relative to the tempdir instead.
++    let mut env = test.env.clone();
++    let mut path_extra = Vec::new();
++    if let Some(path) = env.get("PATH") {
++      if let Some(relative) = Path::new(path)
++        .strip_prefix(test.tempdir.path())
++        .ok()
++        .and_then(Path::to_str)
++      {
++        path_extra.push(relative.replace('\\', "/"));
++        env.remove("PATH");
++      }
+     }
++
++    // The command line the harness runs, including the `--shell` argument.
++    let mut args = Vec::new();
++    if test.shell {
++      args.push("--shell".to_owned());
++      args.push("bash".to_owned());
++    }
++    args.extend(test.args.iter().cloned());
++
++    let expected_files = test
++      .expected_files
++      .iter()
++      .map(|(path, content)| (path.to_string_lossy().replace('\\', "/"), base64(content)))
++      .collect::<BTreeMap<_, _>>();
++
++    let mut case = json!({
++      "id": id,
++      "files": files,
++      "args": args,
++      "env": env,
++      "path_extra": path_extra,
++      "cwd": cwd,
++      "stdin": test.stdin,
++      "stdout_regex": test.stdout_regex.as_ref().map(Regex::as_str),
++      "stderr_regex": test.stderr_regex.as_ref().map(Regex::as_str),
++      "status": status,
++      "expected_files": expected_files,
++      "response": test.response.as_ref().map(|response| serde_json::to_value(response).unwrap()),
++    });
++
++    let object = case.as_object_mut().unwrap();
++    if test.stdout_regex.is_none() {
++      object.insert("stdout".into(), stdout.into());
++    }
++    if test.stderr_regex.is_none() {
++      object.insert("stderr".into(), stderr.into());
++    }
++
++    let line = format!("{case}\n");
++    let _guard = LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
++    let mut handle = fs::OpenOptions::new()
++      .create(true)
++      .append(true)
++      .open(file)
++      .expect("failed to open JUST_RECORD_FILE");
++    handle
++      .write_all(line.as_bytes())
++      .expect("failed to write JUST_RECORD_FILE");
+   }
+ }
