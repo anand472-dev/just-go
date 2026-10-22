@@ -32,13 +32,13 @@ const (
 	tempDirName = "just-test-tempdir000000"
 )
 
-// harness is what every case run shares: the binary under test, the PATH
-// inherited from the test process, and the impure boundary.
+// harness is what every case run shares: the binary under test, the
+// environment inherited from the test process, and the impure boundary.
 type harness struct {
-	bin  string
-	path string
-	proc sys.Process
-	fsys sys.FS
+	bin     string
+	environ []string
+	proc    sys.Process
+	fsys    sys.FS
 }
 
 // outcome is what one run of the binary produced.
@@ -70,7 +70,7 @@ func newHarness(t *testing.T) harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return harness{bin: abs, path: os.Getenv("PATH"), proc: sys.OSProcess{}, fsys: sys.OSFS{}}
+	return harness{bin: abs, environ: os.Environ(), proc: sys.OSProcess{}, fsys: sys.OSFS{}}
 }
 
 func TestConformance(t *testing.T) {
@@ -140,19 +140,17 @@ func loadExceptions(t *testing.T, fsys sys.FS) map[string]string {
 }
 
 // exceptionCategories is the closed set of reasons an oracle exception may
-// give. "nondeterministic" is the brief's own allowance (Task 3 Step 3).
-// The other six are recorder gaps: state scripts/recorder.patch does not
-// capture (deferred findings T2-5, T2-6), which the harness cannot rebuild.
+// give (ledger ruling R9). path-hash: a .justcache name derives from the
+// recording machine's temporary path. machine-env: a variable such as USER
+// comes from the recording machine. fifo: upstream feeds a named pipe from a
+// thread the corpus cannot record. Empty directories, symbolic links, and
+// file modes are recorded (R8) and materialized, so they are not excused.
 // Adding a category here widens what the oracle is excused from, so it
-// needs a controller ruling (finding T3-1).
+// needs a controller ruling.
 var exceptionCategories = map[string]bool{
-	"nondeterministic": true,
-	"path-hash":        true,
-	"empty-dir":        true,
-	"symlink":          true,
-	"mode":             true,
-	"fifo":             true,
-	"environment":      true,
+	"path-hash":   true,
+	"machine-env": true,
+	"fifo":        true,
 }
 
 // parseExceptions maps case id to reason. Each entry line is an id, white
@@ -177,14 +175,19 @@ func parseExceptions(data string) (map[string]string, error) {
 	return exceptions, nil
 }
 
+// exceptionCategory returns the "<category>" prefix of a reason. Pure.
+func exceptionCategory(reason string) string {
+	category, _, _ := strings.Cut(reason, ":")
+	return category
+}
+
 // checkExceptionReason rejects an empty reason and one whose "<category>:"
 // prefix is not in exceptionCategories. Pure.
 func checkExceptionReason(reason string) error {
 	if reason == "" {
 		return errors.New("has no reason")
 	}
-	category, _, ok := strings.Cut(reason, ":")
-	if !ok || !exceptionCategories[category] {
+	if !strings.Contains(reason, ":") || !exceptionCategories[exceptionCategory(reason)] {
 		return fmt.Errorf("has reason %q, which does not start with an allowed category", reason)
 	}
 	return nil
@@ -205,7 +208,7 @@ func (h harness) check(t *testing.T, c Case) error {
 	ph := newPlaceholders(dir, h.bin)
 	ctx, cancel := context.WithTimeout(context.Background(), caseTimeout)
 	defer cancel()
-	got, err := runCase(ctx, h.proc, h.bin, c, dir, buildEnv(c, dir, h.path, ph), ph)
+	got, err := runCase(ctx, h.proc, h.bin, c, dir, buildEnv(c, dir, h.environ, ph), ph)
 	if err != nil {
 		return err
 	}
@@ -218,45 +221,91 @@ func (h harness) check(t *testing.T, c Case) error {
 	)
 }
 
-// materialize writes the case's files into a fresh temporary directory and
+// materialize builds the case's inputs in a fresh temporary directory and
 // returns its path with symbolic links resolved. The directory is named
 // like upstream's (tempDirName), because some expectations match that name.
-// Files named "*.exe" are made executable. Impure: it writes the
-// filesystem. Writing is test scaffolding: sys.FS is read-only, and
-// t.TempDir owns the cleanup.
+// It creates the empty directories, then writes the files with the mode
+// Case.FileMode gives, then creates the working directory, and creates the
+// symbolic links last, because a link's target may be any of those (or may
+// dangle). Placeholders are substituted in file contents and link targets.
+// Impure: it writes the filesystem. Writing is test scaffolding: sys.FS is
+// read-only, and t.TempDir owns the cleanup.
 func materialize(t *testing.T, c Case) string {
 	t.Helper()
-	parent, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	parent := caseParentDir(t)
 	dir := filepath.Join(parent, tempDirName)
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	ph := newPlaceholders(dir, "")
-	for name, content := range c.Files {
-		if err := writeCaseFile(filepath.Join(dir, name), ph.plain.Replace(content)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.MkdirAll(filepath.Join(dir, c.Cwd), 0o755); err != nil {
+	if err := writeInputs(c, dir, newPlaceholders(dir, "")); err != nil {
 		t.Fatal(err)
 	}
 	return dir
 }
 
-// writeCaseFile writes one file of a case, creating its parent directories.
-// Impure.
-func writeCaseFile(path, content string) error {
+// caseParentDir returns a fresh directory, symbolic links resolved, to hold
+// one case's temporary directory, and removes it when the test ends. It is
+// not t.TempDir, whose path holds the subtest name: case ids contain "#",
+// and just reads a "#" in a shebang path as the start of a comment, as
+// upstream's own temporary paths never contain one. Impure.
+func caseParentDir(t *testing.T) string {
+	t.Helper()
+	parent, err := os.MkdirTemp("", "just-conformance-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(parent) })
+	parent, err = filepath.EvalSymlinks(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parent
+}
+
+// writeInputs creates the dirs, files, working directory, and symlinks of c
+// under dir, in that order. Impure.
+func writeInputs(c Case, dir string, ph placeholders) error {
+	for _, d := range c.Dirs {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			return err
+		}
+	}
+	for name, content := range c.Files {
+		if err := writeCaseFile(filepath.Join(dir, name), ph.plain.Replace(content), c.FileMode(name)); err != nil {
+			return err
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(dir, c.Cwd), 0o755); err != nil {
+		return err
+	}
+	for link, target := range c.Symlinks {
+		if err := writeSymlink(filepath.Join(dir, link), ph.plain.Replace(target)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeCaseFile writes one file of a case with exactly mode, creating its
+// parent directories. The explicit chmod makes the mode independent of the
+// umask. Impure.
+func writeCaseFile(path, content string, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	mode := os.FileMode(0o644)
-	if strings.HasSuffix(path, ".exe") {
-		mode = 0o755
+	if err := os.WriteFile(path, []byte(content), mode); err != nil {
+		return err
 	}
-	return os.WriteFile(path, []byte(content), mode)
+	return os.Chmod(path, mode)
+}
+
+// writeSymlink creates the symbolic link path pointing at target, creating
+// its parent directories. Impure.
+func writeSymlink(path, target string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.Symlink(target, path)
 }
 
 // newPlaceholders builds the substitutions for a case run in dir against
@@ -281,39 +330,40 @@ func newPlaceholders(dir, bin string) placeholders {
 	}
 }
 
-// buildEnv returns the exact environment of a run: the case's env with
-// placeholders substituted, plus PATH. When path_extra is set, PATH is
-// those directories resolved against dir, ahead of the inherited PATH, so
-// they win every lookup. Otherwise PATH is the case's own PATH when env
-// sets one, or the inherited PATH. Nothing else is inherited. Pure.
-func buildEnv(c Case, dir, inheritedPath string, ph placeholders) []string {
-	env := make([]string, 0, len(c.Env)+1)
-	path := inheritedPath
-	for key, value := range c.Env {
-		value = ph.plain.Replace(value)
-		if key == "PATH" {
-			path = value
-			continue
+// buildEnv returns the environment of a run, following upstream's test
+// harness (see the Env and PathExtra docs in case.go): the inherited
+// environment minus every variable whose name starts with "JUST_", with the
+// case's env overlaid (placeholders substituted). When path_extra is set,
+// PATH is exactly those directories resolved against dir, replacing any
+// other PATH, as upstream's Test::path does. The result is sorted. Pure.
+func buildEnv(c Case, dir string, inherited []string, ph placeholders) []string {
+	vars := make(map[string]string, len(inherited)+len(c.Env))
+	for _, kv := range inherited {
+		key, value, _ := strings.Cut(kv, "=")
+		if !strings.HasPrefix(key, "JUST_") {
+			vars[key] = value
 		}
-		env = append(env, key+"="+value)
+	}
+	for key, value := range c.Env {
+		vars[key] = ph.plain.Replace(value)
 	}
 	if len(c.PathExtra) > 0 {
-		path = joinPathExtra(c.PathExtra, dir, inheritedPath)
+		vars["PATH"] = joinPathExtra(c.PathExtra, dir)
 	}
-	env = append(env, "PATH="+path)
+	env := make([]string, 0, len(vars))
+	for key, value := range vars {
+		env = append(env, key+"="+value)
+	}
 	sort.Strings(env)
 	return env
 }
 
-// joinPathExtra resolves each entry against dir and prepends them to
-// inherited. Pure.
-func joinPathExtra(entries []string, dir, inherited string) string {
-	parts := make([]string, 0, len(entries)+1)
+// joinPathExtra resolves each entry against dir and joins them with the
+// path list separator. The result is the whole PATH. Pure.
+func joinPathExtra(entries []string, dir string) string {
+	parts := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		parts = append(parts, filepath.Join(dir, entry))
-	}
-	if inherited != "" {
-		parts = append(parts, inherited)
 	}
 	return strings.Join(parts, string(os.PathListSeparator))
 }
@@ -430,7 +480,9 @@ func TestOracleExceptionsNameCorpusCases(t *testing.T) {
 // other direction: every listed case must still fail against the oracle.
 // An exception that passes is stale (for example after a recorder fix) and
 // must be removed. It runs only when JUST_GO_BIN is the pinned oracle,
-// because the exceptions describe the oracle, not just-go.
+// because the exceptions describe the oracle, not just-go. A machine-env
+// entry is skipped: the run inherits the environment, so on the recording
+// machine it passes, and it fails only elsewhere.
 func TestOracleExceptionsStillFail(t *testing.T) {
 	h := newHarness(t)
 	if !isOracle(h.bin) {
@@ -440,9 +492,12 @@ func TestOracleExceptionsStillFail(t *testing.T) {
 	for _, c := range loadCorpus(t, h.fsys) {
 		byID[c.ID] = c
 	}
-	for id := range loadExceptions(t, h.fsys) {
+	for id, reason := range loadExceptions(t, h.fsys) {
 		t.Run(id, func(t *testing.T) {
 			t.Parallel()
+			if exceptionCategory(reason) == "machine-env" {
+				t.Skip("machine-env: the case fails only on a machine other than the recording one")
+			}
 			if err := h.check(t, byID[id]); err == nil {
 				t.Errorf("oracle exception %q now passes against the oracle; remove it from %s", id, exceptionsPath)
 			}
@@ -464,15 +519,15 @@ func TestIsOracle(t *testing.T) {
 }
 
 func TestParseExceptions(t *testing.T) {
-	got, err := parseExceptions("# comment\n\na#1 fifo: why  not\n  b#2   mode: because \n")
+	got, err := parseExceptions("# comment\n\na#1 fifo: why  not\n  b#2   machine-env: because \n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"a#1": "fifo: why  not", "b#2": "mode: because"}
+	want := map[string]string{"a#1": "fifo: why  not", "b#2": "machine-env: because"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
-	for _, bad := range []string{"a#1\n", "a#1 no category here\n", "a#1 flaky: unknown category\n"} {
+	for _, bad := range []string{"a#1\n", "a#1 no category here\n", "a#1 flaky: unknown category\n", "a#1 mode: no longer excused (R9)\n"} {
 		if _, err := parseExceptions(bad); err == nil || !strings.Contains(err.Error(), ":1:") {
 			t.Errorf("parseExceptions(%q): want error naming the line, got %v", bad, err)
 		}
@@ -496,23 +551,31 @@ func TestNewPlaceholders(t *testing.T) {
 func TestBuildEnv(t *testing.T) {
 	ph := newPlaceholders("/d", "/b")
 	sep := string(os.PathListSeparator)
+	inherited := []string{"HOME=/h", "PATH=/usr/bin", "JUST_GO_BIN=/x", "JUST_UNSTABLE=1", "K=old", "EQ=a=b"}
 	for name, tc := range map[string]struct {
 		c    Case
 		want []string
 	}{
-		"inherits only PATH": {Case{Env: map[string]string{"K": "@@TEMPDIR@@/v"}}, []string{"K=/d/v", "PATH=/usr/bin"}},
-		"case PATH wins":     {Case{Env: map[string]string{"PATH": "@@TEMPDIR@@/bin"}}, []string{"PATH=/d/bin"}},
-		"path_extra first": {
-			Case{PathExtra: []string{".", "sub"}},
-			[]string{"PATH=/d" + sep + "/d/sub" + sep + "/usr/bin"},
+		"inherits minus JUST_": {Case{}, []string{"EQ=a=b", "HOME=/h", "K=old", "PATH=/usr/bin"}},
+		"env overlays": {
+			Case{Env: map[string]string{"K": "@@TEMPDIR@@/v", "JUST_X": "kept"}},
+			[]string{"EQ=a=b", "HOME=/h", "JUST_X=kept", "K=/d/v", "PATH=/usr/bin"},
+		},
+		"case PATH wins": {
+			Case{Env: map[string]string{"PATH": "@@TEMPDIR@@/bin"}},
+			[]string{"EQ=a=b", "HOME=/h", "K=old", "PATH=/d/bin"},
+		},
+		"path_extra replaces PATH": {
+			Case{PathExtra: []string{".", "sub"}, Env: map[string]string{"PATH": "/ignored"}},
+			[]string{"EQ=a=b", "HOME=/h", "K=old", "PATH=/d" + sep + "/d/sub"},
 		},
 	} {
-		if got := buildEnv(tc.c, "/d", "/usr/bin", ph); !reflect.DeepEqual(got, tc.want) {
+		if got := buildEnv(tc.c, "/d", inherited, ph); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s: got %v, want %v", name, got, tc.want)
 		}
 	}
-	if got := joinPathExtra([]string{"a"}, "/d", ""); got != "/d/a" {
-		t.Errorf("no inherited PATH: got %q", got)
+	if got := buildEnv(Case{PathExtra: []string{"a"}}, "/d", nil, ph); !reflect.DeepEqual(got, []string{"PATH=/d/a"}) {
+		t.Errorf("no inherited environment: got %v", got)
 	}
 }
 
@@ -603,7 +666,13 @@ func TestCompareFiles(t *testing.T) {
 }
 
 func TestMaterialize(t *testing.T) {
-	c := Case{Files: map[string]string{"a/b.txt": "in @@TEMPDIR@@", "x.exe": "#!/bin/sh\n"}, Cwd: "deep/cwd"}
+	c := Case{
+		Files:    map[string]string{"a/b.txt": "in @@TEMPDIR@@", "x.exe": "#!/bin/sh\n", "ro": "r", "plain.exe": ""},
+		Modes:    map[string]string{"ro": "0400", "plain.exe": "0644"},
+		Dirs:     []string{"empty", "deep/empty"},
+		Symlinks: map[string]string{"abs": "@@TEMPDIR@@/a", "rel/dangle": "nowhere", "to-file": "@@TEMPDIR@@/x.exe"},
+		Cwd:      "deep/cwd",
+	}
 	dir := materialize(t, c)
 	if filepath.Base(dir) != tempDirName {
 		t.Fatalf("dir %q is not named %q", dir, tempDirName)
@@ -612,25 +681,69 @@ func TestMaterialize(t *testing.T) {
 	if err != nil || string(data) != "in "+dir {
 		t.Fatalf("a/b.txt = %q, %v", data, err)
 	}
-	assertExecutable(t, filepath.Join(dir, "a/b.txt"), false)
-	assertExecutable(t, filepath.Join(dir, "x.exe"), true)
-	if info, err := os.Stat(filepath.Join(dir, "deep/cwd")); err != nil || !info.IsDir() {
-		t.Fatalf("cwd not created: %v", err)
+	for name, want := range map[string]os.FileMode{"a/b.txt": 0o644, "x.exe": 0o755, "ro": 0o400, "plain.exe": 0o644} {
+		assertMode(t, filepath.Join(dir, name), want)
 	}
-	if err := writeCaseFile(filepath.Join(dir, "a/b.txt", "under-a-file"), ""); err == nil {
-		t.Fatal("want error writing below a file")
+	for _, d := range []string{"deep/cwd", "empty", "deep/empty"} {
+		assertEmptyDir(t, filepath.Join(dir, d))
+	}
+	for link, want := range map[string]string{"abs": dir + "/a", "rel/dangle": "nowhere", "to-file": dir + "/x.exe"} {
+		assertLink(t, filepath.Join(dir, link), want)
+	}
+	if info, err := os.Stat(filepath.Join(dir, "abs")); err != nil || !info.IsDir() {
+		t.Errorf("abs does not resolve to a directory: %v", err)
 	}
 }
 
-// assertExecutable checks whether path has any execute bit set.
-func assertExecutable(t *testing.T, path string, want bool) {
+// assertEmptyDir checks that path is a directory with no entries.
+func assertEmptyDir(t *testing.T, path string) {
+	t.Helper()
+	if entries, err := os.ReadDir(path); err != nil || len(entries) != 0 {
+		t.Errorf("%s: want an empty directory, got %v, %v", path, entries, err)
+	}
+}
+
+// assertLink checks that path is a symbolic link to want.
+func assertLink(t *testing.T, path, want string) {
+	t.Helper()
+	if got, err := os.Readlink(path); err != nil || got != want {
+		t.Errorf("link %s -> %q, %v; want %q", path, got, err, want)
+	}
+}
+
+func TestWriteInputsErrors(t *testing.T) {
+	ph := newPlaceholders("/d", "")
+	for name, c := range map[string]Case{
+		"dir below a file":    {Files: map[string]string{"f": ""}, Dirs: []string{"f/d"}},
+		"file below a file":   {Files: map[string]string{"f": "", "f/g": ""}},
+		"cwd below a file":    {Files: map[string]string{"f": ""}, Cwd: "f/c"},
+		"link over a file":    {Files: map[string]string{"f": ""}, Symlinks: map[string]string{"f": "x"}},
+		"link below a file":   {Files: map[string]string{"f": ""}, Symlinks: map[string]string{"f/l": "x"}},
+		"file in a ro dir":    {Files: map[string]string{"ro/f": ""}},
+		"empty case succeeds": {},
+	} {
+		dir := t.TempDir()
+		if name == "file in a ro dir" {
+			if err := os.Mkdir(filepath.Join(dir, "ro"), 0o500); err != nil {
+				t.Fatal(err)
+			}
+		}
+		err := writeInputs(c, dir, ph)
+		if wantErr := name != "empty case succeeds"; (err != nil) != wantErr {
+			t.Errorf("%s: err = %v, want error %v", name, err, wantErr)
+		}
+	}
+}
+
+// assertMode checks the permission bits of path.
+func assertMode(t *testing.T, path string, want os.FileMode) {
 	t.Helper()
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode()&0o111 != 0; got != want {
-		t.Errorf("%s: mode %v, want executable=%v", path, info.Mode(), want)
+	if got := info.Mode().Perm(); got != want {
+		t.Errorf("%s: mode %v, want %v", path, got, want)
 	}
 }
 
@@ -639,7 +752,7 @@ func assertExecutable(t *testing.T, path string, want bool) {
 // expectations match passes, and one that differs in every field fails on
 // each of them.
 func TestCheckDetectsMismatch(t *testing.T) {
-	h := harness{bin: "/bin/sh", path: os.Getenv("PATH"), proc: sys.OSProcess{}, fsys: sys.OSFS{}}
+	h := harness{bin: "/bin/sh", environ: os.Environ(), proc: sys.OSProcess{}, fsys: sys.OSFS{}}
 	pass := Case{
 		Args:          []string{"-c", `cat; echo "$K" >&2; printf x > out`},
 		Env:           map[string]string{"K": "@@TEMPDIR@@"},
