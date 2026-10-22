@@ -1,6 +1,7 @@
 // Package analyzer checks a parsed justfile for semantic errors that upstream
 // reports before anything runs: duplicate recipe and variable names, uses of
-// undefined variables, and dependencies that name no recipe.
+// undefined variables, circular variable definitions, and dependencies that
+// name no recipe or that form a cycle.
 //
 // The package is pure: every function reads the syntax tree it is given and
 // returns a value. None performs I/O, none mutates its input, and there is no
@@ -9,6 +10,8 @@ package analyzer
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
@@ -17,22 +20,26 @@ import (
 // Analyze checks jf and returns the first error it finds as a *diag.Error of
 // KindAnalysis, or nil. It is pure.
 //
-// The checks run in this order: duplicate recipe names, duplicate assignment
-// names, undefined variables, unknown dependencies. The first check that
-// fails decides the result, and within a check the earliest error in source
-// order wins. Each error carries the line of the offending item. The syntax
-// tree records no columns, so Col is 0, meaning unknown.
+// The checks run in upstream's order, so that a file with several errors
+// reports the one upstream reports: duplicate assignment names; then the
+// assignments, resolved in name order, each after the assignments it uses
+// (undefined and circular variables); then duplicate recipe names; then the
+// recipes, resolved in name order, each after the recipes it depends on (its
+// dependencies, then its parameter defaults, then its body). The first error
+// decides the result. Each error carries the line of the offending item. The
+// syntax tree records no columns, so Col is 0, meaning unknown.
 func Analyze(jf *ast.Justfile) error {
-	checks := [...]func(*ast.Justfile) *diag.Error{
-		duplicateRecipe,
-		duplicateAssignment,
-		undefinedVariable,
-		unknownDependency,
+	if err := duplicateAssignment(jf); err != nil {
+		return err
 	}
-	for _, check := range checks {
-		if err := check(jf); err != nil {
-			return err
-		}
+	if err := resolveAssignments(jf); err != nil {
+		return err
+	}
+	if err := duplicateRecipe(jf); err != nil {
+		return err
+	}
+	if err := resolveRecipes(jf); err != nil {
+		return err
 	}
 	return nil
 }
@@ -73,83 +80,42 @@ func duplicateAssignment(jf *ast.Justfile) *diag.Error {
 	return nil
 }
 
-// undefinedVariable reports the first reference to a name that is neither an
-// assignment nor a visible parameter. It is pure.
-//
-// An assignment may use any assignment, wherever it appears, so the globals
-// are collected first. A parameter default sees the globals and the
-// parameters before it. A body line sees the globals and every parameter.
-// A parameter default has no line of its own, so it is reported at the line
-// of its recipe.
-func undefinedVariable(jf *ast.Justfile) *diag.Error {
-	globals := make(map[string]struct{}, len(jf.Assignments))
-	for _, a := range jf.Assignments {
-		globals[a.Name] = struct{}{}
+// sortedNames returns the keys of m in byte order, which is the order of
+// upstream's name-keyed tables. It is pure.
+func sortedNames[V any](m map[string]V) []string {
+	names := make([]string, 0, len(m))
+	for name := range m {
+		names = append(names, name)
 	}
-	for _, a := range jf.Assignments {
-		if name, ok := undefinedIn(a.Value, globals, nil); ok {
-			return fail(jf, a.Line, "variable `%s` not defined", name)
-		}
-	}
-	for _, r := range jf.Recipes {
-		if err := undefinedInRecipe(jf, r, globals); err != nil {
-			return err
-		}
-	}
-	return nil
+	sort.Strings(names)
+	return names
 }
 
-// undefinedInRecipe applies undefinedVariable's scoping rules to one recipe.
-// It is pure.
-func undefinedInRecipe(jf *ast.Justfile, r ast.Recipe, globals map[string]struct{}) *diag.Error {
-	params := make(map[string]struct{}, len(r.Params))
-	for _, p := range r.Params {
-		if name, ok := undefinedIn(p.Default, globals, params); ok {
-			return fail(jf, r.Line, "variable `%s` not defined", name)
-		}
-		params[p.Name] = struct{}{}
-	}
-	for _, l := range r.Lines {
-		for _, part := range l.Parts {
-			if name, ok := undefinedIn(part, globals, params); ok {
-				return fail(jf, l.Line, "variable `%s` not defined", name)
-			}
-		}
-	}
-	return nil
+// circle formats the names of a dependency cycle for a message. It is pure.
+func circle(names []string) string {
+	return strings.Join(names, " -> ")
 }
 
-// undefinedIn returns the first name in e, reading left to right, that is in
-// neither globals nor locals. A nil expression has no names. It is pure.
-func undefinedIn(e ast.Expr, globals, locals map[string]struct{}) (string, bool) {
-	switch e := e.(type) {
-	case ast.Var:
-		_, inGlobals := globals[e.Name]
-		_, inLocals := locals[e.Name]
-		return e.Name, !inGlobals && !inLocals
-	case ast.Concat:
-		if name, ok := undefinedIn(e.Left, globals, locals); ok {
-			return name, true
+// cycleFrom returns the part of stack that starts at its last occurrence of
+// name, followed by name again: upstream's circle. It is pure.
+func cycleFrom(stack []string, name string) []string {
+	start := 0
+	for i, s := range stack {
+		if s == name {
+			start = i
+			break
 		}
-		return undefinedIn(e.Right, globals, locals)
 	}
-	return "", false
+	out := append([]string(nil), stack[start:]...)
+	return append(out, name)
 }
 
-// unknownDependency reports the first dependency that names no recipe. A
-// recipe may depend on one defined later in the file. A dependency has no
-// line of its own, so it is reported at the line of its recipe. It is pure.
-func unknownDependency(jf *ast.Justfile) *diag.Error {
-	known := make(map[string]struct{}, len(jf.Recipes))
-	for _, r := range jf.Recipes {
-		known[r.Name] = struct{}{}
-	}
-	for _, r := range jf.Recipes {
-		for _, dep := range r.Deps {
-			if _, ok := known[dep]; !ok {
-				return fail(jf, r.Line, "recipe `%s` has unknown dependency `%s`", r.Name, dep)
-			}
+// contains reports whether names has name. It is pure.
+func contains(names []string, name string) bool {
+	for _, s := range names {
+		if s == name {
+			return true
 		}
 	}
-	return nil
+	return false
 }

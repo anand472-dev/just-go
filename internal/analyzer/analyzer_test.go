@@ -57,6 +57,8 @@ func TestAnalyzeUndefinedVariable(t *testing.T) {
 	wantError(t, "x := nope\n", 1, "variable `nope` not defined")
 	wantError(t, "x := nope + 'a'\n", 1, "variable `nope` not defined")
 	wantError(t, "x := 'a' + ('b' + nope)\n", 1, "variable `nope` not defined")
+	wantError(t, "r:\n  echo {{ nope + 'a' }}\n", 2, "variable `nope` not defined")
+	wantError(t, "r:\n  echo {{ 'a' + ('b' + nope) }}\n", 2, "variable `nope` not defined")
 	wantError(t, "r a=nope:\n  echo\n", 1, "variable `nope` not defined")
 	wantError(t, "r:\n  echo hi\n  echo {{ 'a' + nope }}\n", 3, "variable `nope` not defined")
 }
@@ -97,17 +99,70 @@ func TestAnalyzeParameterScope(t *testing.T) {
 	wantError(t, "r a:\n  echo\ns:\n  echo {{a}}\n", 4, "variable `a` not defined")
 }
 
+// TestAnalyzeCheckOrder pins upstream's order. Each want was produced by
+// oracle/bin/just on the same source.
 func TestAnalyzeCheckOrder(t *testing.T) {
-	// Checks run in the order duplicate recipe, duplicate assignment,
-	// undefined variable, unknown dependency; the first failing check wins
-	// even when a later check's error is earlier in the file.
-	wantError(t, "a: nope\nx := z\nx := 'a'\nr:\nr:\n", 5,
-		"recipe `r` first defined on line 4 is redefined on line 5")
+	// A duplicate assignment comes before a duplicate recipe and an unknown
+	// dependency, wherever they appear.
+	wantError(t, "a: nope\nx := z\nx := 'a'\nr:\nr:\n", 3, "variable `x` has multiple definitions")
 	wantError(t, "a: nope\nx := 'b'\nx := 'a'\n", 3, "variable `x` has multiple definitions")
+	// An undefined variable in an assignment comes before a duplicate recipe
+	// and an unknown dependency.
 	wantError(t, "a: nope\nx := z\n", 2, "variable `z` not defined")
-	// Within one check the earliest error in source order wins.
+	wantError(t, "r:\nr:\nx := z\n", 3, "variable `z` not defined")
+	// A duplicate recipe comes before an unknown dependency.
+	wantError(t, "a: nope\nr:\nr:\n", 3, "recipe `r` first defined on line 2 is redefined on line 3")
+	// A recipe's unknown dependency comes before the undefined variable in
+	// its own body, even though the body is later in the file.
+	wantError(t, "a: nope\nb:\n  echo {{zz}}\n", 1, "recipe `a` has unknown dependency `nope`")
+	// Within the assignments, resolution is in name order.
+	wantError(t, "z := q\na := w\n", 2, "variable `w` not defined")
 	wantError(t, "x := p\ny := q\n", 1, "variable `p` not defined")
+	// Within the recipes, resolution is in name order, not source order.
+	wantError(t, "b: n2\na: n1\n", 2, "recipe `a` has unknown dependency `n1`")
 	wantError(t, "a: n1\nb: n2\n", 1, "recipe `a` has unknown dependency `n1`")
+}
+
+// TestAnalyzeRecipeResolutionOrder pins the depth-first walk: a recipe's
+// dependencies are fully checked before the recipe itself.
+func TestAnalyzeRecipeResolutionOrder(t *testing.T) {
+	// b is resolved first, being first by name; a's dependency comes before
+	// a's own parameter default.
+	wantError(t, "b: a\na p=zz:\n  echo {{yy}}\n", 2, "variable `zz` not defined")
+	// Parameter defaults come before the body.
+	wantError(t, "a p=zz:\n  echo {{yy}}\n", 1, "variable `zz` not defined")
+	// a depends on x, x on y, and y has an undefined variable: that is found
+	// while resolving a, before b's unknown dependency.
+	wantError(t, "a: x\nx: y\ny:\n  echo {{q}}\nb: nope\n", 4, "variable `q` not defined")
+	// A recipe's dependencies come before its own parameters.
+	wantError(t, "b p=z: nope\n  echo {{y}}\n", 1, "recipe `b` has unknown dependency `nope`")
+	// A dependency resolved earlier is not checked again.
+	if err := analyzer.Analyze(mustParse(t, "a: c\nb: c\nc:\n")); err != nil {
+		t.Errorf("Analyze(shared dependency) = %v, want nil", err)
+	}
+}
+
+func TestAnalyzeCircularVariables(t *testing.T) {
+	wantError(t, "x := x\n", 1, "variable `x` is defined in terms of itself")
+	wantError(t, "x := y\ny := x\n", 1, "variable `x` depends on its own value: `x -> y -> x`")
+	wantError(t, "a := b\nb := c\nc := a\n", 1, "variable `a` depends on its own value: `a -> b -> c -> a`")
+	// The cycle is reported at the variable that closes it, which is the one
+	// resolved first, by name.
+	wantError(t, "z := y\ny := z\n", 2, "variable `y` depends on its own value: `y -> z -> y`")
+	// A cycle entered through a variable outside it.
+	wantError(t, "a := b\nb := c + 'x'\nc := b\n", 2, "variable `b` depends on its own value: `b -> c -> b`")
+	// A variable used twice is not a cycle.
+	if err := analyzer.Analyze(mustParse(t, "a := 'x'\nb := a + a\nc := b + a\n")); err != nil {
+		t.Errorf("Analyze(reused variable) = %v, want nil", err)
+	}
+}
+
+func TestAnalyzeCircularRecipes(t *testing.T) {
+	wantError(t, "a: a\n", 1, "recipe `a` depends on itself")
+	wantError(t, "a: b\nb: a\n", 2, "recipe `b` has circular dependency `a -> b -> a`")
+	wantError(t, "a: b\nb: c\nc: a\n", 3, "recipe `c` has circular dependency `a -> b -> c -> a`")
+	// A cycle entered through a recipe outside it.
+	wantError(t, "a: b\nb: c\nc: b\n", 3, "recipe `c` has circular dependency `b -> c -> b`")
 }
 
 func TestAnalyzeToleratesAbsentExpressions(t *testing.T) {
