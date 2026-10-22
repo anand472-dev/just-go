@@ -1,6 +1,9 @@
 package builtins
 
-import "testing"
+import (
+	"testing"
+	"unicode"
+)
 
 // caseRows holds, for each input, what each case function returns. Every row
 // was produced by oracle/bin/just v1.59.0 with `just --evaluate x` on
@@ -157,5 +160,16 @@ func BenchmarkCaseFunctions(b *testing.B) {
 				bench.f("MixedUP CamelCase, with some Spaces and XMLHttpRequest")
 			}
 		})
+	}
+}
+
+// The case tables were generated from the standard library of the Rust
+// compiler that built the oracle (Unicode 17), and Go's unicode package supplies
+// the rest. When Go's tables move to another Unicode version, the two may
+// differ for a few code points, and this test says so.
+func TestGoUnicodeVersionMatchesTheOracleToolchain(t *testing.T) {
+	if unicode.Version != unicodeVersion {
+		t.Errorf("unicode.Version = %s, the oracle's rustc has Unicode %s: regenerate casetable.go and check the splitting tables",
+			unicode.Version, unicodeVersion)
 	}
 }

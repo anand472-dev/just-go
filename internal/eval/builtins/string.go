@@ -108,13 +108,13 @@ func isURIUnreserved(c byte) bool {
 // two and PathBuf::push does for the others: an argument that is an absolute
 // path replaces what comes before it. It is pure.
 func join(args []string) (string, error) {
-	return pathJoin(args[0], args[1:]...), nil
+	return pathJoin(hostPath, args[0], args[1:]...), nil
 }
 
 // fileName returns the last component of path. It is an error if the path ends
 // in `..` or has no components. It is pure.
 func fileName(path string) (string, error) {
-	name, ok := pathFileName(path)
+	name, ok := pathFileName(hostPath, path)
 	if !ok {
 		return "", fmt.Errorf("could not extract file name from `%s`", path)
 	}
@@ -123,7 +123,7 @@ func fileName(path string) (string, error) {
 
 // fileStem returns the file name of path without its extension. It is pure.
 func fileStem(path string) (string, error) {
-	stem, ok := pathStem(path)
+	stem, ok := pathStem(hostPath, path)
 	if !ok {
 		return "", fmt.Errorf("could not extract file stem from `%s`", path)
 	}
@@ -133,7 +133,7 @@ func fileStem(path string) (string, error) {
 // extension returns the extension of the file name of path, without the dot,
 // which may be empty. It is an error if the file name has none. It is pure.
 func extension(path string) (string, error) {
-	ext, ok := pathExtension(path)
+	ext, ok := pathExtension(hostPath, path)
 	if !ok {
 		return "", fmt.Errorf("could not extract extension from `%s`", path)
 	}
@@ -143,13 +143,13 @@ func extension(path string) (string, error) {
 // withoutExtension returns path with the extension of its file name removed.
 // It is pure.
 func withoutExtension(path string) (string, error) {
-	parent, ok := pathParent(path)
+	parent, ok := pathParent(hostPath, path)
 	if !ok {
 		return "", fmt.Errorf("could not extract parent from `%s`", path)
 	}
-	stem, ok := pathStem(path)
+	stem, ok := pathStem(hostPath, path)
 	if !ok {
 		return "", fmt.Errorf("could not extract file stem from `%s`", path)
 	}
-	return pathJoin(parent, stem), nil
+	return pathJoin(hostPath, parent, stem), nil
 }

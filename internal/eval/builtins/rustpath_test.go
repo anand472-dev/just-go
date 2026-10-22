@@ -74,7 +74,7 @@ func TestPathFunctionsMatchUpstream(t *testing.T) {
 		check("extension", got, err, row.ext)
 		got, err = withoutExtension(row.path)
 		check("without_extension", got, err, row.without)
-		got, ok := pathParent(row.path)
+		got, ok := pathParent(unixPath, row.path)
 		if got == "" {
 			got = "."
 		}
@@ -97,7 +97,7 @@ func TestPathJoinPushesAsRustDoes(t *testing.T) {
 		{[]string{"a/", "/b"}, "/b"}, {[]string{"a/", "b"}, "a/b"}, {[]string{"a", "b/"}, "a/b/"},
 		{[]string{"", ""}, ""}, {[]string{"a"}, "a"},
 	} {
-		if got := pathJoin(tc.parts[0], tc.parts[1:]...); got != tc.want {
+		if got := pathJoin(unixPath, tc.parts[0], tc.parts[1:]...); got != tc.want {
 			t.Errorf("pathJoin(%q) = %q, want %q", strings.Join(tc.parts, ", "), got, tc.want)
 		}
 	}
