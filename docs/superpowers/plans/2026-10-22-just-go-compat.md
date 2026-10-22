@@ -201,6 +201,7 @@ Performance targets (roadmap item 7) are out of this plan.
 
 - [ ] **Step 1: Failing tests** from the `backticks` group and the backtick cases in `misc` and `lazy`.
 - [ ] **Step 2: Implement.** Evaluation is impure; put it in a function that takes `sys.Process`.
+- [ ] **Step 2b: Make dependency-argument evaluation lazy** (Task 5 F4). `runner.orderer.dependencies` evaluates every dependency argument while the plan is built, before any recipe runs; upstream evaluates when the dependency is reached, so earlier recipes run first and their output appears before a failing argument's error. Backticks make this observable. Write a failing test first: `a: (b `exit 1`)` after an `a`-preceding recipe that echoes must run that recipe before the error.
 - [ ] **Step 3: Verify** and commit `feat: backticks`.
 
 ### Task 11: Shebang and script recipes

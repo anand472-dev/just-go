@@ -273,6 +273,12 @@ func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]bool) erro
 // dependencies visits deps, the dependencies of from, evaluating each one's
 // arguments in scope, the scope of from. It is pure apart from updating o and
 // ran.
+//
+// Known divergence, harmless while arguments are pure: this evaluates every
+// argument while the plan is built, before any recipe runs, where upstream
+// evaluates them when the dependency is reached. Once an argument can fail or
+// have effects (backticks, Task 10), a failing argument is reported before
+// the earlier recipes run. Task 10 must make this lazy; its plan step says so.
 func (o *orderer) dependencies(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope, ran map[string]bool) error {
 	for _, d := range deps {
 		callee, ok := o.byName[d.Name]
