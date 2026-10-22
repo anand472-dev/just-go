@@ -22,6 +22,7 @@ import (
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/eval"
 )
 
 // Resolved holds the expression settings of a justfile after evaluation.
@@ -86,7 +87,7 @@ func Resolve(jf *ast.Justfile) (Resolved, error) {
 	}
 	for _, step := range steps {
 		if err := step(); err != nil {
-			return Resolved{}, err
+			return Resolved{}, unfault(err)
 		}
 	}
 	return out, nil
@@ -98,7 +99,8 @@ func Resolve(jf *ast.Justfile) (Resolved, error) {
 // *diag.Error of KindAnalysis, located at the variable or call concerned,
 // or a *ListError. ConstValue is pure.
 func ConstValue(jf *ast.Justfile, e ast.Expr) (string, error) {
-	return newConst(jf).expr(e)
+	v, err := newConst(jf).expr(e)
+	return v, unfault(err)
 }
 
 // consts evaluates expressions in a const context. memo holds the assignments
@@ -115,6 +117,7 @@ type constValue struct {
 	value    string
 	notConst bool
 	listed   bool
+	fault    *fault
 }
 
 // ListError is the error of a list in a setting. Lists belong to the unstable
@@ -186,6 +189,8 @@ func (c *consts) expr(e ast.Expr) (string, error) {
 		return c.concat(e)
 	case ast.List:
 		return c.elements(e)
+	case ast.Conditional, ast.Assert, ast.Comparison:
+		return c.branching(e)
 	case ast.Call:
 		return "", c.fail(e.Line, e.Col, e.Name, "cannot call functions in const context")
 	case ast.Backtick:
@@ -209,6 +214,100 @@ func (c *consts) elements(l ast.List) (string, error) {
 // listed is the error of a list. It is pure.
 func (c *consts) listed() error {
 	return &ListError{Diag: c.fail(0, 0, "", "list values are not supported")}
+}
+
+// branching evaluates a conditional, an assert or a comparison. A comparison
+// outside a condition needs `set lists`, so it is refused as a list is. It is
+// pure.
+func (c *consts) branching(e ast.Expr) (string, error) {
+	switch e := e.(type) {
+	case ast.Conditional:
+		return c.conditional(e)
+	case ast.Assert:
+		return c.assertion(e)
+	}
+	return "", c.listed()
+}
+
+// conditional evaluates the condition of cond, and only the branch it picks.
+// A conditional that needs `set lists` is refused as a list is. It is pure.
+func (c *consts) conditional(cond ast.Conditional) (string, error) {
+	holds, err := c.holds(cond.Cond)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case cond.Else == nil:
+		return "", c.listed()
+	case holds:
+		return c.expr(cond.Then)
+	}
+	return c.expr(cond.Else)
+}
+
+// assertion evaluates the condition of a, which gives the empty string when it
+// holds. It is pure.
+func (c *consts) assertion(a ast.Assert) (string, error) {
+	holds, err := c.holds(a.Cond)
+	if err != nil || holds {
+		return "", err
+	}
+	message := "`" + a.Text + "`"
+	if a.Message != nil {
+		if message, err = c.expr(a.Message); err != nil {
+			return "", err
+		}
+	}
+	return "", c.fault(eval.AssertFailure(a, message))
+}
+
+// holds evaluates a comparison, left side first. Anything but a comparison is
+// a condition that needs `set lists`: its faults are reported, and then it is
+// refused as a list is. It is pure.
+func (c *consts) holds(condition ast.Expr) (bool, error) {
+	cmp, ok := condition.(ast.Comparison)
+	if !ok {
+		if _, err := c.expr(condition); err != nil {
+			return false, err
+		}
+		return false, c.listed()
+	}
+	left, err := c.expr(cmp.Left)
+	if err != nil {
+		return false, err
+	}
+	right, err := c.expr(cmp.Right)
+	if err != nil {
+		return false, err
+	}
+	holds, failure := eval.Compare(cmp, left, right)
+	if failure != nil {
+		return false, c.fault(failure)
+	}
+	return holds, nil
+}
+
+// fault is the error of a failed assert or a bad pattern, which fails the
+// evaluation even of an assignment that something refers to: unlike a call,
+// it does not make the assignment non-const. It is pure apart from updating
+// failure.
+func (c *consts) fault(failure *diag.Error) error {
+	failure.Kind, failure.File = diag.KindAnalysis, c.jf.File
+	return &fault{failure}
+}
+
+// fault is a failure of the code a const context evaluates. Resolve and
+// ConstValue return the error it holds.
+type fault struct{ error }
+
+// unfault returns the error that a fault holds, or err if it is not one.
+// Pure.
+func unfault(err error) error {
+	var f *fault
+	if errors.As(err, &f) {
+		return f.error
+	}
+	return err
 }
 
 // concat evaluates both sides of cat and joins them. It is pure.
@@ -242,6 +341,9 @@ func (c *consts) variable(v ast.Var) (string, error) {
 	if got.listed {
 		return "", c.listed()
 	}
+	if got.fault != nil {
+		return "", got.fault
+	}
 	if got.notConst {
 		return "", c.fail(v.Line, v.Col, v.Name, "cannot access non-const variable `%s` in const context", v.Name)
 	}
@@ -253,14 +355,18 @@ func (c *consts) variable(v ast.Var) (string, error) {
 // is left is a call, or a list. It is pure.
 func (c *consts) assignment(a ast.Assignment) constValue {
 	v, err := c.expr(a.Value)
+	if err == nil {
+		return constValue{value: v}
+	}
 	var le *ListError
-	if errors.As(err, &le) {
+	var f *fault
+	switch {
+	case errors.As(err, &le):
 		return constValue{listed: true}
+	case errors.As(err, &f):
+		return constValue{fault: f}
 	}
-	if err != nil {
-		return constValue{notConst: true}
-	}
-	return constValue{value: v}
+	return constValue{notConst: true}
 }
 
 // fail builds an analysis error located at the name that starts at line and

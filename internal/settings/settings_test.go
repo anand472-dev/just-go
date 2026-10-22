@@ -154,6 +154,28 @@ func TestResolveErrorsMatchUpstream(t *testing.T) {
 			"variable `foo` not defined", 1, 26, 3},
 		{"a call inside a list", "set shell := ['a', arch()]\n",
 			"cannot call functions in const context", 1, 20, 4},
+		{"settings::assert", "set working-directory := assert('foo' == 'bar', 'fail')\n",
+			"assert failed: fail", 1, 26, 6},
+		{"an assert without a message", "set tempdir := assert('foo' != 'foo')\n",
+			"assert failed: `'foo' != 'foo'`", 1, 16, 6},
+		{"settings::bad_regex", "set working-directory := if '' =~ '(' {\n  'a'\n} else {\n  'b'\n}\n",
+			"regex parse error:\n    (\n    ^\nerror: unclosed group", 1, 32, 2},
+		{"a call in the taken branch", "set tempdir := if 'a' == 'a' { arch() } else { 'b' }\n",
+			"cannot call functions in const context", 1, 32, 4},
+		{"a variable in the taken branch", "set tempdir := if 'a' != 'a' { 'b' } else { foo }\n",
+			"variable `foo` not defined", 1, 45, 3},
+		{"a backtick in a comparison", "set tempdir := if `pwd` == 'a' { 'b' } else { 'c' }\n",
+			"cannot call backticks in const context", 1, 19, 5},
+		{"an undefined variable in a comparison, left", "set tempdir := assert(a == 'a')\n",
+			"variable `a` not defined", 1, 23, 1},
+		{"an undefined variable in a comparison, right", "set tempdir := assert('a' == a)\n",
+			"variable `a` not defined", 1, 30, 1},
+		{"an undefined variable in a message", "set tempdir := assert('a' != 'a', a)\n",
+			"variable `a` not defined", 1, 35, 1},
+		{"a call in a plain condition", "set tempdir := if arch() { 'a' } else { 'b' }\n",
+			"cannot call functions in const context", 1, 19, 4},
+		{"a failing assert in a variable", "foo := assert('a' == 'b', 'bad')\nset tempdir := foo\n",
+			"assert failed: bad", 1, 8, 6},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// The parser accepts these; the analyzer would reject some earlier
@@ -170,6 +192,43 @@ func TestResolveErrorsMatchUpstream(t *testing.T) {
 				t.Errorf("Kind = %v, want KindAnalysis", de.Kind)
 			}
 		})
+	}
+}
+
+// A conditional and an assert are const when their parts are, and the branch
+// that is not taken is not evaluated, so it may hold what a const context
+// refuses (settings::assert#1 and settings::bad_regex#1 are the errors).
+func TestResolveEvaluatesConditionalsAndAsserts(t *testing.T) {
+	src := "x := 'a'\n" +
+		"set tempdir := if x == 'a' { 't' + assert(x =~ '^a$', 'no') } else { arch() }\n" +
+		"set working-directory := if x != 'a' { `pwd` } else if x !~ 'b' { 'w' } else { 'z' }\n" +
+		"set shell := [if x == 'a' { 'sh' } else { 'bash' }, assert(x == 'a') + '-c']\n"
+	got, err := Resolve(parse(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Resolved{Shell: []string{"sh", "-c"}, Tempdir: str("t"), WorkingDirectory: str("w")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Resolve = %+v, want %+v", got, want)
+	}
+}
+
+// A comparison outside a condition, an `if` without an `else`, and a
+// condition that is not a comparison belong to `set lists`, which is
+// unstable: they are refused as a list is.
+func TestResolveRefusesWhatNeedsLists(t *testing.T) {
+	for _, src := range []string{
+		"set tempdir := 'a' == 'a'\n",
+		"set tempdir := if 'a' == 'b' { 'c' }\n",
+		"set tempdir := if 'a' { 'c' } else { 'd' }\n",
+		"set tempdir := assert('a')\n",
+		"x := if 'a' == 'b' { 'c' }\nset tempdir := x\n",
+	} {
+		_, err := Resolve(parse(t, src))
+		var le *ListError
+		if !errors.As(err, &le) {
+			t.Errorf("Resolve(%q) = %v, want a ListError", src, err)
+		}
 	}
 }
 

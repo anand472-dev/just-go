@@ -10,8 +10,12 @@
 // them the operating-system attributes (`[linux]`, `[unix]`, ...), which leave
 // the item out of the result on the systems they do not name (see ParseFor).
 //
-// Expressions include list literals, which belong to the unstable `lists`
-// setting: the parser records where they and the list-only functions are used
+// Expressions are strings, backticks, variables, calls, sums, and the
+// comparisons `==`, `!=`, `=~` and `!~` in the condition of `if` (with `else`
+// and `else if`) and of `assert`. Upstream's other forms belong to the
+// unstable `lists` setting: list literals, the list-only functions, a
+// comparison outside a condition, an `if` without an `else`, and a condition
+// that is not a comparison. The parser records where they are used
 // (ast.ListUses), and the analyzer refuses them.
 //
 // Two settings change how a body is read, `ignore-comments` and `guards`;
@@ -99,6 +103,10 @@ type parser struct {
 	listUses []ast.ListUse
 }
 
+// comparisonKinds are the comparison operators, in the order upstream looks
+// for them.
+var comparisonKinds = [...]lexer.TokenKind{lexer.BangEquals, lexer.EqualsTilde, lexer.BangTilde, lexer.EqualsEquals}
+
 // kinds returns the set of the given token kinds. Pure.
 func kinds(ks ...lexer.TokenKind) uint64 {
 	var set uint64
@@ -115,9 +123,9 @@ var (
 	// operandEnd is what upstream looks for after an operand: the path join
 	// and list concatenation operators. Concatenation is probed on its own.
 	operandEnd = kinds(lexer.Slash, lexer.PlusPlus)
-	// exprEnd is what upstream looks for after a whole operand chain: the
-	// comparison and logical operators.
-	exprEnd = kinds(lexer.BangEquals, lexer.EqualsTilde, lexer.BangTilde, lexer.EqualsEquals, lexer.AmpAmp, lexer.BarBar)
+	// logicalEnd is what upstream looks for after a comparison: the logical
+	// operators.
+	logicalEnd = kinds(lexer.AmpAmp, lexer.BarBar)
 	// headerEnd is what upstream looks for after a recipe's dependencies,
 	// besides the end of the line: another dependency, one with arguments,
 	// the subsequents' `&&`, and the body.
@@ -369,21 +377,186 @@ func (p *parser) assignment(jf *ast.Justfile, attrs attributeSet, keyword string
 	return p.endLine()
 }
 
-// expr parses `operand ('+' operand)*`, left associative, nested inside at
+// expr parses an expression: a comparison or a chain of sums, nested inside at
 // most recursionLimit other expressions, as upstream allows. Upstream also
-// looks for comparison and logical operators after it, which the subset does
-// not have.
+// looks for logical operators after it, which belong to `set lists` and are
+// not part of the subset.
 func (p *parser) expr() (ast.Expr, error) {
-	if p.depth == recursionLimit {
-		return nil, p.errAt(p.peek(), "parsing recursion depth exceeded")
-	}
-	p.depth++
-	e, err := p.sum()
-	p.depth--
+	e, _, err := p.exprIn(false)
 	return e, err
 }
 
-// sum parses `operand ('+' operand)*` for expr.
+// exprIn is expr for the condition of an `if` or an `assert` when condition
+// is true, where a comparison is not a feature of `set lists`. It reports
+// whether the expression is a comparison.
+func (p *parser) exprIn(condition bool) (ast.Expr, bool, error) {
+	if p.depth == recursionLimit {
+		return nil, false, p.errAt(p.peek(), "parsing recursion depth exceeded")
+	}
+	p.depth++
+	e, comparison, err := p.comparison(condition)
+	p.depth--
+	return e, comparison, err
+}
+
+// comparison parses `conjunct (('==' | '!=' | '=~' | '!~') conjunct)?`. Upstream
+// looks for a logical operator after it, whatever it found.
+func (p *parser) comparison(condition bool) (ast.Expr, bool, error) {
+	left, err := p.conjunct()
+	if err != nil {
+		return nil, false, err
+	}
+	op, ok := p.comparisonOperator()
+	if !ok {
+		p.expected |= logicalEnd
+		return left, false, nil
+	}
+	if !condition {
+		p.useList(ast.ComparisonOperator, op)
+	}
+	right, err := p.conjunct()
+	if err != nil {
+		return nil, false, err
+	}
+	p.expected |= logicalEnd
+	return ast.Comparison{Op: op.Text, Left: left, Right: right, Line: op.Line, Col: op.Col}, true, nil
+}
+
+// comparisonOperator consumes a comparison operator if one is next. Upstream
+// looks for them in this order.
+func (p *parser) comparisonOperator() (lexer.Token, bool) {
+	for _, kind := range comparisonKinds {
+		op := p.peek()
+		if p.accept(kind) {
+			return op, true
+		}
+	}
+	return lexer.Token{}, false
+}
+
+// conjunct parses a conditional, or a sum. Upstream also looks for a `/`
+// before a sum and a `/` or `++` after one, which the subset does not have.
+func (p *parser) conjunct() (ast.Expr, error) {
+	if p.isKeyword("if") {
+		return p.conditional()
+	}
+	return p.sum()
+}
+
+// isKeyword reports whether the current token is the identifier word. Unlike
+// is, it does not record that the grammar looked for it.
+func (p *parser) isKeyword(word string) bool {
+	t := p.peek()
+	return t.Kind == lexer.Ident && t.Text == word
+}
+
+// conditional parses `if condition { then } else { otherwise }`, where the
+// `else` may be followed by another `if` instead of a block. An `if` with no
+// `else` is a feature of `set lists`.
+func (p *parser) conditional() (ast.Expr, error) {
+	ifToken := p.next()
+	condition, err := p.condition()
+	if err != nil {
+		return nil, err
+	}
+	then, err := p.block()
+	if err != nil {
+		return nil, err
+	}
+	c := ast.Conditional{Cond: condition, Then: then}
+	if !p.isKeyword("else") {
+		p.useList(ast.IfWithoutElse, ifToken)
+		return c, nil
+	}
+	p.next()
+	if p.isKeyword("if") {
+		c.Else, err = p.conditional()
+	} else {
+		c.Else, err = p.block()
+	}
+	return c, err
+}
+
+// block parses `{ expression }`.
+func (p *parser) block() (ast.Expr, error) {
+	if _, err := p.expect(lexer.LBrace); err != nil {
+		return nil, err
+	}
+	e, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.expect(lexer.RBrace)
+	return e, err
+}
+
+// condition parses the condition of an `if` or an `assert`. Anything but a
+// comparison is a feature of `set lists`, recorded at the first token.
+func (p *parser) condition() (ast.Expr, error) {
+	first := p.peek()
+	e, comparison, err := p.exprIn(true)
+	if err != nil {
+		return nil, err
+	}
+	if !comparison {
+		p.useList(ast.NonComparisonCondition, first)
+	}
+	return e, nil
+}
+
+// assertion parses the rest of `assert(condition, message)`, after its name.
+func (p *parser) assertion(name lexer.Token) (ast.Expr, error) {
+	if _, err := p.expect(lexer.LParen); err != nil {
+		return nil, err
+	}
+	from := p.pos
+	condition, err := p.condition()
+	if err != nil {
+		return nil, err
+	}
+	a := ast.Assert{Cond: condition, Text: display(p.toks[from:p.pos]), Line: name.Line, Col: name.Col}
+	if p.accept(lexer.Comma) {
+		if a.Message, err = p.expr(); err != nil {
+			return nil, err
+		}
+	}
+	_, err = p.expect(lexer.RParen)
+	return a, err
+}
+
+// display spells the tokens of an expression as upstream displays it: a space
+// around each binary operator, braces and `if` and `else`, after each comma,
+// and none inside parentheses or brackets or between a function and its
+// parenthesis. Strings and backticks are as written. Pure.
+func display(toks []lexer.Token) string {
+	var b strings.Builder
+	for i, t := range toks {
+		if i > 0 && spaceBetween(toks[i-1], t) {
+			b.WriteByte(' ')
+		}
+		if t.Raw != "" {
+			b.WriteString(t.Raw)
+		} else {
+			b.WriteString(t.Text)
+		}
+	}
+	return b.String()
+}
+
+// spaceBetween reports whether display puts a space between two tokens. Pure.
+func spaceBetween(prev, next lexer.Token) bool {
+	switch {
+	case prev.Kind == lexer.LParen, prev.Kind == lexer.LBracket, prev.Kind == lexer.Bang:
+		return false
+	case next.Kind == lexer.RParen, next.Kind == lexer.RBracket, next.Kind == lexer.Comma:
+		return false
+	case next.Kind == lexer.LParen:
+		return prev.Kind != lexer.Ident || prev.Text == "if" || prev.Text == "else"
+	}
+	return true
+}
+
+// sum parses `operand ('+' operand)*` for conjunct, left associative.
 func (p *parser) sum() (ast.Expr, error) {
 	left, err := p.operand()
 	for err == nil && p.accept(lexer.Plus) {
@@ -392,11 +565,7 @@ func (p *parser) sum() (ast.Expr, error) {
 			left = ast.Concat{Left: left, Right: right}
 		}
 	}
-	if err != nil {
-		return nil, err
-	}
-	p.expected |= exprEnd
-	return left, nil
+	return left, err
 }
 
 // operand parses a value. Upstream also looks for a `/` before it and a `/`
@@ -425,6 +594,9 @@ func (p *parser) value() (ast.Expr, error) {
 		return p.backtick(t)
 	case lexer.Ident:
 		p.next()
+		if t.Text == "assert" {
+			return p.assertion(t)
+		}
 		if p.is(lexer.LParen) {
 			return p.call(t)
 		}

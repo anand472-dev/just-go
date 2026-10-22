@@ -2,7 +2,8 @@
 //
 // It is pure: it holds data and performs no I/O. Expression nodes are value
 // types, so a consumer switches on ast.Text, ast.StringLit, ast.Backtick,
-// ast.Var, ast.Concat, ast.Call and ast.List.
+// ast.Var, ast.Concat, ast.Call, ast.List, ast.Comparison, ast.Conditional
+// and ast.Assert.
 //
 // Positions are 1-based lines and rune columns of the token they describe, as
 // in diag.Error. A name's width is its length, since names are ASCII.
@@ -90,31 +91,43 @@ const (
 	ShowFunction
 	SplitFunction
 	WhichFunction
+	// ComparisonOperator is a comparison outside the condition of an `if`
+	// or an `assert`.
+	ComparisonOperator
+	// IfWithoutElse is an `if` with no `else`.
+	IfWithoutElse
+	// NonComparisonCondition is an `if` or `assert` condition that is not a
+	// comparison.
+	NonComparisonCondition
 )
+
+// listMessages are upstream's messages for using a feature without `set
+// lists`, except the one for `which()`, which String gives for any feature it
+// does not list.
+var listMessages = map[ListFeature]string{
+	ListLiteral:            "list literals require `set lists`",
+	BoolFunction:           "the `bool()` function requires `set lists`",
+	JoinListFunction:       "the `join_list()` function requires `set lists`",
+	NumJobsFunction:        "the `num_jobs()` function requires `set lists`",
+	ShowFunction:           "the `show()` function requires `set lists`",
+	SplitFunction:          "the `split()` function requires `set lists`",
+	ComparisonOperator:     "comparison operators require `set lists`",
+	IfWithoutElse:          "`if` without `else` requires `set lists`",
+	NonComparisonCondition: "`if` and `assert` conditions other than comparisons require `set lists`",
+}
 
 // String is upstream's message for using the feature without `set lists`.
 // Pure.
 func (f ListFeature) String() string {
-	switch f {
-	case ListLiteral:
-		return "list literals require `set lists`"
-	case BoolFunction:
-		return "the `bool()` function requires `set lists`"
-	case JoinListFunction:
-		return "the `join_list()` function requires `set lists`"
-	case NumJobsFunction:
-		return "the `num_jobs()` function requires `set lists`"
-	case ShowFunction:
-		return "the `show()` function requires `set lists`"
-	case SplitFunction:
-		return "the `split()` function requires `set lists`"
+	if message, ok := listMessages[f]; ok {
+		return message
 	}
 	return "the `which()` function requires `set lists`"
 }
 
 // ListUse is one use of a list feature, and the span of source it is
-// reported at: the opening bracket of a list literal, or the name of a
-// function.
+// reported at: the opening bracket of a list literal, the name of a function,
+// the operator of a comparison, an `if`, or the start of a condition.
 type ListUse struct {
 	Feature ListFeature
 	At      Span
@@ -524,11 +537,36 @@ func Variables(e Expr, names []string) []string {
 			names = Variables(element, names)
 		}
 	}
+	return variablesOf(names, Operands(e)...)
+}
+
+// Operands returns the parts of a comparison, a conditional or an assert in
+// the order they are written, and nil for any other expression. A part that
+// is left out, the `else` of a conditional or the message of an assert, is a
+// nil Expr. Pure.
+func Operands(e Expr) []Expr {
+	switch e := e.(type) {
+	case Comparison:
+		return []Expr{e.Left, e.Right}
+	case Conditional:
+		return []Expr{e.Cond, e.Then, e.Else}
+	case Assert:
+		return []Expr{e.Cond, e.Message}
+	}
+	return nil
+}
+
+// variablesOf is Variables for each of es in turn; a nil expression has
+// none. Pure.
+func variablesOf(names []string, es ...Expr) []string {
+	for _, e := range es {
+		names = Variables(e, names)
+	}
 	return names
 }
 
-// Expr is an expression node: Text, StringLit, Backtick, Var, Concat, Call or
-// List.
+// Expr is an expression node: Text, StringLit, Backtick, Var, Concat, Call,
+// List, Comparison, Conditional or Assert.
 type Expr interface{ exprNode() }
 
 // Text is literal source text of a recipe line, outside any interpolation.
@@ -581,6 +619,41 @@ type List struct {
 	Col      int
 }
 
+// The comparison operators.
+const (
+	OpEqual    = "=="
+	OpNotEqual = "!="
+	OpMatch    = "=~"
+	OpMismatch = "!~"
+)
+
+// Comparison is `Left Op Right`, where Op is one of the four operators above.
+// `==` and `!=` compare the two values; `=~` and `!~` match the left against
+// the regular expression on the right. Line and Col locate the operator.
+//
+// Only the condition of a Conditional or an Assert has a meaning without
+// `set lists`: a Comparison anywhere else is a feature of that unstable
+// setting, which the parser records (see ListUse).
+type Comparison struct {
+	Op          string
+	Left, Right Expr
+	Line, Col   int
+}
+
+// Conditional is `if Cond { Then } else { Else }`. An `else if` is a
+// Conditional in Else. Else is nil for an `if` without an `else`, which
+// belongs to `set lists`.
+type Conditional struct{ Cond, Then, Else Expr }
+
+// Assert is `assert(Cond, Message)`. Message is nil when it is left out. Text
+// is the condition as upstream displays an expression, which a failure with no
+// message quotes. Line and Col locate the name `assert`.
+type Assert struct {
+	Cond, Message Expr
+	Text          string
+	Line, Col     int
+}
+
 // The marker methods have a statement so that coverage can count them;
 // an empty function body is reported as 0% by the Go cover tool.
 func (Text) exprNode()      { return }
@@ -590,3 +663,7 @@ func (Var) exprNode()       { return }
 func (Concat) exprNode()    { return }
 func (Call) exprNode()      { return }
 func (List) exprNode()      { return }
+
+func (Comparison) exprNode()  { return }
+func (Conditional) exprNode() { return }
+func (Assert) exprNode()      { return }

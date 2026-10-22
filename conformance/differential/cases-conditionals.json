@@ -1,0 +1,1104 @@
+[
+ {
+  "name": "conditional: 'a' == 'a'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'a' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'a' == 'b'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'b' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'a' != 'b'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' != 'b' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'a' != 'a'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' != 'a' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'abbbc' =~ 'ab+c'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'abbbc' =~ 'ab+c' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'abbbc' =~ 'ab{4}c'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'abbbc' =~ 'ab{4}c' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'Foo' !~ '^ab+c'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'Foo' !~ '^ab+c' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'Foo' !~ 'Foo'",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'Foo' !~ 'Foo' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: '' == ''",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if '' == '' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: '' =~ ''",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if '' =~ '' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: 'a' =~ ''",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' =~ '' { 'yes' } else { 'no' } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "conditional: else if chain",
+  "files": {
+   "justfile": "x := if 'a' == 'b' { '1' } else if 'a' == 'c' { '2' } else if 'a' == 'a' { '3' } else { '4' }\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "conditional: nested in branch",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'a' { if 'b' == 'c' { 'x' } else { 'y' } } else { 'z' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: nested in operand",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == (if 'b' == 'b' { 'a' } else { 'z' }) { 'c' } else { 'd' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: sums",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' + 'b' == 'ab' { 'c' + 'd' } else { 'e' + 'f' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: variable operands",
+  "files": {
+   "justfile": "a := 'x'\nb := 'x'\nfoo:\n  @echo {{ if a == b { a + '!' } else { b } }}\n"
+  }
+ },
+ {
+  "name": "conditional: parameter operand",
+  "files": {
+   "justfile": "foo p:\n  @echo {{ if p == 'x' { 'is x' } else { 'not x: ' + p } }}\n"
+  },
+  "args": [
+   "foo",
+   "y"
+  ]
+ },
+ {
+  "name": "conditional: parameter default value untouched",
+  "files": {
+   "justfile": "foo p='a':\n  @echo {{ if p != 'a' { 'x' } else { 'y' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: abutting braces",
+  "files": {
+   "justfile": "foo:\n  @echo {{if 'a' == 'b' { 'c' } else { 'd' }}}\n"
+  }
+ },
+ {
+  "name": "conditional: multi-line interpolation",
+  "files": {
+   "justfile": "foo:\n  @echo {{\n  if 'a' == 'b' {\n 'c' } else {\n 'd' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: multi-line assignment",
+  "files": {
+   "justfile": "x := if '' == '' {\n  'a'\n} else {\n  'b'\n}\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "conditional: untaken then not run",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'b' { `exit 1` } else { 'ok' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: untaken else not run",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'a' { 'ok' } else { `exit 1` } }}\n"
+  }
+ },
+ {
+  "name": "conditional: taken backtick runs",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'a' { `echo ran` } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: failing taken backtick",
+  "files": {
+   "justfile": "foo:\n  @echo before\n  @echo {{ if 'a' == 'a' { `exit 3` } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: backtick operand",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if `echo ab` == 'ab' { 'y' } else { 'n' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: dependency argument",
+  "files": {
+   "justfile": "bar x:\n  @echo got {{x}}\nfoo: (bar if 'a' == 'b' { 'c' } else { 'd' })\n"
+  }
+ },
+ {
+  "name": "conditional: dependency argument in parens",
+  "files": {
+   "justfile": "bar x y:\n  @echo got {{x}} {{y}}\nfoo: (bar (if 'a' == 'a' { 'c' } else { 'd' }) 'z')\n"
+  }
+ },
+ {
+  "name": "conditional: in a setting",
+  "files": {
+   "justfile": "set shell := [if 'a' == 'a' { 'bash' } else { 'sh' }, '-c']\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "conditional: setting working-directory",
+  "files": {
+   "justfile": "set working-directory := if 'a' == 'a' { 'sub' } else { 'other' }\nfoo:\n  @pwd | sed 's#.*/##'\n",
+   "sub/.keep": ""
+  }
+ },
+ {
+  "name": "conditional: private variable",
+  "files": {
+   "justfile": "_x := if 'a' == 'a' { 'p' } else { 'q' }\nfoo:\n  @echo {{_x}}\n"
+  }
+ },
+ {
+  "name": "conditional: export",
+  "files": {
+   "justfile": "export X := if 'a' == 'a' { 'p' } else { 'q' }\nfoo:\n  @echo $X\n"
+  }
+ },
+ {
+  "name": "conditional: lazy unused",
+  "files": {
+   "justfile": "set lazy\nx := if `exit 1` == 'a' { 'p' } else { 'q' }\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "conditional: lazy both branches variables",
+  "files": {
+   "justfile": "set lazy\na := `echo A >&2; echo a`\nb := `echo B >&2; echo b`\nx := if 'x' == 'x' { a } else { b }\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "conditional: eager unused",
+  "files": {
+   "justfile": "x := if `echo A >&2; echo a` == 'a' { 'p' } else { 'q' }\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 0",
+  "files": {
+   "justfile": "x := if b == '' { '' } else { '' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 1",
+  "files": {
+   "justfile": "x := if '' == b { '' } else { '' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 2",
+  "files": {
+   "justfile": "x := if '' == '' { b } else { '' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 3",
+  "files": {
+   "justfile": "x := if '' == '' { '' } else { b }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 4",
+  "files": {
+   "justfile": "x := if 'a' == 'b' { 'c' } else if y =~ 'a' { 'd' } else { 'e' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 5",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if y == 'b' { 'c' } else { 'd' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 6",
+  "files": {
+   "justfile": "x := if foo == bar { baz } else { qux }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 7",
+  "files": {
+   "justfile": "x := if uppercase() == 'a' { 'b' } else { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 8",
+  "files": {
+   "justfile": "x := if 'a' == 'a' { nope('x') } else { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 9",
+  "files": {
+   "justfile": "x := if 'a' == y { 'b' } else { 'c' }\ny := x\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 10",
+  "files": {
+   "justfile": "x := if x == 'a' { 'b' } else { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: analysis error 11",
+  "files": {
+   "justfile": "x := if 'a' == 'b' { y } else { 'c' }\ny := if x == '' { '' } else { '' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 0",
+  "files": {
+   "justfile": "TEST := if path_exists('/bin/bash') == 'true' {'yes'} els {'no'}\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 1",
+  "files": {
+   "justfile": "a := if '' a '' { '' } else { b }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 2",
+  "files": {
+   "justfile": "a := if 'a' == 'b' 'c'\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 3",
+  "files": {
+   "justfile": "a := if\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 4",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'c' } else 'd'\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 5",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'c' } else {\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 6",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'c' } else { 'd'\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 7",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { } else { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 8",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'c' } else { 'd' } + 'e'\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 9",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'c' } else { 'd' } == 'e'\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 10",
+  "files": {
+   "justfile": "a := if 'a' == 'b' == 'c' { 'x' } else { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 11",
+  "files": {
+   "justfile": "a := if 'a' { 'x' } else { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 12",
+  "files": {
+   "justfile": "a := if ('a' == 'b') { 'x' } else { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 13",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'x' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 14",
+  "files": {
+   "justfile": "a := 'a' == 'b'\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 15",
+  "files": {
+   "justfile": "a := ('a' == 'b')\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 16",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'x' == 'y' } else { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 17",
+  "files": {
+   "justfile": "a := if 'a' == 'b' && 'c' == 'd' { 'x' } else { 'd' }\n"
+  },
+  "known": "logical operators (`&&`, `||`) are unstable (R15): the gate error is not implemented"
+ },
+ {
+  "name": "conditional: parse error 18",
+  "files": {
+   "justfile": "a := if 'a' == 'b' { 'x' } else if 'a' { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 19",
+  "files": {
+   "justfile": "a := if 'a' !~ 'b' 'c' { 'x' } else { 'd' }\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 20",
+  "files": {
+   "justfile": "a := if (\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 21",
+  "files": {
+   "justfile": "a := if 'a' == \n"
+  }
+ },
+ {
+  "name": "conditional: parse error 22",
+  "files": {
+   "justfile": "a := if 'a' ==\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 23",
+  "files": {
+   "justfile": "if := 'x'\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 24",
+  "files": {
+   "justfile": "else := 'x'\nb := else\nfoo:\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 25",
+  "files": {
+   "justfile": "foo:\n  echo {{ if 'a' == 'b' { 'x' } }}\n"
+  }
+ },
+ {
+  "name": "conditional: parse error 26",
+  "files": {
+   "justfile": "foo:\n  echo {{ if 'a' == 'b' { 'x' } else { 'y' } else }}\n"
+  }
+ },
+ {
+  "name": "assert 0",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' == 'a', 'error message') }}\n"
+  }
+ },
+ {
+  "name": "assert 1",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' != 'a', 'error message') }}\n"
+  }
+ },
+ {
+  "name": "assert 2",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' != 'a') }}\n"
+  }
+ },
+ {
+  "name": "assert 3",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a'!='a') }}\n"
+  }
+ },
+ {
+  "name": "assert 4",
+  "files": {
+   "justfile": "foo:\n  {{ assert(  \"a\"   +  'b'  ==  \"c\" ) }}\n"
+  }
+ },
+ {
+  "name": "assert 5",
+  "files": {
+   "justfile": "foo:\n  {{ assert(uppercase('a')=='b') }}\n"
+  },
+  "known": "builtin functions are Phase 2 (Task 14)"
+ },
+ {
+  "name": "assert 6",
+  "files": {
+   "justfile": "foo:\n  {{ assert(`echo hi`=~'^x') }}\n"
+  }
+ },
+ {
+  "name": "assert 7",
+  "files": {
+   "justfile": "x := 'v'\nfoo:\n  {{ assert(x == 'w', 'x is ' + x) }}\n"
+  }
+ },
+ {
+  "name": "assert 8",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' == 'a', 'm') }}done\n"
+  }
+ },
+ {
+  "name": "assert 9",
+  "files": {
+   "justfile": "foo:\n  @echo {{ assert('a' == 'a') }}end\n"
+  }
+ },
+ {
+  "name": "assert 10",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' != 'a', y) }}\n"
+  }
+ },
+ {
+  "name": "assert 11",
+  "files": {
+   "justfile": "foo:\n  {{ assert(y == 'a', 'm') }}\n"
+  }
+ },
+ {
+  "name": "assert 12",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' == 'a', `exit 1`) }}\n"
+  }
+ },
+ {
+  "name": "assert 13",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' != 'a', `echo from backtick`) }}\n"
+  }
+ },
+ {
+  "name": "assert 14",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' != 'a', if 'x' == 'x' { 'cond' } else { 'no' }) }}\n"
+  }
+ },
+ {
+  "name": "assert 15",
+  "files": {
+   "justfile": "foo:\n  {{ assert(if 'x' == 'x' { 'a' } else { 'b' } == 'b') }}\n"
+  }
+ },
+ {
+  "name": "assert 16",
+  "files": {
+   "justfile": "foo:\n  {{ assert('a' != 'a', 'm') }}\n  echo after\n"
+  }
+ },
+ {
+  "name": "assert 17",
+  "files": {
+   "justfile": "foo:\n  @echo before\n  {{ assert('a' != 'a', 'm') }}\n"
+  }
+ },
+ {
+  "name": "assert 18",
+  "files": {
+   "justfile": "a := assert('a' == 'a', 'x')\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "assert 19",
+  "files": {
+   "justfile": "a := assert('a' != 'a', 'x')\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "assert 20",
+  "files": {
+   "justfile": "set lazy\na := assert('a' != 'a', 'x')\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "assert 21",
+  "files": {
+   "justfile": "a := assert('a' != 'a', 'x')\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "assert 22",
+  "files": {
+   "justfile": "set tempdir := assert('a' != 'a', 'in setting')\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 23",
+  "files": {
+   "justfile": "set working-directory := assert('foo' == 'bar', 'fail')\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 24",
+  "files": {
+   "justfile": "set working-directory := assert('foo' != 'foo')\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 25",
+  "files": {
+   "justfile": "a := assert('a' != 'a', 'bad')\nset tempdir := a\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 26",
+  "files": {
+   "justfile": "set tempdir := if '' =~ '(' { 'a' } else { 'b' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 27",
+  "files": {
+   "justfile": "a := assert\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 28",
+  "files": {
+   "justfile": "a := assert 'a'\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 29",
+  "files": {
+   "justfile": "a := assert()\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 30",
+  "files": {
+   "justfile": "a := assert('a' == 'a',)\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 31",
+  "files": {
+   "justfile": "a := assert('a' == 'a' 'b')\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 32",
+  "files": {
+   "justfile": "a := assert('a')\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 33",
+  "files": {
+   "justfile": "a := assert('a' == 'a', 'm', 'n')\nfoo:\n"
+  }
+ },
+ {
+  "name": "assert 34",
+  "files": {
+   "justfile": "foo:\n  @echo {{ assert('a' == 'a') + 'x' }}\n"
+  }
+ },
+ {
+  "name": "assert 35",
+  "files": {
+   "justfile": "a := assert(b == 'a')\nfoo:\n"
+  }
+ },
+ {
+  "name": "regex 0: (",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 1: )",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ ')' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 2: a)",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a)' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 3: (a",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(a' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 4: *",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '*' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 5: [",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '[' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 6: a{2,1}",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a{2,1}' { 'yes' } else { 'no' } }}\n"
+  },
+  "known": "the regex crate's wording of a bad repetition range is not reproduced (R15-independent; only four faults are worded as the crate does)"
+ },
+ {
+  "name": "regex 7: (?P<n>a",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(?P<n>a' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 8: (?z)",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(?z)' { 'yes' } else { 'no' } }}\n"
+  },
+  "known": "the regex crate's wording of an unknown flag is not reproduced"
+ },
+ {
+  "name": "regex 9: x(y(z",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'x(y(z' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 10: +a",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '+a' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 11: [z-a]",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '[z-a]' { 'yes' } else { 'no' } }}\n"
+  },
+  "known": "the regex crate's wording of a reversed class range is not reproduced"
+ },
+ {
+  "name": "regex 12: (?:*)",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(?:*)' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 13: ((a)",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '((a)' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 14: (a))",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(a))' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 15: a|*",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a|*' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 16: [[:alpha:]",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '[[:alpha:]' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 17: a[",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a[' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 18: \\\\((",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '\\\\((' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 19: \u00e9(",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '\u00e9(' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 20: (*)",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(*)' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 21: a|+",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a|+' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 22: **",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '**' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 23: [(]",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '[(]' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 24: a.c",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a.c' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 25: ^a$",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '^a$' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 26: \\\\d+",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '\\\\d+' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 27: (?i)A",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(?i)A' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 28: a{1,3}",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a{1,3}' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 29: \\\\bfoo\\\\b",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '\\\\bfoo\\\\b' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 30: [^a-z]",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '[^a-z]' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 32: \\\\pL",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '\\\\pL' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 33: a*?",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'a*?' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 34: (?s).",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '(?s).' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 35: [[:digit:]]+",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ '[[:digit:]]+' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex 36: x|y|z",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a1\u00e9' =~ 'x|y|z' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex: bad regex after earlier output",
+  "files": {
+   "justfile": "default:\n  echo before\n  echo {{ if '' =~ '(' { 'a' } else { 'b' } }}\n  echo after\n"
+  }
+ },
+ {
+  "name": "regex: bad regex in mismatch",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'x' !~ '(' { 'a' } else { 'b' } }}\n"
+  }
+ },
+ {
+  "name": "regex: bad regex in assignment",
+  "files": {
+   "justfile": "x := if 'x' =~ '[' { 'a' } else { 'b' }\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "regex: bad regex in assert",
+  "files": {
+   "justfile": "foo:\n  @echo {{ assert('x' =~ '*', 'm') }}\n"
+  }
+ },
+ {
+  "name": "regex: non-ASCII before the operator",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if '\u00e9' =~ '(' { 'a' } else { 'b' } }}\n"
+  }
+ },
+ {
+  "name": "regex: pattern from variable",
+  "files": {
+   "justfile": "p := '^a.c$'\nfoo:\n  @echo {{ if 'abc' =~ p { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "regex: multi-line pattern error",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'x' =~ '''\n(\n''' { 'a' } else { 'b' } }}\n"
+  },
+  "known": "the regex crate frames a multi-line pattern differently"
+ },
+ {
+  "name": "regex: empty pattern on empty text",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if '' =~ '' { 'a' } else { 'b' } }}\n"
+  }
+ },
+ {
+  "name": "regex: dump-safe string escapes",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a\\tb' =~ \"a\\tb\" { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "unicode: equality",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if '\u00e9' == \"\\u{e9}\" { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "whitespace: no spaces around operator",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a'=='a' { 'yes' } else { 'no' } }}\n"
+  }
+ },
+ {
+  "name": "whitespace: newlines in condition",
+  "files": {
+   "justfile": "x := if 'a'\n  ==\n  'a' { 'yes' } else { 'no' }\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "whitespace: comment after else",
+  "files": {
+   "justfile": "x := if 'a' == 'a' { 'yes' } else { 'no' } # trailing\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "lists gate: comparison",
+  "files": {
+   "justfile": "x := 'a' == 'b'\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: if without else",
+  "files": {
+   "justfile": "x := if 'a' == 'b' { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: non-comparison condition",
+  "files": {
+   "justfile": "x := if 'a' { 'c' } else { 'd' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: assert non-comparison",
+  "files": {
+   "justfile": "x := assert('a')\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: grouped comparison",
+  "files": {
+   "justfile": "x := if ('a' == 'b') { 'c' } else { 'd' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: with set lists but not unstable",
+  "files": {
+   "justfile": "set lists\nx := if 'a' == 'b' { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: in a recipe",
+  "files": {
+   "justfile": "foo:\n  @echo {{ 'a' == 'b' }}\n"
+  }
+ },
+ {
+  "name": "lists gate: first of several",
+  "files": {
+   "justfile": "a := 'a' == 'b'\nb := if 'a' == 'b' { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: undefined variable before gate",
+  "files": {
+   "justfile": "a := if y == 'b' { 'c' }\nfoo:\n"
+  }
+ },
+ {
+  "name": "lists gate: setting conditional",
+  "files": {
+   "justfile": "set tempdir := if 'a' == 'b' { 'c' }\nfoo:\n"
+  },
+  "known": "a list value in a setting is reported before list features upstream (R15)"
+ },
+ {
+  "name": "comparison keywords: variable named assert",
+  "files": {
+   "justfile": "assert := 'x'\nfoo:\n  @echo {{assert}}\n"
+  }
+ },
+ {
+  "name": "comparison keywords: variable named if in recipe",
+  "files": {
+   "justfile": "foo if:\n  @echo {{if}}\n"
+  }
+ },
+ {
+  "name": "comparison keywords: parameter named else",
+  "files": {
+   "justfile": "foo else:\n  @echo {{else}}\n"
+  },
+  "args": [
+   "foo",
+   "v"
+  ]
+ },
+ {
+  "name": "assert: used as recipe name",
+  "files": {
+   "justfile": "assert:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "assert: as a dependency",
+  "files": {
+   "justfile": "assert:\n  @echo hi\nfoo: assert\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "assert: as a dependency argument",
+  "files": {
+   "justfile": "bar x:\n  @echo {{x}}\nfoo: (bar assert('a' == 'a'))\n"
+  }
+ }
+]

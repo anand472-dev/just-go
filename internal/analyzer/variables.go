@@ -63,8 +63,9 @@ func (r *assignmentResolver) walk(e ast.Expr) *diag.Error {
 
 // references calls visit on each call and each variable in e, in upstream's
 // order: a call before its arguments, and the operands of a concatenation
-// left to right. It stops at the first error visit returns. A nil expression
-// has none. It is pure.
+// left to right, and the parts of a comparison, a conditional and an assert as
+// they are written. It stops at the first error visit returns. A nil
+// expression has none. It is pure.
 func references(e ast.Expr, visit func(ast.Expr) *diag.Error) *diag.Error {
 	switch e := e.(type) {
 	case ast.Var:
@@ -79,7 +80,7 @@ func references(e ast.Expr, visit func(ast.Expr) *diag.Error) *diag.Error {
 	case ast.List:
 		return referencesAll(e.Elements, visit)
 	}
-	return nil
+	return referencesAll(ast.Operands(e), visit)
 }
 
 // referencesAll is references for each of es in turn, stopping at the first

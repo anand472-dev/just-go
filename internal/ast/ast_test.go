@@ -9,7 +9,7 @@ import (
 // TestExprNodes checks that every expression type is an Expr. The marker
 // methods have empty bodies, so calling them is the only way to cover them.
 func TestExprNodes(t *testing.T) {
-	for _, e := range []Expr{Text{Value: "t"}, StringLit{Value: "a"}, Backtick{Command: "ls"}, Var{Name: "x"}, Concat{Left: Var{Name: "x"}, Right: StringLit{}}, Call{Name: "f", Args: []Expr{Var{Name: "x"}}}, List{Elements: []Expr{Var{Name: "x"}}}} {
+	for _, e := range []Expr{Text{Value: "t"}, StringLit{Value: "a"}, Backtick{Command: "ls"}, Var{Name: "x"}, Concat{Left: Var{Name: "x"}, Right: StringLit{}}, Call{Name: "f", Args: []Expr{Var{Name: "x"}}}, List{Elements: []Expr{Var{Name: "x"}}}, Comparison{Op: OpEqual}, Conditional{}, Assert{}} {
 		e.exprNode()
 	}
 }
@@ -232,5 +232,66 @@ func BenchmarkEnabled(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		Enabled(a, "linux")
+	}
+}
+
+func TestOperandsAreInTheOrderTheyAreWritten(t *testing.T) {
+	a, b, c := Var{Name: "a"}, Var{Name: "b"}, Var{Name: "c"}
+	for _, tc := range []struct {
+		e    Expr
+		want []Expr
+	}{
+		{Comparison{Op: OpMatch, Left: a, Right: b}, []Expr{a, b}},
+		{Conditional{Cond: a, Then: b, Else: c}, []Expr{a, b, c}},
+		{Conditional{Cond: a, Then: b}, []Expr{a, b, nil}},
+		{Assert{Cond: a, Message: b}, []Expr{a, b}},
+		{Assert{Cond: a}, []Expr{a, nil}},
+		{Concat{Left: a, Right: b}, nil},
+		{StringLit{Value: "x"}, nil},
+		{nil, nil},
+	} {
+		if got := Operands(tc.e); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("Operands(%+v) = %v, want %v", tc.e, got, tc.want)
+		}
+	}
+}
+
+// Every variable of a comparison, a conditional and an assert is listed, the
+// ones in an untaken branch too, in the order they are written.
+func TestVariablesOfConditionals(t *testing.T) {
+	v := func(name string) Expr { return Var{Name: name} }
+	for _, tc := range []struct {
+		e    Expr
+		want []string
+	}{
+		{Comparison{Op: OpEqual, Left: v("a"), Right: Concat{Left: v("b"), Right: v("c")}}, []string{"a", "b", "c"}},
+		{Conditional{Cond: Comparison{Left: v("a"), Right: v("b")}, Then: v("c"), Else: Conditional{Cond: v("d"), Then: v("e")}},
+			[]string{"a", "b", "c", "d", "e"}},
+		{Assert{Cond: Comparison{Left: v("a"), Right: v("b")}, Message: v("c")}, []string{"a", "b", "c"}},
+		{Assert{Cond: Comparison{Left: v("a"), Right: v("b")}}, []string{"a", "b"}},
+		{StringLit{Value: "x"}, nil},
+	} {
+		if got := Variables(tc.e, nil); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("Variables(%+v) = %v, want %v", tc.e, got, tc.want)
+		}
+	}
+}
+
+func TestListFeatureMessages(t *testing.T) {
+	for f, want := range map[ListFeature]string{
+		ComparisonOperator:     "comparison operators require `set lists`",
+		IfWithoutElse:          "`if` without `else` requires `set lists`",
+		NonComparisonCondition: "`if` and `assert` conditions other than comparisons require `set lists`",
+		ListLiteral:            "list literals require `set lists`",
+		BoolFunction:           "the `bool()` function requires `set lists`",
+		JoinListFunction:       "the `join_list()` function requires `set lists`",
+		NumJobsFunction:        "the `num_jobs()` function requires `set lists`",
+		ShowFunction:           "the `show()` function requires `set lists`",
+		SplitFunction:          "the `split()` function requires `set lists`",
+		WhichFunction:          "the `which()` function requires `set lists`",
+	} {
+		if got := f.String(); got != want {
+			t.Errorf("ListFeature(%d) = %q, want %q", f, got, want)
+		}
 	}
 }

@@ -118,7 +118,8 @@ type Scope map[string]string
 // variable with no entry in scope, a list (which belongs to the unstable
 // `lists` setting), a backtick (there is no Commander to run it), or an
 // expression of a type the evaluator does not know, is a *diag.Error of
-// KindRuntime. An undefined variable is located at its name, as the syntax
+// KindRuntime. A conditional evaluates only the branch its comparison picks;
+// an assert is the empty string, or an error when its comparison fails. An undefined variable is located at its name, as the syntax
 // tree records it, but without a file, which the caller fills in. Evaluate is
 // pure.
 func Evaluate(e ast.Expr, scope Scope) (string, error) {
@@ -143,8 +144,12 @@ func EvaluateWith(e ast.Expr, scope Scope, cmd Commander) (string, error) {
 		return lookup(x, scope)
 	case ast.Concat:
 		return concat(x, scope, cmd)
-	case ast.List:
-		return "", fail("list values are not supported")
+	case ast.List, ast.Comparison:
+		return "", errLists()
+	case ast.Conditional:
+		return conditional(x, scope, cmd)
+	case ast.Assert:
+		return assertion(x, scope, cmd)
 	default:
 		return "", fail("cannot evaluate expression of type %T", e)
 	}
