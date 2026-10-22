@@ -1074,6 +1074,91 @@
   "cwd": "sub"
  },
  {
+  "name": "path_exists('')",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "foo:\n  @echo '{{ path_exists('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('') in a working directory",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('.')",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "foo:\n  @echo '{{ path_exists('.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('.') in a working directory",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('.') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('..')",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "foo:\n  @echo '{{ path_exists('..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('..') in a working directory",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "set working-directory := 'd'\nfoo:\n  @echo '{{ path_exists('..') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "path_exists('') from a subdirectory",
+  "files": {
+   "f": "x",
+   "d/g": "y",
+   "sub/h": "",
+   "justfile": "foo:\n  @echo '{{ path_exists('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "cwd": "sub"
+ },
+ {
   "name": "path_exists('f')",
   "files": {
    "justfile": "foo:\n  @echo '{{ path_exists('f') }}'\n",
