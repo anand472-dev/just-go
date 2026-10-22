@@ -22,6 +22,20 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
 The pass counts and the ratchet baseline are recorded by hand in
 `conformance/BASELINE.md`, which `make corpus` does not touch.
 
+## Phase 1 gate counts
+
+Recorded at the Phase 1 gate (compat Task 13, 2026-10-22), `bin/just-go` built
+from the commit that precedes the gate commit. These are measurements, not part
+of what `make corpus` records; `conformance/BASELINE.md` keeps the history.
+
+| | |
+|---|---|
+| Corpus cases | 2011 |
+| Full run: pass | 485 |
+| Full run: fail | 1510 |
+| Full run: skip (oracle exceptions) | 16 |
+| Cases in `conformance/baseline.txt` | 485 |
+
 ## How to read a case
 
 - `args` is the full command line. Upstream adds `--shell bash` unless a test
