@@ -59,6 +59,12 @@ func stripExpr(e ast.Expr) ast.Expr {
 		return ast.Var{Name: x.Name}
 	case ast.Concat:
 		return ast.Concat{Left: stripExpr(x.Left), Right: stripExpr(x.Right)}
+	case ast.Call:
+		call := ast.Call{Name: x.Name}
+		for _, a := range x.Args {
+			call.Args = append(call.Args, stripExpr(a))
+		}
+		return call
 	}
 	return e
 }
@@ -736,4 +742,83 @@ func TestParseUnclosedDelimiterAtEOF(t *testing.T) {
 			wantError(t, c.src, c.line, c.col, c.msg)
 		})
 	}
+}
+
+func call(name string, args ...ast.Expr) ast.Expr { return ast.Call{Name: name, Args: args} }
+
+// TestParseCall pins the call grammar of upstream's parse_value and
+// parse_sequence: a name directly followed by `(`, then comma-separated
+// expressions with an optional trailing comma, then `)`. A call is an operand
+// like any other value, in assignments, parameter defaults and interpolations.
+func TestParseCall(t *testing.T) {
+	cases := []struct {
+		name, src string
+		want      ast.Expr
+	}{
+		{"no arguments", "a := foo()\n", call("foo")},
+		{"one argument", "a := foo('x')\n", call("foo", lit("x"))},
+		{"variable argument", "a := foo(b)\n", call("foo", ref("b"))},
+		{"two arguments", "a := foo('x', b)\n", call("foo", lit("x"), ref("b"))},
+		{"trailing comma", "a := foo('x',)\n", call("foo", lit("x"))},
+		{"nested", "a := foo(bar(baz('x')), 'y')\n", call("foo", call("bar", call("baz", lit("x"))), lit("y"))},
+		{"concatenation in an argument", "a := foo('x' + b)\n", call("foo", ast.Concat{Left: lit("x"), Right: ref("b")})},
+		{"concatenated call", "a := foo() + 'x'\n", ast.Concat{Left: call("foo"), Right: lit("x")}},
+		{"grouped call", "a := (foo())\n", call("foo")},
+		{"arguments across lines", "a := foo(\n  'x',\n  'y'\n)\n", call("foo", lit("x"), lit("y"))},
+		{"space before the parenthesis", "a := foo ()\n", call("foo")},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			jf := mustParse(t, c.src)
+			if len(jf.Assignments) != 1 || !reflect.DeepEqual(jf.Assignments[0].Value, c.want) {
+				t.Errorf("Parse(%q) Assignments = %+v, want one with value %+v", c.src, jf.Assignments, c.want)
+			}
+		})
+	}
+	t.Run("parameter default", func(t *testing.T) {
+		jf := mustParse(t, "r x=foo('a'):\n")
+		if got := jf.Recipes[0].Params[0]; !reflect.DeepEqual(got.Default, call("foo", lit("a"))) || got.DefaultText != "foo('a')" {
+			t.Errorf("Params[0] = %+v, want default foo('a')", got)
+		}
+	})
+	t.Run("interpolation", func(t *testing.T) {
+		jf := mustParse(t, "r:\n  echo {{foo(b)}}\n")
+		want := []ast.Expr{txt("echo "), call("foo", ref("b"))}
+		if got := jf.Recipes[0].Lines[0].Parts; !reflect.DeepEqual(got, want) {
+			t.Errorf("Parts = %+v, want %+v", got, want)
+		}
+	})
+}
+
+// TestParseCallLocatesTheName pins that a call carries the position of its
+// name, which is where upstream reports an undefined function.
+func TestParseCallLocatesTheName(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("a := 'x' + foo()\nr:\n  echo {{ bar('q') }}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := jf.Assignments[0].Value.(ast.Concat).Right.(ast.Call); !ok || c.Line != 1 || c.Col != 12 {
+		t.Errorf("assignment call = %+v, want foo at 1:12", jf.Assignments[0].Value)
+	}
+	if c, ok := jf.Recipes[0].Lines[0].Parts[1].(ast.Call); !ok || c.Line != 3 || c.Col != 11 {
+		t.Errorf("interpolated call = %+v, want bar at 3:11", jf.Recipes[0].Lines[0].Parts[1])
+	}
+}
+
+// TestParseCallErrors pins the expected-token lists inside a call. Each row
+// was produced by oracle/bin/just on the same source.
+func TestParseCallErrors(t *testing.T) {
+	const argument = "backtick, '!', '[', identifier, '(', ')', '/', or string"
+	const afterArgument = "'&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/'"
+	wantError(t, "a := foo(\n", 1, 11, "expected "+argument+", but found end of file")
+	wantError(t, "a := foo(,)\n", 1, 10, "expected "+argument+", but found ','")
+	wantError(t, "a := foo(,'x')\n", 1, 10, "expected "+argument+", but found ','")
+	wantError(t, "a := foo('x',,)\n", 1, 14, "expected "+argument+", but found ','")
+	wantError(t, "a := foo('x',\n", 1, 15, "expected "+argument+", but found end of file")
+	wantError(t, "a := foo('x' 'y')\n", 1, 14, "expected "+afterArgument+", but found string")
+	wantError(t, "a := foo('x'\n", 1, 14, "expected "+afterArgument+", but found end of file")
+	wantError(t, "r p=foo('a' 'b'):\n", 1, 13, "expected "+afterArgument+", but found string")
+	wantError(t, "a := foo('x') bar\n", 1, 15,
+		"expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '+', '++', or '/', but found identifier")
+	wantError(t, "r:\n  echo {{foo('x' }}\n", 2, 18, "mismatched closing delimiter `}`, did you mean to close the `(` on line 2?")
 }

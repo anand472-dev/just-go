@@ -55,7 +55,7 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 
 ## Current counts
 
-From the run recorded in `groups.json`: 168 pass, 1827 fail, 16 skip, of
+From the run recorded in `groups.json`: 177 pass, 1818 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
@@ -65,8 +65,8 @@ From the run recorded in `groups.json`: 168 pass, 1827 fail, 16 skip, of
 | `attribute` | 220 |
 | `module` | 157 |
 | `setting:*` | 112 |
-| `grammar` | 74 |
-| `builtin:*` | 62 |
+| `grammar` | 69 |
+| `builtin:*` | 58 |
 | `backtick` | 39 |
 | `completions` | 40 |
 | `dotenv` | 30 |

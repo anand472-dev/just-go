@@ -17,6 +17,9 @@ error_messages::unexpected_character#1
 fallback::doesnt_work_with_justfile#1
 fallback::requires_setting#1
 format_string::format_backticks_are_forbidden#1
+function_definitions::undefined_in_assignment#1
+function_definitions::undefined_in_interpolation#1
+function_definitions::undefined_in_recipe_parameter_default#1
 guards::guard_lines_are_ignored_without_setting#1
 help::help_is_positional_if_recipe_does_not_take_options#1
 ignore_comments::dont_ignore_comments_in_recipe_by_default#1
@@ -85,6 +88,8 @@ misc::status_passthrough#1
 misc::supply_defaults#1
 misc::supply_use_default#1
 misc::trailing_flags#1
+misc::undefined_function_in_assignment#1
+misc::undefined_function_in_default#1
 misc::unexpected_token_after_name#1
 misc::unexpected_token_in_dependency_position#1
 misc::unknown_dependency#1
@@ -165,4 +170,8 @@ string::unterminated_indented_string#1
 string::unterminated_raw_string#1
 string::unterminated_string#1
 undefined_variables::parameter_default_unknown_variable_in_expression#1
+undefined_variables::unknown_first_variable_in_binary_call#1
+undefined_variables::unknown_second_variable_in_binary_call#1
+undefined_variables::unknown_variable_in_ternary_call#1
+undefined_variables::unknown_variable_in_unary_call#1
 unexport::unexport_does_not_conflict_with_recipe_syntax#1

@@ -122,9 +122,20 @@ type Var struct {
 // Concat is `Left + Right`.
 type Concat struct{ Left, Right Expr }
 
+// Call is a call of a function: `Name(Args...)`. Line and Col locate the
+// name. An Expr that holds a Call cannot be compared with ==, because the
+// arguments are a slice.
+type Call struct {
+	Name string
+	Args []Expr
+	Line int
+	Col  int
+}
+
 // The marker methods have a statement so that coverage can count them;
 // an empty function body is reported as 0% by the Go cover tool.
 func (Text) exprNode()      { return }
 func (StringLit) exprNode() { return }
 func (Var) exprNode()       { return }
 func (Concat) exprNode()    { return }
+func (Call) exprNode()      { return }

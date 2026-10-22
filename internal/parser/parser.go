@@ -359,7 +359,7 @@ func (p *parser) operand() (ast.Expr, error) {
 	return v, err
 }
 
-// value parses a string, a variable, or a parenthesised expression.
+// value parses a string, a variable, a call, or a parenthesised expression.
 func (p *parser) value() (ast.Expr, error) {
 	p.expected |= valueStart
 	t := p.peek()
@@ -372,13 +372,37 @@ func (p *parser) value() (ast.Expr, error) {
 		return ast.StringLit{Value: value}, nil
 	case lexer.Ident:
 		p.next()
-		p.is(lexer.LParen) // a call, which upstream would parse here
+		if p.is(lexer.LParen) {
+			return p.call(t)
+		}
 		return ast.Var{Name: t.Text, Line: t.Line, Col: t.Col}, nil
 	case lexer.LParen:
 		p.next()
 		return p.group()
 	}
 	return nil, p.unexpected()
+}
+
+// call parses the arguments of a call of name, as upstream's parse_sequence
+// does: expressions separated by commas, with a comma allowed after the last,
+// up to the closing parenthesis. The current token is the opening one.
+func (p *parser) call(name lexer.Token) (ast.Expr, error) {
+	p.next()
+	c := ast.Call{Name: name.Text, Line: name.Line, Col: name.Col}
+	for !p.is(lexer.RParen) {
+		arg, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+		c.Args = append(c.Args, arg)
+		if !p.accept(lexer.Comma) {
+			break
+		}
+	}
+	if _, err := p.expect(lexer.RParen); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // group parses the rest of a parenthesised expression.

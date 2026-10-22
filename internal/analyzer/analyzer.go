@@ -2,7 +2,8 @@
 // reports before anything runs: misordered parameters, duplicate parameter,
 // recipe and variable
 // names, recipe lines with extra leading whitespace, uses of undefined
-// variables, circular variable definitions, and dependencies that name no
+// variables, calls of undefined functions or with the wrong number of
+// arguments, circular variable definitions, and dependencies that name no
 // recipe, that form a cycle, or that need arguments a dependency cannot give.
 //
 // The package is pure: every function reads the syntax tree it is given and
@@ -27,7 +28,8 @@ import (
 // without a default after one with a default, recipe by recipe;
 // then duplicate assignment names; then the assignments, resolved in name
 // order, each after the assignments it uses (undefined and circular
-// variables); then, recipe by recipe in source order, a duplicate name and
+// variables, undefined functions and argument counts, each call before its
+// arguments); then, recipe by recipe in source order, a duplicate name and
 // lines with extra leading whitespace; then the recipes, resolved in name
 // order, each after the recipes it depends on (its dependencies, then its
 // parameter defaults, then its body, then the argument counts of its

@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 168,
-    "fail": 1827,
+    "pass": 177,
+    "fail": 1818,
     "skip": 16,
     "total": 2011
   },
@@ -10,11 +10,11 @@
     "backtick": 39,
     "builtin:case": 10,
     "builtin:constants": 2,
-    "builtin:env": 9,
+    "builtin:env": 6,
     "builtin:invocation": 12,
     "builtin:path": 12,
     "builtin:semver": 1,
-    "builtin:string": 9,
+    "builtin:string": 8,
     "builtin:style": 4,
     "builtin:system": 3,
     "cli:alias-style": 3,
@@ -72,7 +72,7 @@
     "conditional": 16,
     "dependency-args": 20,
     "dotenv": 30,
-    "grammar": 74,
+    "grammar": 69,
     "module": 157,
     "setting:allow-duplicate-recipes": 2,
     "setting:allow-duplicate-variables": 1,
@@ -383,10 +383,7 @@
       "misc::env_function_as_env_var#1": "calls env()",
       "misc::env_function_as_env_var_or_default#1": "calls env()",
       "misc::env_function_as_env_var_or_default_with_existing_env_var#1": "calls env()",
-      "misc::env_function_as_env_var_with_existing_env_var#1": "calls env()",
-      "undefined_variables::unknown_first_variable_in_binary_call#1": "calls env_var_or_default()",
-      "undefined_variables::unknown_second_variable_in_binary_call#1": "calls env_var_or_default()",
-      "undefined_variables::unknown_variable_in_unary_call#1": "calls env_var()"
+      "misc::env_function_as_env_var_with_existing_env_var#1": "calls env()"
     },
     "builtin:invocation": {
       "functions::dir_abbreviations_are_accepted#1": "calls justfile_dir()",
@@ -427,8 +424,7 @@
       "lists::quote_of_empty_variadic_is_empty_string_without_lists_setting#1": "calls quote()",
       "parameters::variadic_arguments_are_joined_when_passed_to_functions#1": "calls quote()",
       "parameters::variadic_parameter_passed_to_dependency_is_joined_with_spaces#1": "calls quote()",
-      "quote::quoted_strings_can_be_used_as_arguments#1": "calls quote()",
-      "undefined_variables::unknown_variable_in_ternary_call#1": "calls replace()"
+      "quote::quoted_strings_can_be_used_as_arguments#1": "calls quote()"
     },
     "builtin:style": {
       "style::style_command_default#1": "calls style()",
@@ -1317,9 +1313,9 @@
     "grammar": {
       "alias_style::default#1": "uses `alias`",
       "alias_style::multiple#1": "uses `alias`",
-      "assertions::assert_fail#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', '==', '=~', '}}', '(', '+', '++', or '/', but found '('",
-      "assertions::assert_pass#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', '==', '=~', '}}', '(', '+', '++', or '/', but found '('",
-      "assertions::assert_without_message_reports_condition#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', '==', '=~', '}}', '(', '+', '++', or '/', but found '('",
+      "assertions::assert_fail#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/', but found '!='",
+      "assertions::assert_pass#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/', but found '=='",
+      "assertions::assert_without_message_reports_condition#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/', but found '!='",
       "comparison::comparisons_are_not_associative#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '+', '++', or '/', b",
       "dependencies::dependency_submodule_missing#1": "just-go reports a parse error: expected '&&', '*', '::', comment, end of file, end of line, identifier, indent, or '(', but found '",
       "export::parameter#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '$'",
@@ -1338,9 +1334,6 @@
       "format_string::undefined_variable_error#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unmatched_close_is_ignored#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unterminated_format_string_error#1": "just-go reports a parse error: unterminated string",
-      "function_definitions::undefined_in_assignment#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
-      "function_definitions::undefined_in_interpolation#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', '==', '=~', '}}', '(', '+', '++', or '/', but found '('",
-      "function_definitions::undefined_in_recipe_parameter_default#1": "just-go reports a parse error: expected '*', ':', '$', identifier, '(', or '+', but found '('",
       "markdown::code_blocks_are_concatenated#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
       "markdown::line_numbers_are_preserved#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
       "markdown::non_just_code_blocks_are_ignored#1": "just-go reports a parse error: unterminated backtick",
@@ -1370,8 +1363,6 @@
       "misc::star_variadic_none#1": "just-go reports a parse error: expected '*', ':', '$', '=', identifier, or '+', but found '*'",
       "misc::star_variadic_recipe#1": "just-go reports a parse error: expected '*', ':', '$', '=', identifier, or '+', but found '*'",
       "misc::star_variadic_use_default#1": "just-go reports a parse error: expected '*', ':', '$', '=', identifier, or '+', but found '*'",
-      "misc::undefined_function_in_assignment#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
-      "misc::undefined_function_in_default#1": "just-go reports a parse error: expected '*', ':', '$', identifier, '(', or '+', but found '('",
       "misc::unknown_alias_target#1": "uses `alias`",
       "options::argument_values_starting_with_dashes_are_accepted_if_recipe_does_not_take_options#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "parameters::exported_variadic_parameter_is_joined_with_spaces#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '+'",
