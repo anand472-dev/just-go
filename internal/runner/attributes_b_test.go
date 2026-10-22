@@ -488,15 +488,17 @@ func TestRunParallelReturnsTheErrorOfTheFirstBranchThatHasOne(t *testing.T) {
 }
 
 // A branch that waits for a recipe another branch fails to run does not wait
-// for ever, and does not go on.
+// for ever, and does not go on. The fork names c first, so its branch is the
+// one that runs it, and the branch of b, which depends on c, is the one that
+// waits.
 func TestRunParallelWaiterOfAFailedRecipe(t *testing.T) {
 	proc := &timedProcess{codes: map[string]int{"exit 1": 1}}
-	plan, _, stderr := newPlan(t, "[parallel]\nall: a b\na: c\n  @echo a\nb: c\n  @echo b\nc:\n  @exit 1\n", proc)
+	plan, _, stderr := newPlan(t, "[parallel]\nall: c b\nb: c\n  @echo b\nc:\n  @exit 1\n", proc)
 	res := mustRun(t, plan)
-	if res.ExitCode != 1 || proc.count("start echo a") != 0 || proc.count("start echo b") != 0 {
-		t.Errorf("exit %d, events %v; want 1 and neither a nor b run", res.ExitCode, proc.events)
+	if res.ExitCode != 1 || proc.count("start echo b") != 0 {
+		t.Errorf("exit %d, events %v; want 1 and b not run", res.ExitCode, proc.events)
 	}
-	if want := "error: recipe `c` failed on line 8 with exit code 1\n"; stderr.String() != want {
+	if want := "error: recipe `c` failed on line 6 with exit code 1\n"; stderr.String() != want {
 		t.Errorf("stderr = %q, want %q", stderr.String(), want)
 	}
 }
