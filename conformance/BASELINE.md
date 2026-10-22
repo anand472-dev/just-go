@@ -41,8 +41,32 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 6: settings, group A | 260 | 260 | 1735 | 16 |
 | Compat Task 7: settings, group B (dotenv, lists, unstable gate) | 273 | 273 | 1722 | 16 |
 | Compat Task 8: attributes, group A | 329 | 329 | 1666 | 16 |
+| Compat Task 9: attributes, group B | 360 | 360 | 1635 | 16 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the
 quoted line and carets), so a case that reports an error can match stderr
 byte for byte when its message matches.
+
+## Platform-dependent baseline entries
+
+The corpus was recorded on macOS, and the baseline was measured on macOS. Of
+the 360 baseline cases exactly one expects output that depends on the
+operating system: `os_attributes::os#1`. Its justfile defines `foo` once per
+operating-system gate (`[macos]`, `[linux]`, `[windows]`, and the BSDs), and
+the recorded output is the `[macos]` recipe's (`bar`). On Linux the `[linux]`
+recipe runs and the case fails. The other `os_attributes` baseline cases
+(`all`, `assignment`, `none`, `os_family`, `setting`) use `[unix]` or every
+gate, and give the same output on any Unix. A scan of the other baseline
+cases for gates, `os()`, `arch()`, `windows-shell`, and backslash or path
+dependence found no other host-dependent case: the `arch()` cases fail to
+parse before `arch()` is evaluated, and the `windows` cases do not select a
+shell.
+
+This entry is not an oracle exception (the oracle passes it on macOS and
+fails it elsewhere, and the closed categories of R9 and R16 do not cover a
+recording-platform difference). Task 33 (the platform matrix and
+`docs/platforms.md`) owns it: before a Linux or Windows job gates on
+`make check`, that task must either skip this case off the recording
+platform, with the reason printed, or record the per-platform result. Until
+then the gate is macOS-only.
