@@ -114,13 +114,14 @@ func TestParsePrefixAloneAndBeforeInterpolation(t *testing.T) {
 	}
 }
 
-func TestParseQuietRecipeSilencesEveryLine(t *testing.T) {
+// A leading `@` on the recipe toggles each line's `@` (upstream `quiet ^ self.quiet`).
+func TestParseQuietRecipeTogglesLinePrefix(t *testing.T) {
 	jf := mustParse(t, "@r:\n  a\n  -b\n  @c\n  @-d\n")
 	var got []ast.Prefix
 	for _, l := range jf.Recipes[0].Lines {
 		got = append(got, l.Prefix)
 	}
-	want := []ast.Prefix{ast.PrefixAt, ast.PrefixAtDash, ast.PrefixAt, ast.PrefixAtDash}
+	want := []ast.Prefix{ast.PrefixAt, ast.PrefixAtDash, ast.PrefixNone, ast.PrefixDash}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("prefixes = %v, want %v", got, want)
 	}
@@ -160,6 +161,8 @@ func TestParseSettingErrors(t *testing.T) {
 	wantError(t, "set nope\n", 1, 5, "Unknown setting `nope`")
 	wantError(t, "set shell\n", 1, 10, "Expected ':=', but found end of line")
 	wantError(t, "set shell :=\n", 1, 13, "Expected '[', but found end of line")
+	wantError(t, "set shell := []\n", 1, 15, "Expected string, but found ']'")
+	wantError(t, "set shell := [,]\n", 1, 15, "Expected string, but found ','")
 	wantError(t, "set shell := \"a\"\n", 1, 14, "Expected '[', but found string")
 	wantError(t, "set shell := [\"a\" \"b\"]\n", 1, 19, "Expected string or ']', but found string")
 	wantError(t, "set shell := [\"a\"\n", 1, 18, "Expected string or ']', but found end of line")

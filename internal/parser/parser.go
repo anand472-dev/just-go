@@ -183,13 +183,17 @@ func (p *parser) shell() ([]string, error) {
 	if _, err := p.expect(lexer.LBracket, "'['"); err != nil {
 		return nil, err
 	}
-	var words []string
-	for p.peek().Kind == lexer.String {
-		words = append(words, p.next().Text)
-		if p.peek().Kind != lexer.Comma {
+	first, err := p.expect(lexer.String, "string")
+	if err != nil {
+		return nil, err
+	}
+	words := []string{first.Text}
+	for p.peek().Kind == lexer.Comma {
+		p.next()
+		if p.peek().Kind != lexer.String {
 			break
 		}
-		p.next()
+		words = append(words, p.next().Text)
 	}
 	if _, err := p.expect(lexer.RBracket, "string or ']'"); err != nil {
 		return nil, err
@@ -309,7 +313,9 @@ func (p *parser) param() (ast.Param, error) {
 	return param, err
 }
 
-// silence marks every line as quiet, as a leading `@` on the recipe does.
+// silence applies a leading `@` on the recipe to every line. As upstream does
+// (recipe.rs: `quiet ^ self.quiet`), it toggles the line's `@`: an unmarked
+// line becomes quiet, and a line marked `@` is echoed again.
 func silence(lines []ast.Line) {
 	for i := range lines {
 		lines[i].Prefix = quietPrefix(lines[i].Prefix)
@@ -317,10 +323,15 @@ func silence(lines []ast.Line) {
 }
 
 func quietPrefix(p ast.Prefix) ast.Prefix {
-	if p == ast.PrefixNone || p == ast.PrefixAt {
+	switch p {
+	case ast.PrefixNone:
 		return ast.PrefixAt
+	case ast.PrefixAt:
+		return ast.PrefixNone
+	case ast.PrefixDash:
+		return ast.PrefixAtDash
 	}
-	return ast.PrefixAtDash
+	return ast.PrefixDash
 }
 
 // skipBlankLines moves past line breaks, but only when a body line follows.
