@@ -1,12 +1,20 @@
 # Cases the pinned oracle (oracle/bin/just) fails under the conformance
 # harness, with the reason. TestConformance skips them.
 #
-# Format: one entry per line, "<case id> <reason>". Blank lines and lines
-# starting with "#" are comments.
+# Format: one entry per line, "<case id> <category>: <reason>". Blank lines
+# and lines starting with "#" are comments. The category must be one of
+# exceptionCategories in runner_test.go; parsing rejects any other.
 #
-# None of these is nondeterministic output. Each one depends on state that
-# scripts/recorder.patch does not capture (see conformance/corpus/README.md,
-# "What is not recorded" and "Cases that cannot be reproduced"):
+# Two tests keep this list honest: TestOracleExceptionsNameCorpusCases
+# (every id is a corpus case) and TestOracleExceptionsStillFail (with
+# JUST_GO_BIN=oracle/bin/just, every listed case still fails; one that
+# passes is stale and must be removed).
+#
+# The brief allows "nondeterministic" output. None of the entries below is
+# that. Each one depends on state that scripts/recorder.patch does not
+# capture (see conformance/corpus/README.md, "What is not recorded" and
+# "Cases that cannot be reproduced"); accepting these recorder-gap
+# categories is pending a controller ruling (finding T3-1):
 #   path-hash    a .justcache file named after the recorder's temporary path
 #   empty-dir    an empty directory the upstream test created
 #   symlink      a symbolic link the upstream test created

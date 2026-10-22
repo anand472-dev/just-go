@@ -139,9 +139,27 @@ func loadExceptions(t *testing.T, fsys sys.FS) map[string]string {
 	return exceptions
 }
 
+// exceptionCategories is the closed set of reasons an oracle exception may
+// give. "nondeterministic" is the brief's own allowance (Task 3 Step 3).
+// The other six are recorder gaps: state scripts/recorder.patch does not
+// capture (deferred findings T2-5, T2-6), which the harness cannot rebuild.
+// Adding a category here widens what the oracle is excused from, so it
+// needs a controller ruling (finding T3-1).
+var exceptionCategories = map[string]bool{
+	"nondeterministic": true,
+	"path-hash":        true,
+	"empty-dir":        true,
+	"symlink":          true,
+	"mode":             true,
+	"fifo":             true,
+	"environment":      true,
+}
+
 // parseExceptions maps case id to reason. Each entry line is an id, white
 // space, and the reason; blank lines and lines starting with "#" are
-// comments. An entry without a reason is an error. Pure.
+// comments. A reason starts with "<category>:", and the category must be in
+// exceptionCategories. An entry without a reason, or with an unknown
+// category, is an error. Pure.
 func parseExceptions(data string) (map[string]string, error) {
 	exceptions := map[string]string{}
 	for i, line := range strings.Split(data, "\n") {
@@ -150,12 +168,34 @@ func parseExceptions(data string) (map[string]string, error) {
 			continue
 		}
 		id, reason, _ := strings.Cut(line, " ")
-		if reason = strings.TrimSpace(reason); reason == "" {
-			return nil, fmt.Errorf("%s:%d: exception %q has no reason", exceptionsPath, i+1, id)
+		reason = strings.TrimSpace(reason)
+		if err := checkExceptionReason(reason); err != nil {
+			return nil, fmt.Errorf("%s:%d: exception %q %w", exceptionsPath, i+1, id, err)
 		}
 		exceptions[id] = reason
 	}
 	return exceptions, nil
+}
+
+// checkExceptionReason rejects an empty reason and one whose "<category>:"
+// prefix is not in exceptionCategories. Pure.
+func checkExceptionReason(reason string) error {
+	if reason == "" {
+		return errors.New("has no reason")
+	}
+	category, _, ok := strings.Cut(reason, ":")
+	if !ok || !exceptionCategories[category] {
+		return fmt.Errorf("has reason %q, which does not start with an allowed category", reason)
+	}
+	return nil
+}
+
+// isOracle reports whether bin is the pinned oracle, oracle/bin/just at the
+// module root. Impure: it resolves the module root against the working
+// directory.
+func isOracle(bin string) bool {
+	oracle, err := filepath.Abs(filepath.Join("..", "oracle", "bin", "just"))
+	return err == nil && oracle == bin
 }
 
 // check runs one case by the comparison rules and returns every mismatch.
@@ -386,17 +426,56 @@ func TestOracleExceptionsNameCorpusCases(t *testing.T) {
 	}
 }
 
-func TestParseExceptions(t *testing.T) {
-	got, err := parseExceptions("# comment\n\na#1 why  not\n  b#2   because \n")
+// TestOracleExceptionsStillFail keeps oracle-exceptions.txt honest in the
+// other direction: every listed case must still fail against the oracle.
+// An exception that passes is stale (for example after a recorder fix) and
+// must be removed. It runs only when JUST_GO_BIN is the pinned oracle,
+// because the exceptions describe the oracle, not just-go.
+func TestOracleExceptionsStillFail(t *testing.T) {
+	h := newHarness(t)
+	if !isOracle(h.bin) {
+		t.Skip("JUST_GO_BIN is not oracle/bin/just; the exceptions describe the oracle")
+	}
+	byID := map[string]Case{}
+	for _, c := range loadCorpus(t, h.fsys) {
+		byID[c.ID] = c
+	}
+	for id := range loadExceptions(t, h.fsys) {
+		t.Run(id, func(t *testing.T) {
+			t.Parallel()
+			if err := h.check(t, byID[id]); err == nil {
+				t.Errorf("oracle exception %q now passes against the oracle; remove it from %s", id, exceptionsPath)
+			}
+		})
+	}
+}
+
+func TestIsOracle(t *testing.T) {
+	oracle, err := filepath.Abs(filepath.Join("..", "oracle", "bin", "just"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"a#1": "why  not", "b#2": "because"}
+	if !isOracle(oracle) {
+		t.Errorf("isOracle(%q) = false, want true", oracle)
+	}
+	if isOracle("/usr/bin/just-go") {
+		t.Error("isOracle(/usr/bin/just-go) = true, want false")
+	}
+}
+
+func TestParseExceptions(t *testing.T) {
+	got, err := parseExceptions("# comment\n\na#1 fifo: why  not\n  b#2   mode: because \n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"a#1": "fifo: why  not", "b#2": "mode: because"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
-	if _, err := parseExceptions("a#1\n"); err == nil || !strings.Contains(err.Error(), ":1:") {
-		t.Fatalf("want error naming the line, got %v", err)
+	for _, bad := range []string{"a#1\n", "a#1 no category here\n", "a#1 flaky: unknown category\n"} {
+		if _, err := parseExceptions(bad); err == nil || !strings.Contains(err.Error(), ":1:") {
+			t.Errorf("parseExceptions(%q): want error naming the line, got %v", bad, err)
+		}
 	}
 }
 
