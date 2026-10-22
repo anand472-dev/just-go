@@ -34,6 +34,17 @@ func isExecutable(path string) bool {
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
+// fatalSignals are the signals upstream treats as fatal.
+func fatalSignals() []os.Signal {
+	return []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM}
+}
+
+// forwardSignal sends signal sig to the process pid; a child that is gone
+// already is no failure. Impure: it signals a process.
+func forwardSignal(pid, sig int) {
+	_ = syscall.Kill(pid, syscall.Signal(sig))
+}
+
 // isolateGroup puts the child in its own process group and makes
 // cancellation kill that whole group. Impure: it configures process and
 // signal behavior of cmd.

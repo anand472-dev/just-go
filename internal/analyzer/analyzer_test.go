@@ -23,8 +23,20 @@ func mustParse(t testing.TB, src string) *ast.Justfile {
 
 // wantError analyzes src and checks for a KindAnalysis *diag.Error on the
 // given line whose message is exactly msg. Messages are the ones the
-// conformance corpus records, without the "error: " prefix.
+// conformance corpus records, without the "error: " prefix. Columns are
+// checked by TestAnalyzeErrorLocations.
 func wantError(t *testing.T, src string, line int, msg string) {
+	t.Helper()
+	got := analyze(t, src)
+	got.Col, got.Width = 0, 0
+	want := diag.Error{Kind: diag.KindAnalysis, File: "justfile", Line: line, Msg: msg}
+	if got != want {
+		t.Errorf("Analyze(%q) error =\n %+v\nwant\n %+v", src, got, want)
+	}
+}
+
+// analyze analyzes src and returns the *diag.Error it must report.
+func analyze(t *testing.T, src string) diag.Error {
 	t.Helper()
 	err := analyzer.Analyze(mustParse(t, src))
 	if err == nil {
@@ -34,9 +46,77 @@ func wantError(t *testing.T, src string, line int, msg string) {
 	if !errors.As(err, &de) {
 		t.Fatalf("Analyze(%q) error %T is not a *diag.Error", src, err)
 	}
-	want := diag.Error{Kind: diag.KindAnalysis, File: "justfile", Line: line, Msg: msg}
-	if *de != want {
-		t.Errorf("Analyze(%q) error =\n %+v\nwant\n %+v", src, *de, want)
+	return *de
+}
+
+// TestAnalyzeErrorLocations pins each error's line, column and width. Each
+// row was produced by oracle/bin/just on the same source: the location from
+// its "——▶ justfile:L:C" line, the width from its carets.
+func TestAnalyzeErrorLocations(t *testing.T) {
+	cases := []struct {
+		src              string
+		line, col, width int
+		msg              string
+	}{
+		{"build:\n  a\nbuild:\n  b\n", 3, 1, 5, "recipe `build` first defined on line 1 is redefined on line 3"},
+		{"x := \"a\"\nx := \"b\"\n", 2, 1, 1, "variable `x` has multiple definitions"},
+		{"r:\n  echo {{nope}}\n", 2, 10, 4, "variable `nope` not defined"},
+		{"x := 'a' + ('b' + nope)\n", 1, 19, 4, "variable `nope` not defined"},
+		{"r a=nope:\n  echo\n", 1, 5, 4, "variable `nope` not defined"},
+		{"@a: x yy\nx:\n", 1, 7, 2, "recipe `a` has unknown dependency `yy`"},
+		{"a: a\n", 1, 4, 1, "recipe `a` depends on itself"},
+		{"a: b\nb: a\n", 2, 4, 1, "recipe `b` has circular dependency `a -> b -> a`"},
+		{"z := y\ny := z\n", 2, 1, 1, "variable `y` depends on its own value: `y -> z -> y`"},
+		{"a: b\nb x:\n  echo {{zz}}\n", 3, 10, 2, "variable `zz` not defined"},
+	}
+	for _, c := range cases {
+		got := analyze(t, c.src)
+		if got.Line != c.line || got.Col != c.col || got.Width != c.width || got.Msg != c.msg {
+			t.Errorf("Analyze(%q) = %d:%d width %d %q, want %d:%d width %d %q",
+				c.src, got.Line, got.Col, got.Width, got.Msg, c.line, c.col, c.width, c.msg)
+		}
+	}
+}
+
+// TestAnalyzeRejectsWhatUpstreamRejects covers the checks of the final
+// review (FINAL-4): each row was produced by oracle/bin/just.
+func TestAnalyzeRejectsWhatUpstreamRejects(t *testing.T) {
+	cases := []struct {
+		src              string
+		line, col, width int
+		msg              string
+	}{
+		{"a x x:\n", 1, 5, 1, "recipe `a` has duplicate parameter `x`"},
+		{"a x y z y:\n", 1, 9, 1, "recipe `a` has duplicate parameter `y`"},
+		{"a b c x=\"1\" y:\n", 1, 13, 1, "non-default parameter `y` follows default parameter"},
+		{"bar:\n\t\techo hello\n\t\t\techo goodbye", 3, 3, 13, "recipe line has extra leading whitespace"},
+		{"bar:\n  a\n    b {{x}}\n", 3, 3, 4, "recipe line has extra leading whitespace"},
+		{"bar:\n  a\n    {{x}}\n", 3, 3, 2, "recipe line has extra leading whitespace"},
+		{"a: b\nb x:\n", 1, 4, 1, "dependency `b` got 0 arguments but takes 1 argument"},
+		{"a: b\nb x y='1':\n", 1, 4, 1, "dependency `b` got 0 arguments but takes at least 1 argument"},
+		{"a: b\nb x y:\n", 1, 4, 1, "dependency `b` got 0 arguments but takes 2 arguments"},
+		// The order of the checks.
+		{"x := y\na x x:\n", 2, 5, 1, "recipe `a` has duplicate parameter `x`"},
+		{"x:\n   y\na x x:\n", 3, 5, 1, "recipe `a` has duplicate parameter `x`"},
+		{"r:\nr:\n  x\n   y\n", 2, 1, 1, "recipe `r` first defined on line 1 is redefined on line 2"},
+		{"r:\n  x\n   y\nr:\n", 3, 3, 2, "recipe line has extra leading whitespace"},
+		{"a: b\nb x:\nc: nope\n", 1, 4, 1, "dependency `b` got 0 arguments but takes 1 argument"},
+	}
+	for _, c := range cases {
+		got := analyze(t, c.src)
+		if got.Line != c.line || got.Col != c.col || got.Width != c.width || got.Msg != c.msg {
+			t.Errorf("Analyze(%q) = %d:%d width %d %q, want %d:%d width %d %q",
+				c.src, got.Line, got.Col, got.Width, got.Msg, c.line, c.col, c.width, c.msg)
+		}
+	}
+}
+
+// A continuation line may start with extra whitespace, and a dependency
+// whose parameters all have defaults takes no arguments.
+func TestAnalyzeAcceptsContinuationsAndDefaultedDependencies(t *testing.T) {
+	src := "a: b\n  echo one \\\n      two\nb x='1':\n  echo {{x}}\n"
+	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+		t.Errorf("Analyze = %v, want nil", err)
 	}
 }
 
@@ -80,7 +160,7 @@ build target=y: test
 test: build2
   echo ok
 
-build2 p q=p:
+build2 p="x" q=p:
   echo {{p}} {{q}} {{ 'lit' + y }}
 `
 	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
@@ -172,7 +252,7 @@ func TestAnalyzeToleratesAbsentExpressions(t *testing.T) {
 		Recipes: []ast.Recipe{{
 			Name:   "r",
 			Params: []ast.Param{{Name: "p"}},
-			Lines:  []ast.Line{{Parts: []ast.Expr{nil, ast.StringLit{Value: "t"}}, Line: 3}},
+			Lines:  []ast.Line{{Parts: []ast.Expr{nil, ast.Text{Value: "t"}}, Line: 3}},
 			Line:   3,
 		}},
 	}

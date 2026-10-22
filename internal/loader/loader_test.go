@@ -195,6 +195,9 @@ func TestLoadReportsParseErrorWithFilePath(t *testing.T) {
 	if de.Kind != diag.KindParse {
 		t.Errorf("Kind = %v, want KindParse", de.Kind)
 	}
+	if de.Source != "a b c" {
+		t.Errorf("Source = %q, want the line of the error", de.Source)
+	}
 }
 
 func TestLoadReportsAnalysisError(t *testing.T) {
@@ -206,6 +209,9 @@ func TestLoadReportsAnalysisError(t *testing.T) {
 	}
 	if de.Kind != diag.KindAnalysis || de.File != "/p/justfile" {
 		t.Errorf("got kind %v file %q, want analysis in /p/justfile", de.Kind, de.File)
+	}
+	if de.Source != "a: nope" || de.Col != 4 {
+		t.Errorf("Source = %q at col %d, want the dependency's line and column", de.Source, de.Col)
 	}
 }
 

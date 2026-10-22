@@ -13,6 +13,7 @@ import (
 
 	"gitea.com/wimwian/just-go/internal/analyzer"
 	"gitea.com/wimwian/just-go/internal/ast"
+	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
@@ -170,8 +171,8 @@ func findIn(fsys sys.FS, dir string) (string, error) {
 
 // Load reads the justfile at path, parses it with path as the file name, and
 // analyzes it. It returns the first error: a read failure (wrapped), or a
-// *diag.Error from parsing or analysis whose File is path. Impure: it reads
-// fsys.
+// *diag.Error from parsing or analysis whose File is path and whose Source is
+// the line it is on. Impure: it reads fsys.
 func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
 	src, err := fsys.ReadFile(path)
 	if err != nil {
@@ -179,10 +180,10 @@ func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
 	}
 	jf, err := parser.Parse(path, src)
 	if err != nil {
-		return nil, err
+		return nil, diag.WithSource(err, src)
 	}
 	if err := analyzer.Analyze(jf); err != nil {
-		return nil, err
+		return nil, diag.WithSource(err, src)
 	}
 	return jf, nil
 }

@@ -120,15 +120,15 @@ func locate(fsys sys.FS, opts Options) (string, error) {
 }
 
 // Parse parses and analyzes src as a justfile; name is used as the file name
-// in errors. A justfile parsed from memory has no directory, so Run needs
-// Options.WorkDir for it. Pure.
+// in errors, and an error's Source quotes its line of src. A justfile parsed
+// from memory has no directory, so Run needs Options.WorkDir for it. Pure.
 func Parse(name string, src []byte) (*Justfile, error) {
 	tree, err := parser.Parse(name, src)
 	if err != nil {
-		return nil, err
+		return nil, diag.WithSource(err, src)
 	}
 	if err := analyzer.Analyze(tree); err != nil {
-		return nil, err
+		return nil, diag.WithSource(err, src)
 	}
 	return &Justfile{tree: tree}, nil
 }

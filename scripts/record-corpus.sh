@@ -97,6 +97,9 @@ Each line of \`cases.jsonl\` is one call to \`Test::status\` in upstream's
 | Cases with file modes outside the convention (\`modes\`) | $MODES |
 | Lossy cases (an input that is not valid UTF-8 was left out) | $LOSSY |
 
+The pass counts and the ratchet baseline are recorded by hand in
+\`conformance/BASELINE.md\`, which \`make corpus\` does not touch.
+
 ## How to read a case
 
 - \`args\` is the full command line. Upstream adds \`--shell bash\` unless a test

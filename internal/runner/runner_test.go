@@ -185,6 +185,54 @@ func TestRunSignalExitIsUnknownFailure(t *testing.T) {
 	}
 }
 
+// TestRunSignals follows upstream's run_shell: a failing status comes first,
+// then a signal that terminated the command, then a fatal signal caught
+// while it ran; `-` ignores them all; the status is 128 plus the signal.
+func TestRunSignals(t *testing.T) {
+	cases := []struct {
+		name, src string
+		codes     []int
+		errs      []error
+		quiet     bool
+		ran, exit int
+		stderr    string
+	}{
+		{"terminated", "r:\n\t@kill -TERM $$\n\t@echo no\n", []int{-1}, []error{&sys.SignalError{Signal: 15}}, false, 1, 143,
+			"error: recipe `r` was terminated on line 2 by signal 15\n"},
+		{"terminated and caught", "r:\n\t@sleep 9\n", []int{-1}, []error{&sys.SignalError{Signal: 2, Caught: 2}}, false, 1, 130,
+			"error: recipe `r` was terminated on line 2 by signal 2\n"},
+		{"caught after success", "r:\n\t@true\n\t@echo no\n", []int{0}, []error{&sys.SignalError{Caught: 2}}, false, 1, 130,
+			"error: interrupted by SIGINT\n"},
+		{"caught after failure", "r:\n\t@false\n", []int{3}, []error{&sys.SignalError{Caught: 15}}, false, 1, 3,
+			"error: recipe `r` failed on line 2 with exit code 3\n"},
+		{"infallible goes on", "r:\n\t-@sleep 9\n\t@echo yes\n", []int{-1}, []error{&sys.SignalError{Signal: 2, Caught: 2}}, false, 2, 0, ""},
+		{"quiet", "r:\n\t@sleep 9\n", []int{-1}, []error{&sys.SignalError{Signal: 9}}, true, 1, 137, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fake := &sysfake.FakeProcess{Codes: c.codes, Errs: c.errs}
+			plan, _, stderr := newPlan(t, c.src, fake)
+			plan.Quiet = c.quiet
+			if res := mustRun(t, plan); res.ExitCode != c.exit || len(fake.Specs) != c.ran || stderr.String() != c.stderr {
+				t.Fatalf("exit %d, ran %d, stderr %q; want %d, %d, %q", res.ExitCode, len(fake.Specs), stderr, c.exit, c.ran, c.stderr)
+			}
+		})
+	}
+}
+
+// A real child that a signal ends reports it as upstream does
+// (FINAL-7): `kill -TERM $$` gives status 143.
+func TestRunSignalTerminatedChild(t *testing.T) {
+	plan, _, stderr := newPlan(t, "a:\n\tkill -TERM $$\n", sys.OSProcess{})
+	plan.Env = []string{"PATH=/usr/bin:/bin"}
+	if res := mustRun(t, plan); res.ExitCode != 143 {
+		t.Fatalf("exit = %d; want 143", res.ExitCode)
+	}
+	if want := "kill -TERM $$\nerror: recipe `a` was terminated on line 2 by signal 15\n"; stderr.String() != want {
+		t.Fatalf("stderr = %q; want %q", stderr, want)
+	}
+}
+
 func TestRunCancelKillsChild(t *testing.T) {
 	plan, _, _ := newPlan(t, "r:\n\t@sleep 30\n", sys.OSProcess{})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -446,11 +494,25 @@ func TestRunLineEvaluationErrorIsLocated(t *testing.T) {
 	}
 }
 
-func TestLocateKeepsExistingLocationAndOtherErrors(t *testing.T) {
+func TestLocateKeepsExistingLocation(t *testing.T) {
 	located := &diag.Error{Kind: diag.KindRuntime, File: "f", Line: 7, Msg: "m"}
 	if got := locate(located, "justfile", 1); got != located || located.Line != 7 || located.File != "f" {
 		t.Fatalf("locate changed an already located error: %+v", got)
 	}
+}
+
+func TestLocateFillsInWhatIsMissing(t *testing.T) {
+	unlocated := &diag.Error{Kind: diag.KindRuntime, Msg: "m"}
+	if locate(unlocated, "justfile", 3); unlocated.File != "justfile" || unlocated.Line != 3 {
+		t.Fatalf("locate did not fill in the location: %+v", unlocated)
+	}
+	column := &diag.Error{Kind: diag.KindRuntime, Line: 2, Col: 9, Msg: "m"}
+	if locate(column, "justfile", 3); column.File != "justfile" || column.Line != 2 || column.Col != 9 {
+		t.Fatalf("locate replaced the position of a variable: %+v", column)
+	}
+}
+
+func TestLocateLeavesOtherErrors(t *testing.T) {
 	plain := errors.New("plain")
 	if got := locate(plain, "justfile", 1); got != plain {
 		t.Fatalf("locate(%v) = %v; want it unchanged", plain, got)
@@ -463,7 +525,7 @@ func chain(n int) *ast.Justfile {
 	for i := 0; i < n; i++ {
 		r := ast.Recipe{Name: fmt.Sprintf("r%d", i), Line: i + 1}
 		if i+1 < n {
-			r.Deps = []string{fmt.Sprintf("r%d", i+1)}
+			r.Deps = []ast.Dep{{Name: fmt.Sprintf("r%d", i+1)}}
 		}
 		jf.Recipes = append(jf.Recipes, r)
 	}

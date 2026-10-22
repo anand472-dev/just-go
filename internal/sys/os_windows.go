@@ -48,6 +48,16 @@ func isExecutable(path string) bool {
 	return err == nil && info.Mode().IsRegular() && filepath.Ext(path) != ""
 }
 
+// fatalSignals are the signals Windows delivers that upstream treats as
+// fatal: Ctrl-C, and the termination Go maps to SIGTERM.
+func fatalSignals() []os.Signal {
+	return []os.Signal{os.Interrupt, syscall.SIGTERM}
+}
+
+// forwardSignal does nothing: as upstream, Windows forwards no signal to the
+// children, which share the console's Ctrl-C. Pure.
+func forwardSignal(pid, sig int) {}
+
 // isolateGroup puts the child in its own process group. Cancellation uses
 // the default Cmd.Cancel, which kills the direct child. Impure: it configures
 // process behavior of cmd.

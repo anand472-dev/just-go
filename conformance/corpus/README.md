@@ -19,30 +19,8 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
 | Cases with file modes outside the convention (`modes`) | 3 |
 | Lossy cases (an input that is not valid UTF-8 was left out) | 0 |
 
-## Baseline
-
-`conformance/baseline.txt` lists the cases `bin/just-go` passes. The
-ratchet (`make ratchet`) only adds to it, and `TestBaseline` (`make baseline`)
-fails if any of them stops passing. `make check` runs that gate.
-`make conformance-report` runs the full corpus and prints the pass, fail, and
-skip counts; it is allowed to fail. This section is written by hand at each
-milestone gate; `make corpus` regenerates the rest of this file and drops it.
-
-| | |
-|---|---|
-| Recorded | 2026-10-22, milestone 1 gate, `bin/just-go` built from commit `bfd0b56` |
-| Corpus cases | 2011 |
-| Cases in the baseline | 80 |
-| Full run: pass | 80 |
-| Full run: fail | 1915 |
-| Full run: skip (oracle exceptions) | 16 |
-
-The gate proves only the 80 baseline cases. The honest pass rate is 80 of the
-2011 cases. Of the 1915 failures, 857 fail on a command-line flag that
-Plan 1 does not implement (for example `--evaluate` or `--dump`), and 1058
-fail on other differences from upstream that are outside Plan 1's scope.
-Upstream adds `--shell bash` to 1949 cases (see below); `--shell` is in
-Plan 1's scope, and no case fails on it.
+The pass counts and the ratchet baseline are recorded by hand in
+`conformance/BASELINE.md`, which `make corpus` does not touch.
 
 ## How to read a case
 

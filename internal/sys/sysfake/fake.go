@@ -55,6 +55,9 @@ type FakeProcess struct {
 	Codes []int
 	// Err, when non-nil, is returned by every call (with exit code -1).
 	Err error
+	// Errs are errors returned by successive calls together with the matching
+	// entry of Codes; a nil or missing entry means none.
+	Errs []error
 	// Specs records each ProcessSpec passed to Run, in order.
 	Specs []sys.ProcessSpec
 }
@@ -67,8 +70,12 @@ func (p *FakeProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error) 
 		return -1, p.Err
 	}
 	call := len(p.Specs) - 1
+	code := 0
 	if call < len(p.Codes) {
-		return p.Codes[call], nil
+		code = p.Codes[call]
 	}
-	return 0, nil
+	if call < len(p.Errs) {
+		return code, p.Errs[call]
+	}
+	return code, nil
 }

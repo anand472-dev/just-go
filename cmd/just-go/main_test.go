@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -209,7 +210,7 @@ func TestRunQuietSuppressesErrors(t *testing.T) {
 		{"recipe failure", files, []int{3}, []string{"-q", "a"}, 3},
 		{"unknown recipe", files, nil, []string{"-q", "nope"}, 1},
 		{"no justfile", nil, nil, []string{"-q"}, 1},
-		{"argument count mismatch", files, nil, []string{"c", "-q"}, 1},
+		{"argument count mismatch", files, nil, []string{"-q", "c"}, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := runFake(t, tc.files, tc.codes, tc.args...)
@@ -283,13 +284,16 @@ func TestParseArgs(t *testing.T) {
 		{"clustered", []string{"-lq"}, config{list: true, quiet: true}},
 		{"attached short value", []string{"-fj"}, config{justfile: "j"}},
 		{"cluster ending in value", []string{"-qf", "j"}, config{quiet: true, justfile: "j"}},
-		{"flags after words", []string{"a", "-q", "b"}, config{quiet: true, words: []string{"a", "b"}}},
-		{"double dash ends flags", []string{"a", "--", "-q", "--list"}, config{words: []string{"a", "-q", "--list"}}},
+		// As upstream's: after the first word every argument is a word.
+		{"dashes after a word are words", []string{"a", "-q", "--verbose", "b"}, config{words: []string{"a", "-q", "--verbose", "b"}}},
+		{"double dash after a word is a word", []string{"a", "--", "-l"}, config{words: []string{"a", "--", "-l"}}},
+		{"double dash before words ends flags", []string{"-q", "--", "-l", "--list"}, config{quiet: true, words: []string{"-l", "--list"}}},
 		{"lone dash is a word", []string{"-"}, config{words: []string{"-"}}},
+		{"flags after a lone dash are words", []string{"-", "-q"}, config{words: []string{"-", "-q"}}},
 		{"shell", []string{"--shell", "bash"}, config{shell: "bash", shellGiven: true}},
 		{"attached shell", []string{"--shell=bash"}, config{shell: "bash", shellGiven: true}},
 		{"shell arg", []string{"--shell-arg", "-c"}, config{shellArgs: []string{"-c"}}},
-		{"shell args repeat in order", []string{"--shell-arg", "-e", "a", "--shell-arg=-c"}, config{shellArgs: []string{"-e", "-c"}, words: []string{"a"}}},
+		{"shell args repeat in order", []string{"--shell-arg", "-e", "--shell-arg=-c", "a"}, config{shellArgs: []string{"-e", "-c"}, words: []string{"a"}}},
 		{"shell with args", []string{"--shell-arg", "-c", "--shell", "zsh"}, config{shell: "zsh", shellGiven: true, shellArgs: []string{"-c"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -312,7 +316,7 @@ func TestParseArgsErrors(t *testing.T) {
 		{[]string{"--list=1"}, "unexpected value for '--list'"},
 		{[]string{"--justfile"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
 		{[]string{"-f"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
-		{[]string{"a", "-lf"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
+		{[]string{"-lf"}, "a value is required for '--justfile <JUSTFILE>' but none was supplied"},
 		{[]string{"--shell"}, "a value is required for '--shell <SHELL>' but none was supplied"},
 		{[]string{"--shell-arg"}, "a value is required for '--shell-arg <SHELL_ARG>' but none was supplied"},
 		{[]string{"--shell", "a", "--shell=b"}, "the argument '--shell <SHELL>' cannot be used multiple times"},
@@ -454,15 +458,29 @@ func TestFormatListDoesNotReorderInput(t *testing.T) {
 	}
 }
 
+// TestDescribe pins upstream's rendering of a located error (Token's
+// ColorDisplay): the base name of the file, the line quoted with tabs as four
+// spaces, and carets under the token. Each located want is the oracle's.
 func TestDescribe(t *testing.T) {
-	located := &diag.Error{Kind: diag.KindParse, File: "justfile", Line: 2, Col: 3, Msg: "bad"}
+	located := func(file string, line, col, width int, source, msg string) *diag.Error {
+		return &diag.Error{Kind: diag.KindAnalysis, File: file, Line: line, Col: col, Width: width, Source: source, Msg: msg}
+	}
 	for _, tc := range []struct {
 		err  error
 		want string
 	}{
 		{usage("no good"), "no good"},
-		{located, "justfile:2:3: bad"},
 		{errors.New("plain"), "plain"},
+		{located("/w/justfile", 2, 9, 1, "\techo {{y}}", "variable `y` not defined"),
+			"variable `y` not defined\n ——▶ justfile:2:9\n  │\n2 │     echo {{y}}\n  │            ^"},
+		{located("/w/justfile", 3, 3, 13, "\t\t\techo goodbye", "recipe line has extra leading whitespace"),
+			"recipe line has extra leading whitespace\n ——▶ justfile:3:3\n  │\n3 │             echo goodbye\n  │         ^^^^^^^^^^^^^^^^"},
+		{located("justfile", 1, 6, 0, "x := ", "expected"),
+			"expected\n ——▶ justfile:1:6\n  │\n1 │ x := \n  │      ^"},
+		{located("j", 12, 1, 3, "ab", "past the end"),
+			"past the end\n  ——▶ j:12:1\n   │\n12 │ ab\n   │ ^^"},
+		{located("j", 1, 1, 1, "", "empty"),
+			"empty\n ——▶ j:1:1\n  │\n1 │ \n  │ ^"},
 	} {
 		if got := describe(tc.err); got != tc.want {
 			t.Errorf("describe(%v) = %q, want %q", tc.err, got, tc.want)
@@ -536,5 +554,51 @@ func TestRunRepeatedShellExitsTwo(t *testing.T) {
 	want := "error: the argument '--shell <SHELL>' cannot be used multiple times\n"
 	if o.code != 2 || o.stderr != want || len(o.proc.Specs) != 0 {
 		t.Errorf("run = %d, stderr %q, specs %d; want 2, %q, 0", o.code, o.stderr, len(o.proc.Specs), want)
+	}
+}
+
+// TestRunQuietDiscardsRecipeOutput pins upstream's --quiet, which sends the
+// recipes' stdout and stderr to /dev/null (quiet::no_stdout#1,
+// quiet::stderr#1).
+func TestRunQuietDiscardsRecipeOutput(t *testing.T) {
+	files := map[string]string{"/w/justfile": "default:\n  @echo hello\n  echo err >&2\n"}
+	quiet := runFake(t, files, nil, "--quiet")
+	for _, spec := range quiet.proc.Specs {
+		if spec.Stdout != io.Discard || spec.Stderr != io.Discard {
+			t.Errorf("-q child streams = %v, %v; want io.Discard", spec.Stdout, spec.Stderr)
+		}
+	}
+	loud := runFake(t, files, nil)
+	if spec := loud.proc.Specs[0]; spec.Stdout == io.Discard || spec.Stderr == io.Discard {
+		t.Errorf("child streams without -q are discarded")
+	}
+	if len(quiet.proc.Specs) != 2 || quiet.stdout != "" || quiet.stderr != "" {
+		t.Errorf("run -q = %d commands, %q, %q; want 2 and no output", len(quiet.proc.Specs), quiet.stdout, quiet.stderr)
+	}
+}
+
+// TestRunPassesDashedArgumentsToTheRecipe pins upstream: `just a -x` gives
+// -x to recipe a, and after a word "--" is a word too.
+func TestRunPassesDashedArgumentsToTheRecipe(t *testing.T) {
+	files := map[string]string{"/w/justfile": "a x:\n  echo {{x}}\nl:\n  echo l\n"}
+	for _, arg := range []string{"-x", "--verbose", "--"} {
+		got := runFake(t, files, nil, "a", arg)
+		if got.code != 0 || len(got.proc.Specs) != 1 || got.proc.Specs[0].Argv[2] != "echo "+arg {
+			t.Errorf("run a %s = %d, %v (stderr %q); want echo %s", arg, got.code, got.proc.Specs, got.stderr, arg)
+		}
+	}
+	got := runFake(t, files, nil, "a", "--", "-l")
+	if want := "error: justfile does not contain recipe `-l`\n"; got.code != 1 || got.stderr != want {
+		t.Errorf("run a -- -l = %d, %q; want 1, %q", got.code, got.stderr, want)
+	}
+}
+
+// TestRunRendersErrorsAsUpstream checks a whole error as the corpus records
+// it (misc::unknown_dependency#1).
+func TestRunRendersErrorsAsUpstream(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "bar:\nhello:\nfoo: bar baaaaaaaz hello"}, nil)
+	want := "error: recipe `foo` has unknown dependency `baaaaaaaz`\n ——▶ justfile:3:10\n  │\n3 │ foo: bar baaaaaaaz hello\n  │          ^^^^^^^^^\n"
+	if got.code != 1 || got.stderr != want {
+		t.Errorf("run = %d, %q; want 1, %q", got.code, got.stderr, want)
 	}
 }

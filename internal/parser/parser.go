@@ -7,12 +7,15 @@
 // following line that starts with indentation. Blank lines belong to the body
 // only when more indented lines follow them, and they are dropped. The first
 // body line fixes the recipe's indentation; each later line must start with it,
-// and any extra whitespace becomes part of the line's text.
+// and any extra whitespace becomes part of the line's text. A line whose text
+// ends in a backslash continues on the next line, as upstream's does.
 package parser
 
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
@@ -36,9 +39,12 @@ type parser struct {
 	toks []lexer.Token // always ends with EOF
 	pos  int
 	// doc is the text of the most recent top-level comment, and docLine the
-	// line it was on. A recipe on the next line adopts it.
-	doc     string
-	docLine int
+	// line it was on. A recipe on the next line adopts it, unless docShebang
+	// says it is a `#!` line at the very start of the file, which upstream
+	// never takes as a doc.
+	doc        string
+	docLine    int
+	docShebang bool
 }
 
 // peek returns the current token.
@@ -58,8 +64,17 @@ func (p *parser) next() lexer.Token {
 	return t
 }
 
+// errAt reports msg at t, covering the whole token.
 func (p *parser) errAt(t lexer.Token, msg string) error {
-	return &diag.Error{Kind: diag.KindParse, File: p.file, Line: t.Line, Col: t.Col, Msg: msg}
+	return &diag.Error{Kind: diag.KindParse, File: p.file, Line: t.Line, Col: t.Col, Width: tokenWidth(t), Msg: msg}
+}
+
+// tokenWidth is the width of t in the source, in runes. Pure.
+func tokenWidth(t lexer.Token) int {
+	if t.Kind == lexer.String {
+		return utf8.RuneCountInString(t.Raw)
+	}
+	return utf8.RuneCountInString(t.Text)
 }
 
 // unexpected reports that t is not what the grammar needs next.
@@ -113,6 +128,7 @@ func (p *parser) item(jf *ast.Justfile) error {
 	case lexer.Newline:
 		p.next()
 	case lexer.Comment:
+		p.docShebang = p.pos == 0 && strings.HasPrefix(t.Text, "!")
 		p.next()
 		p.doc, p.docLine = strings.TrimSpace(t.Text), t.Line
 	case lexer.At, lexer.Ident:
@@ -170,7 +186,7 @@ func (p *parser) setting(jf *ast.Justfile) error {
 		}
 		jf.Settings.Shell = shell
 	default:
-		return p.errAt(name, fmt.Sprintf("Unknown setting `%s`", name.Text))
+		return p.errAt(name, fmt.Sprintf("unknown setting `%s`", name.Text))
 	}
 	return p.endLine()
 }
@@ -208,7 +224,7 @@ func (p *parser) assignment(jf *ast.Justfile) error {
 	if err != nil {
 		return err
 	}
-	jf.Assignments = append(jf.Assignments, ast.Assignment{Name: name.Text, Value: value, Line: name.Line})
+	jf.Assignments = append(jf.Assignments, ast.Assignment{Name: name.Text, Value: value, Line: name.Line, Col: name.Col})
 	return p.endLine()
 }
 
@@ -237,7 +253,7 @@ func (p *parser) atom() (ast.Expr, error) {
 		return ast.StringLit{Value: t.Text}, nil
 	case lexer.Ident:
 		p.next()
-		return ast.Var{Name: t.Text}, nil
+		return ast.Var{Name: t.Text, Line: t.Line, Col: t.Col}, nil
 	case lexer.LParen:
 		p.next()
 		return p.group()
@@ -267,8 +283,8 @@ func (p *parser) recipe(jf *ast.Justfile) error {
 	if err != nil {
 		return err
 	}
-	r := ast.Recipe{Name: name.Text, Line: name.Line}
-	if p.docLine == start.Line-1 {
+	r := ast.Recipe{Name: name.Text, Line: name.Line, Col: name.Col}
+	if p.docLine == start.Line-1 && !p.docShebang {
 		r.Doc = p.doc
 	}
 	if err := p.header(&r); err != nil {
@@ -297,13 +313,15 @@ func (p *parser) header(r *ast.Recipe) error {
 		return err
 	}
 	for p.peek().Kind == lexer.Ident {
-		r.Deps = append(r.Deps, p.next().Text)
+		d := p.next()
+		r.Deps = append(r.Deps, ast.Dep{Name: d.Text, Line: d.Line, Col: d.Col})
 	}
 	return p.endLine()
 }
 
 func (p *parser) param() (ast.Param, error) {
-	param := ast.Param{Name: p.next().Text}
+	name := p.next()
+	param := ast.Param{Name: name.Text, Line: name.Line, Col: name.Col}
 	if p.peek().Kind != lexer.Equals {
 		return param, nil
 	}
@@ -354,21 +372,34 @@ func quietPrefix(p ast.Prefix) ast.Prefix {
 }
 
 // skipBlankLines moves past line breaks, but only when a body line follows.
-func (p *parser) skipBlankLines() {
+// It returns the line of the first blank line it skipped, or 0.
+func (p *parser) skipBlankLines() int {
 	i := p.pos
 	for p.toks[i].Kind == lexer.Newline {
 		i++
 	}
-	if p.toks[i].Kind == lexer.Indent {
-		p.pos = i
+	if p.toks[i].Kind != lexer.Indent || i == p.pos {
+		return 0
 	}
+	first := p.toks[p.pos].Line
+	p.pos = i
+	return first
 }
 
-// body parses the indented lines of a recipe.
+// body parses the indented lines of a recipe. A physical line that ends in a
+// backslash continues into the next one, unless a blank line comes between,
+// which ends the command, as in upstream.
 func (p *parser) body() ([]ast.Line, error) {
 	var lines []ast.Line
 	indent := ""
-	for p.skipBlankLines(); p.peek().Kind == lexer.Indent; p.skipBlankLines() {
+	continued := false
+	for {
+		if blank := p.skipBlankLines(); blank != 0 && continued {
+			lines[len(lines)-1].Line, continued = blank, false
+		}
+		if p.peek().Kind != lexer.Indent {
+			return lines, nil
+		}
 		t := p.next()
 		if msg := indentError(indent, t.Text); msg != "" {
 			return nil, p.errAt(t, msg)
@@ -376,25 +407,86 @@ func (p *parser) body() ([]ast.Line, error) {
 		if indent == "" {
 			indent = t.Text
 		}
-		line, err := p.bodyLine(t, strings.TrimPrefix(t.Text, indent))
+		phys, err := p.bodyLine(t, indent)
 		if err != nil {
 			return nil, err
 		}
-		lines = append(lines, line)
+		if continued {
+			lines[len(lines)-1] = join(lines[len(lines)-1], phys)
+		} else {
+			lines = append(lines, command(phys))
+		}
+		continued = phys.continues
 	}
-	return lines, nil
 }
 
-// bodyLine parses one body line after its Indent token. extra is whitespace
-// beyond the recipe's indentation, which stays in the text.
-func (p *parser) bodyLine(indent lexer.Token, extra string) (ast.Line, error) {
+// physical is one physical body line: its parts, where it is, and whether it
+// ends in a backslash, which has been removed from Parts.
+type physical struct {
+	parts     []ast.Expr
+	line      int
+	extra     ast.Span // the line's text when it starts with extra whitespace
+	continues bool
+}
+
+// bodyLine parses one physical body line after its Indent token t. indent is
+// the recipe's indentation; whitespace beyond it stays in the text.
+func (p *parser) bodyLine(t lexer.Token, indent string) (physical, error) {
+	extra := strings.TrimPrefix(t.Text, indent)
 	parts, err := p.parts(extra)
 	if err != nil {
-		return ast.Line{}, err
+		return physical{}, err
 	}
-	prefix, parts := splitPrefix(parts)
 	p.next() // the line break: the lexer ends every body line with one
-	return ast.Line{Prefix: prefix, Parts: parts, Line: indent.Line}, nil
+	phys := physical{parts: parts, line: t.Line}
+	if extra != "" {
+		first, _ := parts[0].(ast.Text)
+		phys.extra = ast.Span{Line: t.Line, Col: t.Col + utf8.RuneCountInString(indent),
+			Width: utf8.RuneCountInString(first.Value)}
+	}
+	phys.parts, phys.continues = cutContinuation(parts)
+	return phys, nil
+}
+
+// cutContinuation removes the backslash that ends parts, and reports whether
+// there was one. Only literal text can end in one; an interpolation that
+// yields a backslash does not continue the line. Pure.
+func cutContinuation(parts []ast.Expr) ([]ast.Expr, bool) {
+	last, ok := parts[len(parts)-1].(ast.Text)
+	if !ok || !strings.HasSuffix(last.Value, "\\") {
+		return parts, false
+	}
+	out := append([]ast.Expr(nil), parts[:len(parts)-1]...)
+	return appendText(out, strings.TrimSuffix(last.Value, "\\")), true
+}
+
+// command starts a command with its first physical line: the prefix comes
+// off the front of its text. Pure.
+func command(phys physical) ast.Line {
+	prefix, parts := splitPrefix(phys.parts)
+	return ast.Line{Prefix: prefix, Parts: parts, Line: phys.line, ExtraIndent: phys.extra}
+}
+
+// join appends a continuation line to cmd. Its leading whitespace goes, as
+// does any prefix-like text, which stays text. Pure.
+func join(cmd ast.Line, phys physical) ast.Line {
+	parts := phys.parts
+	if first, ok := firstText(parts); ok {
+		parts = appendText(nil, strings.TrimLeftFunc(first, unicode.IsSpace))
+		parts = append(parts, phys.parts[1:]...)
+	}
+	cmd.Parts = append(append([]ast.Expr(nil), cmd.Parts...), parts...)
+	cmd.Line = phys.line
+	return cmd
+}
+
+// firstText returns the value of the first part when it is text. Pure.
+func firstText(parts []ast.Expr) (string, bool) {
+	if len(parts) == 0 {
+		return "", false
+	}
+	t, ok := parts[0].(ast.Text)
+	return t.Value, ok
 }
 
 // parts parses literal text and interpolations up to the line break.
@@ -432,26 +524,25 @@ func (p *parser) interpolation() (ast.Expr, error) {
 	return e, nil
 }
 
+// appendText appends text to parts as an ast.Text, unless it is empty. Pure.
 func appendText(parts []ast.Expr, text string) []ast.Expr {
 	if text == "" {
 		return parts
 	}
-	return append(parts, ast.StringLit{Value: text})
+	return append(parts, ast.Text{Value: text})
 }
 
 // splitPrefix removes a leading `@` and `-` (each at most once, in either
-// order) from the first literal part.
+// order) from the first part, when it is source text. An interpolation never
+// carries a prefix, even one that yields `@` (upstream's Line::sigils).
 func splitPrefix(parts []ast.Expr) (ast.Prefix, []ast.Expr) {
-	if len(parts) == 0 {
-		return ast.PrefixNone, parts
-	}
-	lit, ok := parts[0].(ast.StringLit)
+	text, ok := firstText(parts)
 	if !ok {
 		return ast.PrefixNone, parts
 	}
-	prefix, rest := cutPrefix(lit.Value)
+	prefix, rest := cutPrefix(text)
 	if rest != "" {
-		parts[0] = ast.StringLit{Value: rest}
+		parts[0] = ast.Text{Value: rest}
 		return prefix, parts
 	}
 	if len(parts) == 1 {

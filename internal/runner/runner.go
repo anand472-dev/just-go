@@ -237,7 +237,7 @@ func resolveOrder(jf *ast.Justfile, calls []Call) ([]call, error) {
 		o.byName[jf.Recipes[i].Name] = &jf.Recipes[i]
 	}
 	for _, c := range calls {
-		if err := o.visit(c.Recipe, c.Args, nil); err != nil {
+		if err := o.visit(ast.Dep{Name: c.Recipe}, c.Args, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -252,20 +252,20 @@ type orderer struct {
 	order  []call
 }
 
-// visit appends name's dependencies and then name itself with args, unless
-// that call was already visited. from is the recipe that depends on name, or
-// nil for a requested recipe. A call is marked before its dependencies are
-// visited, so a cycle the analyzer missed cannot loop forever. It is pure
-// apart from updating o.
-func (o *orderer) visit(name string, args []string, from *ast.Recipe) error {
-	key := callKey(name, args)
+// visit appends the dependencies of dep's recipe and then the recipe itself
+// with args, unless that call was already visited. from is the recipe that
+// names dep, or nil for a requested recipe, which requested has checked. A
+// call is marked before its dependencies are visited, so a cycle the
+// analyzer missed cannot loop forever. It is pure apart from updating o.
+func (o *orderer) visit(dep ast.Dep, args []string, from *ast.Recipe) error {
+	key := callKey(dep.Name, args)
 	if o.seen[key] {
 		return nil
 	}
-	r, ok := o.byName[name]
+	r, ok := o.byName[dep.Name]
 	if !ok {
-		return &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: from.Line,
-			Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, name)}
+		return &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: dep.Line, Col: dep.Col, Width: len(dep.Name),
+			Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, dep.Name)}
 	}
 	o.seen[key] = true
 	for _, d := range r.Deps {
@@ -418,12 +418,18 @@ func exitCode(code int) int {
 	return code
 }
 
-// locate fills in the file and line of a *diag.Error that has none. Any
-// other error is returned unchanged. It is pure apart from updating err.
+// locate fills in the file and the line of a *diag.Error that lacks them.
+// Any other error is returned unchanged. It is pure apart from updating err.
 func locate(err error, file string, line int) error {
 	var de *diag.Error
-	if errors.As(err, &de) && de.Line == 0 {
-		de.File, de.Line = file, line
+	if !errors.As(err, &de) {
+		return err
+	}
+	if de.File == "" {
+		de.File = file
+	}
+	if de.Line == 0 {
+		de.Line = line
 	}
 	return err
 }
@@ -485,23 +491,65 @@ func (inv *invocation) line(s step, line ast.Line) (int, error) {
 		fmt.Fprintln(inv.stderr, command)
 	}
 	code, err := inv.execLine(command)
+	return inv.outcome(s.recipe, line, code, err)
+}
+
+// outcome turns the status of a line's command into the line's result: a
+// signal is handled by signaled, a failure to run the command by
+// startFailure, and a non-zero status of a line without `-` writes the
+// failure message and becomes the exit code. Impure: it writes to Stderr.
+func (inv *invocation) outcome(r *ast.Recipe, line ast.Line, code int, err error) (int, error) {
+	var sig *sys.SignalError
+	if errors.As(err, &sig) {
+		return inv.signaled(r.Name, line, code, sig), nil
+	}
 	if err != nil {
-		return inv.startFailure(s.recipe, line, err)
+		return inv.startFailure(r, line, err)
 	}
 	if code == 0 || infallible(line.Prefix) {
 		return 0, nil
 	}
-	return inv.failed(s.recipe.Name, line.Line, code), nil
+	return inv.failed(r.Name, line.Line, code), nil
+}
+
+// signaled is the outcome of a command that signals affected, in upstream's
+// order (recipe.rs run_shell): a failing status first, then a signal that
+// terminated the command, then a fatal signal caught while it ran. A line
+// with `-` ignores all three, and the run goes on. Impure: it writes to
+// Stderr.
+func (inv *invocation) signaled(recipe string, line ast.Line, code int, sig *sys.SignalError) int {
+	if infallible(line.Prefix) {
+		return 0
+	}
+	switch {
+	case sig.Signal != 0:
+		return inv.report(terminatedMessage(recipe, line.Line, sig.Signal), 128+sig.Signal)
+	case code != 0:
+		return inv.failed(recipe, line.Line, code)
+	}
+	return inv.report(fmt.Sprintf("error: interrupted by %s\n", sys.SignalName(sig.Caught)), 128+sig.Caught)
+}
+
+// terminatedMessage is the line written to Stderr when a signal terminates a
+// command, worded as upstream's Signal error. It is pure.
+func terminatedMessage(recipe string, line, signal int) string {
+	return fmt.Sprintf("error: recipe `%s` was terminated on line %d by signal %d\n", recipe, line, signal)
 }
 
 // failed writes the failure message for a command that exited with code,
-// unless the plan is quiet, as upstream's -q silences it, and returns the
-// invocation's exit code. Impure: it writes to Stderr.
+// unless the plan is quiet, and returns the invocation's exit code. Impure:
+// it writes to Stderr.
 func (inv *invocation) failed(recipe string, line, code int) int {
+	return inv.report(failureMessage(recipe, line, code), exitCode(code))
+}
+
+// report writes msg to Stderr, unless the plan is quiet, as upstream's -q
+// silences it, and returns code. Impure: it writes to Stderr.
+func (inv *invocation) report(msg string, code int) int {
 	if !inv.plan.Quiet {
-		fmt.Fprint(inv.stderr, failureMessage(recipe, line, code))
+		fmt.Fprint(inv.stderr, msg)
 	}
-	return exitCode(code)
+	return code
 }
 
 // startFailure turns an error from the process runner into the result of a

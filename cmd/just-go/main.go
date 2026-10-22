@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -26,9 +27,13 @@ import (
 // exit ends the process. Tests replace it so main can be exercised.
 var exit = os.Exit
 
-// main is the only function that touches the real process.
+// main is the only function that touches the real process. As upstream
+// does, it handles the fatal signals for the whole run: recipes run in the
+// command's own process group, so they can use the terminal and get its
+// Ctrl-C themselves, and the command waits for them (see sys.Signals).
 func main() {
-	exit(run(os.Args[1:], os.Environ(), workingDir(os.Getwd), os.Stdin, os.Stdout, os.Stderr, sys.OSFS{}, sys.OSProcess{}))
+	proc := sys.OSProcess{Signals: sys.NotifySignals(exit)}
+	exit(run(os.Args[1:], os.Environ(), workingDir(os.Getwd), os.Stdin, os.Stdout, os.Stderr, sys.OSFS{}, proc))
 }
 
 // workingDir returns the directory getwd reports, or "." when it cannot say.
@@ -46,8 +51,9 @@ func workingDir(getwd func() (string, error)) string {
 // status. A recipe failure returns the recipe's status. A command-line error
 // (an unknown flag, a flag without its value) prints "error: <message>" and
 // returns 2, as upstream's argument parser does. Any other usage, load or
-// runtime error returns 1, and prints "error: <message>" unless -q was given,
-// which silences every message of the run itself. Impure: it reads fsys, runs
+// runtime error returns 1, and prints "error: <message>" unless -q was given.
+// As upstream's --quiet, -q silences every message of the run itself and
+// discards the recipes' own output too. Impure: it reads fsys, runs
 // processes through exec and writes to the given streams.
 func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.Writer, fsys sys.FS, exec sys.Process) int {
 	cfg, err := parseArgs(args)
@@ -55,13 +61,17 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		report(stderr, err)
 		return exitUsage
 	}
+	childOut, childErr := stdout, stderr
+	if cfg.quiet {
+		childOut, childErr = io.Discard, io.Discard
+	}
 	opts := just.Options{
 		Justfile:   resolve(workDir, cfg.justfile),
 		SearchFrom: workDir,
 		Env:        env,
 		Stdin:      stdin,
-		Stdout:     stdout,
-		Stderr:     stderr,
+		Stdout:     childOut,
+		Stderr:     childErr,
 		Quiet:      cfg.quiet,
 		Shell:      cfg.shell,
 		ShellArgs:  cfg.shellArgs,
@@ -110,14 +120,60 @@ func report(stderr io.Writer, err error) {
 }
 
 // describe is the message of err. A diagnostic without a location, such as a
-// usage error, is its bare message; a located one keeps "file:line:col: ".
-// Pure.
+// usage error, is its bare message. A located one is followed, as upstream
+// prints it, by the file name and position and by the source line with the
+// diagnostic underlined (see snippet). Pure.
 func describe(err error) string {
 	var de *diag.Error
-	if errors.As(err, &de) && de.File == "" && de.Line == 0 {
+	if !errors.As(err, &de) {
+		return err.Error()
+	}
+	if de.Line == 0 {
 		return de.Msg
 	}
-	return err.Error()
+	return de.Msg + "\n" + snippet(de)
+}
+
+// snippet renders the location of de as upstream's Token display does:
+//
+//	 ——▶ justfile:2:9
+//	  │
+//	2 │     echo {{y}}
+//	  │         ^
+//
+// The file is named by its base name, which upstream shows for the root
+// justfile (a path relative to its directory). A tab shows as four spaces,
+// and the carets cover de.Width runes from de.Col, at least one. Pure.
+func snippet(de *diag.Error) string {
+	number := strconv.Itoa(de.Line)
+	pad := strings.Repeat(" ", len(number))
+	text, column, width := underline(de.Source, de.Col-1, max(de.Width, 1))
+	return fmt.Sprintf("%s——▶ %s:%d:%d\n%s │\n%s │ %s\n%s │ %s%s",
+		pad, filepath.Base(de.File), de.Line, de.Col, pad, number, text, pad,
+		strings.Repeat(" ", column), strings.Repeat("^", max(width, 1)))
+}
+
+// underline returns line with each tab shown as four spaces, and the display
+// column and width of the width runes from rune index col. Pure.
+func underline(line string, col, width int) (string, int, int) {
+	var b strings.Builder
+	column, span := 0, 0
+	for i, r := range []rune(line) {
+		w := 1
+		if r == '\t' {
+			b.WriteString("    ")
+			w = 4
+		} else {
+			b.WriteRune(r)
+		}
+		switch {
+		case i < col:
+			column += w
+		case i < col+width:
+			span += w
+		}
+	}
+	return b.String(), column, span
 }
 
 // usage returns a usage diagnostic. Pure.
@@ -148,8 +204,11 @@ type config struct {
 }
 
 // parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --shell PATH,
-// --shell-arg ARG (which may repeat) and positional words. Flags may come before, between and after words; "--" ends flag
-// parsing, so every later argument is a word. A short flag may be clustered
+// --shell-arg ARG (which may repeat) and positional words. Flags come before
+// the words: as upstream's argument parser takes its trailing positional
+// arguments, the first word and everything after it are words, even when
+// they start with a dash, so `a -v` passes -v to recipe a. Before the first
+// word, "--" ends flag parsing and is dropped. A short flag may be clustered
 // (-lq) and a value may be attached (-fPATH, --justfile=PATH). Pure.
 func parseArgs(args []string) (config, error) {
 	var cfg config
@@ -166,7 +225,8 @@ func parseArgs(args []string) (config, error) {
 		case len(arg) > 1 && arg[0] == '-':
 			used, err = parseShort(&cfg, arg, args[i+1:])
 		default:
-			cfg.words = append(cfg.words, arg)
+			cfg.words = append(cfg.words, args[i:]...)
+			return cfg, nil
 		}
 		if err != nil {
 			return cfg, err

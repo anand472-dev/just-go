@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 )
 
@@ -48,13 +49,22 @@ func (OSFS) ReadDir(path string) ([]string, error) {
 }
 
 // OSProcess is the Process backed by os/exec.
-type OSProcess struct{}
+//
+// Without Signals, as a library uses it, each child runs in its own process
+// group and cancelling the context kills that whole group. With Signals, as
+// the command line uses it, each child stays in the caller's process group,
+// so it can read the terminal and receives the terminal's Ctrl-C itself, as
+// upstream's children do; Signals then tracks it and reports the fatal
+// signals caught while it ran.
+type OSProcess struct {
+	Signals *Signals
+}
 
 // Run executes spec. A bare Argv[0] is resolved against the PATH of
-// spec.Env, never the parent's PATH (see resolveProgram). The child runs in
-// its own process group, and cancelling ctx kills the whole group, not just
-// the direct child. Impure: it spawns an operating-system process.
-func (OSProcess) Run(ctx context.Context, spec ProcessSpec) (int, error) {
+// spec.Env, never the parent's PATH (see resolveProgram). Cancelling ctx
+// kills the child: its whole process group when it has its own. Impure: it
+// spawns an operating-system process.
+func (p OSProcess) Run(ctx context.Context, spec ProcessSpec) (int, error) {
 	if len(spec.Argv) == 0 {
 		return -1, errors.New("sys: empty argv")
 	}
@@ -70,8 +80,11 @@ func (OSProcess) Run(ctx context.Context, spec ProcessSpec) (int, error) {
 	cmd.Stdout = spec.Stdout
 	cmd.Stderr = spec.Stderr
 	cmd.WaitDelay = killGrace
-	isolateGroup(cmd)
-	return exitStatus(ctx, cmd.Run())
+	if p.Signals == nil {
+		isolateGroup(cmd)
+		return exitStatus(ctx, cmd.Run())
+	}
+	return p.Signals.run(ctx, cmd)
 }
 
 // exactEnv returns env as a non-nil slice: a nil Cmd.Env would inherit the
@@ -93,7 +106,16 @@ func exitStatus(ctx context.Context, err error) (int, error) {
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		return exitErr.ExitCode(), nil
+		return exitCode(exitErr)
 	}
 	return -1, err
+}
+
+// exitCode is the status of a child that did not exit 0: its exit code, or
+// -1 and a *SignalError when a signal terminated it. Pure.
+func exitCode(exitErr *exec.ExitError) (int, error) {
+	if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+		return -1, &SignalError{Signal: int(ws.Signal())}
+	}
+	return exitErr.ExitCode(), nil
 }

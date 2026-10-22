@@ -37,6 +37,12 @@ func wantTokens(t *testing.T, src string, want []lexer.Token) {
 // wantParseError lexes src and checks for a KindParse diag.Error at the position.
 func wantParseError(t *testing.T, src string, line, col int, msg string) {
 	t.Helper()
+	wantParseErrorWidth(t, src, line, col, 1, msg)
+}
+
+// wantParseErrorWidth is wantParseError for an error that covers width runes.
+func wantParseErrorWidth(t *testing.T, src string, line, col, width int, msg string) {
+	t.Helper()
 	toks, err := lexer.Lex("justfile", []byte(src))
 	if err == nil {
 		t.Fatalf("Lex(%q) = %+v, want an error", src, toks)
@@ -45,7 +51,7 @@ func wantParseError(t *testing.T, src string, line, col int, msg string) {
 	if !errors.As(err, &de) {
 		t.Fatalf("Lex(%q) error %T is not a *diag.Error", src, err)
 	}
-	want := diag.Error{Kind: diag.KindParse, File: "justfile", Line: line, Col: col, Msg: msg}
+	want := diag.Error{Kind: diag.KindParse, File: "justfile", Line: line, Col: col, Width: width, Msg: msg}
 	if *de != want {
 		t.Errorf("Lex(%q) error = %+v, want %+v", src, *de, want)
 	}
@@ -293,8 +299,24 @@ func TestLexBackslashAtEndOfInputUnterminatesString(t *testing.T) {
 	wantParseError(t, `"abc\`, 1, 1, "unterminated string")
 }
 
+// Upstream reports an invalid escape at the string, underlining all of it.
 func TestLexInvalidEscape(t *testing.T) {
-	wantParseError(t, `x := "ab\q"`, 1, 9, "`\\q` is not a valid escape sequence")
+	wantParseErrorWidth(t, `x := "ab\q"`, 1, 6, 6, "`\\q` is not a valid escape sequence")
+	wantParseErrorWidth(t, `x := "\q\"x"`, 1, 6, 7, "`\\q` is not a valid escape sequence")
+	wantParseErrorWidth(t, `x := "é\q`, 1, 6, 4, "`\\q` is not a valid escape sequence")
+	wantParseErrorWidth(t, `x := "\q\`, 1, 6, 4, "`\\q` is not a valid escape sequence")
+}
+
+// An interpolation the input never closes is reported at its opening braces,
+// as upstream does, even when the lexer meets a character of the full
+// language that the subset does not know.
+func TestLexUnterminatedInterpolation(t *testing.T) {
+	wantParseErrorWidth(t, "r:\n\techo {{ x\n\techo $HOME\n", 2, 7, 2, "unterminated interpolation")
+	wantParseErrorWidth(t, "r:\n  x {{ a\n", 2, 5, 2, "unterminated interpolation")
+	wantParseErrorWidth(t, "r:\n  x {{", 2, 5, 2, "unterminated interpolation")
+	wantParseError(t, "r:\n  x {{ $ }}\n", 2, 8, "unknown start of token '$'")
+	wantParseError(t, "x := $", 1, 6, "unknown start of token '$'")
+	wantParseError(t, "r:\n  {{ 'a }}\n", 2, 6, "unterminated string")
 }
 
 func TestLexUnknownStartOfToken(t *testing.T) {

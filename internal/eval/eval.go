@@ -19,11 +19,13 @@ type Scope map[string]string
 
 // Evaluate returns the string value of e, looking variables up in scope. A
 // variable with no entry in scope, or an expression of a type the evaluator
-// does not know, is a *diag.Error of KindRuntime. The error carries no file,
-// line or column, because the syntax tree records no positions for
-// expressions; the caller may fill them in. Evaluate is pure.
+// does not know, is a *diag.Error of KindRuntime. An undefined variable is
+// located at its name, as the syntax tree records it, but without a file,
+// which the caller fills in. Evaluate is pure.
 func Evaluate(e ast.Expr, scope Scope) (string, error) {
 	switch x := e.(type) {
+	case ast.Text:
+		return x.Value, nil
 	case ast.StringLit:
 		return x.Value, nil
 	case ast.Var:
@@ -40,7 +42,9 @@ func Evaluate(e ast.Expr, scope Scope) (string, error) {
 func lookup(v ast.Var, scope Scope) (string, error) {
 	val, ok := scope[v.Name]
 	if !ok {
-		return "", fail("variable `%s` not defined", v.Name)
+		err := fail("variable `%s` not defined", v.Name)
+		err.Line, err.Col, err.Width = v.Line, v.Col, len(v.Name)
+		return "", err
 	}
 	return val, nil
 }

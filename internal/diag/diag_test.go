@@ -2,6 +2,7 @@ package diag_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"gitea.com/wimwian/just-go/internal/diag"
@@ -30,5 +31,30 @@ func TestErrorSatisfiesErrorInterfaceAndAs(t *testing.T) {
 	var de *diag.Error
 	if !errors.As(err, &de) || de.Kind != diag.KindUsage {
 		t.Errorf("errors.As failed or lost the kind: %+v", de)
+	}
+}
+
+func TestWithSourceQuotesTheLine(t *testing.T) {
+	src := []byte("\xEF\xBB\xBFa:\r\n\techo {{x}}\r\nlast")
+	cases := []struct {
+		line int
+		want string
+	}{{1, "a:"}, {2, "\techo {{x}}"}, {3, "last"}, {4, ""}}
+	for _, c := range cases {
+		de := &diag.Error{Kind: diag.KindAnalysis, File: "justfile", Line: c.line}
+		if got := diag.WithSource(fmt.Errorf("wrapped: %w", de), src); !errors.Is(got, de) || de.Source != c.want {
+			t.Errorf("line %d: Source = %q, want %q", c.line, de.Source, c.want)
+		}
+	}
+}
+
+func TestWithSourceLeavesOtherErrorsAlone(t *testing.T) {
+	plain := errors.New("plain")
+	if got := diag.WithSource(plain, []byte("x")); got != plain {
+		t.Errorf("WithSource(plain) = %v", got)
+	}
+	unlocated := &diag.Error{Kind: diag.KindUsage, Msg: "m"}
+	if diag.WithSource(unlocated, []byte("x")); unlocated.Source != "" {
+		t.Errorf("unlocated Source = %q", unlocated.Source)
 	}
 }

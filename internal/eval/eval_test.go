@@ -16,6 +16,21 @@ func TestEvaluateLiteral(t *testing.T) {
 	}
 }
 
+func TestEvaluateText(t *testing.T) {
+	got, err := Evaluate(ast.Text{Value: "@echo"}, nil)
+	if err != nil || got != "@echo" {
+		t.Fatalf("got %q, %v; want %q", got, err, "@echo")
+	}
+}
+
+func TestEvaluateUndefinedVarIsLocatedAtItsName(t *testing.T) {
+	_, err := Evaluate(ast.Var{Name: "nope", Line: 2, Col: 9}, Scope{})
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 9 || de.Width != 4 || de.File != "" {
+		t.Fatalf("error = %+v, want located at 2:9 with width 4 and no file", de)
+	}
+}
+
 func TestEvaluateConcat(t *testing.T) {
 	e := ast.Concat{Left: ast.StringLit{Value: "a"}, Right: ast.StringLit{Value: "b"}}
 	got, err := Evaluate(e, nil)

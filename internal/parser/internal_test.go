@@ -17,7 +17,7 @@ func TestSplitPrefixOfNoParts(t *testing.T) {
 }
 
 func TestSplitPrefixKeepsLaterParts(t *testing.T) {
-	in := []ast.Expr{ast.StringLit{Value: "@"}, ast.Var{Name: "x"}}
+	in := []ast.Expr{ast.Text{Value: "@"}, ast.Var{Name: "x"}}
 	prefix, parts := splitPrefix(in)
 	if prefix != ast.PrefixAt || !reflect.DeepEqual(parts, []ast.Expr{ast.Var{Name: "x"}}) {
 		t.Errorf("splitPrefix = %v, %v", prefix, parts)

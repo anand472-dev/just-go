@@ -89,11 +89,37 @@ func Lex(file string, src []byte) ([]Token, error) {
 	}
 	for l.pos < len(l.src) {
 		if err := l.step(); err != nil {
-			return nil, err
+			return nil, l.unterminated(err)
 		}
+	}
+	if l.interp {
+		return nil, l.interpError()
 	}
 	l.finish()
 	return l.toks, nil
+}
+
+// unterminated returns err, unless it is an unknown character inside an
+// interpolation that nothing later in the source closes. Upstream lexes more
+// characters than the core subset knows, and reaches the end of the input
+// still inside the interpolation, so it reports the interpolation instead.
+func (l *lexer) unterminated(err error) error {
+	if l.interp && !bytes.Contains(l.src[l.pos:], []byte("}}")) && l.unknownAt(err) {
+		return l.interpError()
+	}
+	return err
+}
+
+// unknownAt reports whether err is the lexer's unknown-character error.
+func (l *lexer) unknownAt(err error) bool {
+	de, ok := err.(*diag.Error)
+	return ok && de.Line == l.line && de.Col == l.col && bytes.HasPrefix([]byte(de.Msg), []byte("unknown start of token"))
+}
+
+// interpError reports the interpolation that the input leaves open, at its
+// opening braces, as upstream does.
+func (l *lexer) interpError() error {
+	return l.errWidth(l.open, 2, "unterminated interpolation")
 }
 
 type mark struct{ line, col int }
@@ -106,6 +132,7 @@ type lexer struct {
 	lineStart bool // the next byte begins a line
 	body      bool // the current line is a candidate recipe body line
 	interp    bool // inside {{ ... }}
+	open      mark // where the current interpolation's {{ is
 	toks      []Token
 }
 
@@ -122,7 +149,12 @@ func (l *lexer) emitString(text string, start int, at mark) {
 }
 
 func (l *lexer) errAt(at mark, msg string) error {
-	return &diag.Error{Kind: diag.KindParse, File: l.file, Line: at.line, Col: at.col, Msg: msg}
+	return l.errWidth(at, 1, msg)
+}
+
+// errWidth is errAt for an error that covers width runes.
+func (l *lexer) errWidth(at mark, width int, msg string) error {
+	return &diag.Error{Kind: diag.KindParse, File: l.file, Line: at.line, Col: at.col, Width: width, Msg: msg}
 }
 
 // peek returns the next byte. Every caller has checked that pos is in range.
@@ -239,7 +271,8 @@ func (l *lexer) lexText() {
 }
 
 func (l *lexer) lexInterp() {
-	l.emit(Interp, "{{", l.mark())
+	l.open = l.mark()
+	l.emit(Interp, "{{", l.open)
 	l.skip(2)
 	l.interp = true
 }
@@ -333,7 +366,7 @@ func (l *lexer) lexCooked() error {
 			l.emitString(string(text), start, at)
 			return nil
 		case '\\':
-			out, err := l.lexEscape(at)
+			out, err := l.lexEscape(at, start)
 			if err != nil {
 				return err
 			}
@@ -347,9 +380,9 @@ func (l *lexer) lexCooked() error {
 
 // lexEscape consumes a backslash escape and returns the bytes it produces. A
 // backslash before a line break produces nothing. str is the start of the
-// enclosing string, reported if the input ends inside the escape.
-func (l *lexer) lexEscape(str mark) ([]byte, error) {
-	at := l.mark()
+// enclosing string, reported if the input ends inside the escape, and start
+// is its byte offset.
+func (l *lexer) lexEscape(str mark, start int) ([]byte, error) {
 	l.skip(1)
 	if l.pos >= len(l.src) {
 		return nil, l.errAt(str, "unterminated string")
@@ -361,10 +394,25 @@ func (l *lexer) lexEscape(str mark) ([]byte, error) {
 	out, ok := escapes[l.peek()]
 	if !ok {
 		r, _ := utf8.DecodeRune(l.src[l.pos:])
-		return nil, l.errAt(at, fmt.Sprintf("`\\%c` is not a valid escape sequence", r))
+		return nil, l.errWidth(str, l.stringWidth(start), fmt.Sprintf("`\\%c` is not a valid escape sequence", r))
 	}
 	l.skip(1)
 	return []byte{out}, nil
+}
+
+// stringWidth is the width in runes of the cooked string that starts at byte
+// offset start: through its closing quote, or to the end of the input. The
+// lexer is inside the string, past an invalid escape. Upstream underlines the
+// whole string for that error. It does not move the lexer.
+func (l *lexer) stringWidth(start int) int {
+	end := l.pos
+	for end < len(l.src) && l.src[end] != '"' {
+		if l.src[end] == '\\' {
+			end++
+		}
+		end++
+	}
+	return utf8.RuneCount(l.src[start:min(end+1, len(l.src))])
 }
 
 // lexPunct lexes operators and delimiters, or reports an unknown character.
