@@ -155,13 +155,18 @@ type prepared struct {
 // command's status. A backtick that fails is an error that carries the status
 // to end with (diag.Error.ExitCode). Cancelling ctx kills the running child and
 // Run returns ctx.Err(). Impure: it writes to the plan's streams and runs
-// processes through plan.Exec.
+// processes through plan.Exec, and reads the host's operating system when
+// plan.OS is empty.
 func Run(ctx context.Context, plan Plan) (Result, error) {
 	pre, err := prepare(plan)
 	if err != nil {
 		return Result{}, withSource(plan.Justfile, err)
 	}
-	inv := newInvocation(ctx, plan, pre)
+	goos := plan.OS
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	inv := newInvocation(ctx, plan, pre, goos)
 	code, err := inv.main(pre)
 	return Result{ExitCode: code}, withSource(plan.Justfile, err)
 }
@@ -498,14 +503,6 @@ func exportedGlobals(jf *ast.Justfile) []string {
 	return names
 }
 
-// exportedEnv returns the variables the commands of r see besides the plan's
-// environment: the exported globals, then the parameters written with `$`,
-// or all of them under set export. A global that was not evaluated, under set
-// lazy, is left out. It is nil when there are none. It is pure.
-func exportedEnv(jf *ast.Justfile, r *ast.Recipe, exported []string, globals, scope eval.Scope) map[string]string {
-	return paramEnv(jf, r, scope, globalEnv(exported, globals, len(r.Params)))
-}
-
 // globalEnv returns the exported globals, those of exported that globals has,
 // as variables. It makes room for extra more. It is nil when there are none.
 // It is pure.
@@ -674,12 +671,9 @@ type invocation struct {
 // the shell and directory from the evaluated settings of pre. When some
 // recipes run their dependencies at once, it makes the plan's output streams
 // safe to write to from all of them. It is pure: it only builds a value;
-// sys.OSProcess is not used until a line runs.
-func newInvocation(ctx context.Context, plan Plan, pre prepared) *invocation {
-	goos := plan.OS
-	if goos == "" {
-		goos = runtime.GOOS
-	}
+// sys.OSProcess is not used until a line runs. goos names the operating system
+// the plan runs for; the caller reads the host's when Plan.OS is empty.
+func newInvocation(ctx context.Context, plan Plan, pre prepared, goos string) *invocation {
 	if pre.parallel {
 		locked := lockStreams(plan.Stdout, plan.Stderr, plan.Prompt)
 		plan.Stdout, plan.Stderr, plan.Prompt = locked[0], locked[1], locked[2]

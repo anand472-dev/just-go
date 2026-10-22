@@ -239,14 +239,18 @@ func TestRunPicksTheWindowsShellOnWindows(t *testing.T) {
 	for goos, want := range map[string][]string{
 		"windows": {"pwsh", "-Command", "echo"},
 		"linux":   {"bash", "-c", "echo"},
-		"":        nil, // the platform the test runs on
+		"":        nil, // the platform the test runs on: either of the two shells
 	} {
 		fake := &sysfake.FakeProcess{}
 		plan, _, _ := newPlan(t, src, fake)
 		plan.OS = goos
 		mustRun(t, plan)
-		if want != nil && !reflect.DeepEqual(fake.Specs[0].Argv, want) {
-			t.Errorf("OS %q: argv = %q, want %q", goos, fake.Specs[0].Argv, want)
+		argv := fake.Specs[0].Argv
+		if want != nil && !reflect.DeepEqual(argv, want) {
+			t.Errorf("OS %q: argv = %q, want %q", goos, argv, want)
+		}
+		if len(argv) < 2 || argv[0] == "" || argv[len(argv)-1] != "echo" {
+			t.Errorf("OS %q: argv = %q, want a non-empty shell followed by the command", goos, argv)
 		}
 	}
 }
@@ -549,7 +553,7 @@ func BenchmarkExportedEnv(b *testing.B) {
 	scope := eval.Scope{"p": "1", "q": "2"}
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = exportedEnv(jf, r, exported, globals, scope)
+		_ = paramEnv(jf, r, scope, globalEnv(exported, globals, len(r.Params)))
 	}
 }
 
@@ -562,8 +566,11 @@ func TestExportedGlobalsAreTheExportedOnesOrAllUnderSetExport(t *testing.T) {
 	if got := exportedGlobals(jf); !reflect.DeepEqual(got, []string{"b", "a"}) {
 		t.Errorf("exportedGlobals under set export = %v", got)
 	}
-	if got := exportedEnv(jf, &ast.Recipe{}, nil, eval.Scope{}, eval.Scope{}); got != nil {
-		t.Errorf("exportedEnv of nothing = %v, want nil", got)
+	if got := globalEnv(nil, eval.Scope{}, 0); got != nil {
+		t.Errorf("globalEnv of nothing = %v, want nil", got)
+	}
+	if got := paramEnv(&ast.Justfile{}, &ast.Recipe{}, eval.Scope{}, nil); got != nil {
+		t.Errorf("paramEnv of nothing = %v, want nil", got)
 	}
 }
 
