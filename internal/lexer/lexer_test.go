@@ -27,6 +27,7 @@ func wantTokens(t *testing.T, src string, want []lexer.Token) {
 		t.Fatalf("Lex(%q) returned %d tokens, want %d:\n got %+v\nwant %+v", src, len(got), len(want), got, want)
 	}
 	for i := range want {
+		got[i].Raw = "" // Raw has its own test
 		if got[i] != want[i] {
 			t.Errorf("Lex(%q) token %d = %+v, want %+v", src, i, got[i], want[i])
 		}
@@ -385,4 +386,32 @@ func TestLexBrackets(t *testing.T) {
 		tok(lexer.Newline, "", 1, 11),
 		tok(lexer.EOF, "", 1, 11),
 	})
+}
+
+// TestLexStringRawKeepsSourceText checks that a String token keeps its quotes
+// and escapes, which a consumer needs to show the string as it was written.
+func TestLexStringRawKeepsSourceText(t *testing.T) {
+	cases := map[string]string{
+		`"a\tb"`:   `"a\tb"`,
+		`'a\tb'`:   `'a\tb'`,
+		"'B\t'":    "'B\t'",
+		`x := "y"`: `"y"`,
+	}
+	for src, want := range cases {
+		toks, err := lexer.Lex("justfile", []byte(src))
+		if err != nil {
+			t.Fatalf("Lex(%q) error: %v", src, err)
+		}
+		var raws []string
+		for _, tk := range toks {
+			if tk.Kind == lexer.String {
+				raws = append(raws, tk.Raw)
+			} else if tk.Raw != "" {
+				t.Errorf("Lex(%q): token %+v has Raw set but is not a String", src, tk)
+			}
+		}
+		if len(raws) != 1 || raws[0] != want {
+			t.Errorf("Lex(%q) String Raw = %q, want [%q]", src, raws, want)
+		}
+	}
 }

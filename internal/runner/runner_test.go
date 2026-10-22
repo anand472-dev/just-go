@@ -104,6 +104,31 @@ func TestRunSetQuietSuppressesEcho(t *testing.T) {
 	}
 }
 
+// TestRunQuietSuppressesFailureMessage pins upstream's -q: the command still
+// fails with its status, but nothing is written, not even the failure line.
+func TestRunQuietSuppressesFailureMessage(t *testing.T) {
+	fake := &sysfake.FakeProcess{Codes: []int{3}}
+	plan, _, stderr := newPlan(t, "r:\n\texit 3\n", fake)
+	plan.Quiet = true
+	if res := mustRun(t, plan); res.ExitCode != 3 {
+		t.Fatalf("exit = %d; want 3", res.ExitCode)
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %q; want nothing", stderr)
+	}
+}
+
+// TestRunSetQuietKeepsFailureMessage checks that `set quiet` only silences
+// the echo; upstream still reports the failure.
+func TestRunSetQuietKeepsFailureMessage(t *testing.T) {
+	fake := &sysfake.FakeProcess{Codes: []int{3}}
+	plan, _, stderr := newPlan(t, "set quiet\nr:\n\texit 3\n", fake)
+	mustRun(t, plan)
+	if want := "error: recipe `r` failed on line 3 with exit code 3\n"; stderr.String() != want {
+		t.Fatalf("stderr = %q; want %q", stderr, want)
+	}
+}
+
 func TestRunDashPrefixIgnoresFailure(t *testing.T) {
 	fake := &sysfake.FakeProcess{Codes: []int{1, 0}}
 	plan, _, stderr := newPlan(t, "r:\n\t-false\n\techo after\n", fake)
@@ -248,6 +273,49 @@ func TestRunSeveralRecipesShareDependencies(t *testing.T) {
 	mustRun(t, plan)
 	if want := []string{"echo c", "echo a", "echo b"}; !reflect.DeepEqual(commands(fake), want) {
 		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunCallsCarryTheirOwnArguments is `just d c 1 e 2`: each recipe gets
+// the arguments of its own group.
+func TestRunCallsCarryTheirOwnArguments(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	src := "d:\n\techo d\nc x:\n\techo c {{x}}\ne y='-':\n\techo e {{y}}\n"
+	plan, _, _ := newPlan(t, src, fake)
+	plan.Calls = []Call{{Recipe: "d"}, {Recipe: "c", Args: []string{"1"}}, {Recipe: "e", Args: []string{"2"}}}
+	plan.Recipes, plan.Args = []string{"ignored"}, []string{"ignored"}
+	mustRun(t, plan)
+	if want := []string{"echo d", "echo c 1", "echo e 2"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunCallsRunOncePerArgumentList is `just c 1 c 2 c 1`: a repeated call
+// with the same arguments is dropped, a different argument list is not.
+func TestRunCallsRunOncePerArgumentList(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "c x='-':\n\techo c {{x}}\n", fake)
+	plan.Calls = []Call{
+		{Recipe: "c", Args: []string{"1"}}, {Recipe: "c", Args: []string{"2"}}, {Recipe: "c", Args: []string{"1"}},
+		{Recipe: "c"}, {Recipe: "c", Args: []string{""}},
+	}
+	mustRun(t, plan)
+	if want := []string{"echo c 1", "echo c 2", "echo c -", "echo c "}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+func TestRunCallsReportUnknownRecipeAndArgumentMismatch(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "c x:\n\techo c\n", fake)
+	plan.Calls = []Call{{Recipe: "nope"}}
+	_, err := Run(context.Background(), plan)
+	requireDiag(t, err, diag.KindUsage, 0, "justfile does not contain recipe `nope`")
+	plan.Calls = []Call{{Recipe: "c", Args: []string{"1"}}, {Recipe: "c"}}
+	_, err = Run(context.Background(), plan)
+	requireDiag(t, err, diag.KindUsage, 0, "recipe `c` got 0 positional arguments but takes 1")
+	if len(fake.Specs) != 0 {
+		t.Fatalf("ran %d lines; want none", len(fake.Specs))
 	}
 }
 
@@ -403,22 +471,22 @@ func chain(n int) *ast.Justfile {
 }
 
 func TestResolveOrderChain(t *testing.T) {
-	order, err := resolveOrder(chain(200), []string{"r0"})
+	order, err := resolveOrder(chain(200), []Call{{Recipe: "r0"}})
 	if err != nil {
 		t.Fatalf("resolveOrder: %v", err)
 	}
-	if len(order) != 200 || order[0].Name != "r199" || order[199].Name != "r0" {
+	if len(order) != 200 || order[0].recipe.Name != "r199" || order[199].recipe.Name != "r0" {
 		t.Fatalf("order has %d recipes from %s to %s; want 200 from r199 to r0",
-			len(order), order[0].Name, order[len(order)-1].Name)
+			len(order), order[0].recipe.Name, order[len(order)-1].recipe.Name)
 	}
 }
 
 func BenchmarkResolveOrder(b *testing.B) {
 	jf := chain(200)
-	names := []string{"r0"}
+	calls := []Call{{Recipe: "r0"}}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := resolveOrder(jf, names); err != nil {
+		if _, err := resolveOrder(jf, calls); err != nil {
 			b.Fatal(err)
 		}
 	}

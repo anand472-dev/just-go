@@ -308,9 +308,28 @@ func (p *parser) param() (ast.Param, error) {
 		return param, nil
 	}
 	p.next()
+	from := p.pos
 	def, err := p.atom()
 	param.Default = def
+	param.DefaultText = defaultText(p.toks[from:p.pos])
 	return param, err
+}
+
+// defaultText spells the tokens of a parameter default as upstream displays
+// an expression: strings as written, `+` between spaces. Pure.
+func defaultText(toks []lexer.Token) string {
+	var b strings.Builder
+	for _, t := range toks {
+		switch t.Kind {
+		case lexer.String:
+			b.WriteString(t.Raw)
+		case lexer.Plus:
+			b.WriteString(" + ")
+		default:
+			b.WriteString(t.Text)
+		}
+	}
+	return b.String()
 }
 
 // silence applies a leading `@` on the recipe to every line. As upstream does

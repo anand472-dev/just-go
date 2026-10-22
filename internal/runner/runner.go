@@ -33,14 +33,22 @@ const (
 type Plan struct {
 	Justfile *ast.Justfile
 	Recipes  []string    // requested recipe names; empty means the first recipe in the file
-	Args     []string    // positional arguments for the requested recipe's parameters
+	Args     []string    // positional arguments for the single requested recipe's parameters
+	Calls    []Call      // requested recipes with their own arguments; when set, Recipes and Args are ignored
 	Env      []string    // exact environment for children, as "KEY=VALUE"; nil means empty
 	WorkDir  string      // working directory of every child
 	Stdin    io.Reader   // nil means no input
 	Stdout   io.Writer   // nil discards
 	Stderr   io.Writer   // nil discards; receives echoed commands and failure messages
-	Quiet    bool        // overrides set quiet when true
+	Quiet    bool        // overrides set quiet when true; also silences the failure message
 	Exec     sys.Process // nil uses the OS implementation from internal/sys
+}
+
+// Call is one requested recipe with the positional arguments for its own
+// parameters, as one group of the command line.
+type Call struct {
+	Recipe string
+	Args   []string
 }
 
 // Result is the outcome of a run. ExitCode is meaningful only when Run
@@ -48,6 +56,12 @@ type Plan struct {
 // that could not be started.
 type Result struct {
 	ExitCode int
+}
+
+// call is a recipe together with the arguments it is run with.
+type call struct {
+	recipe *ast.Recipe
+	args   []string
 }
 
 // step is one recipe to run, with the scope its lines are rendered in.
@@ -85,57 +99,74 @@ func Run(ctx context.Context, plan Plan) (Result, error) {
 // every recipe's parameters. It is pure.
 func prepare(plan Plan) ([]step, error) {
 	jf := plan.Justfile
-	names, err := targets(jf, plan.Recipes)
+	calls, err := requested(plan)
 	if err != nil {
 		return nil, err
-	}
-	if len(plan.Args) > 0 && len(names) > 1 {
-		return nil, usage("positional arguments need exactly one requested recipe, but %d were requested", len(names))
 	}
 	globals, err := globalScope(jf)
 	if err != nil {
 		return nil, err
 	}
-	order, err := resolveOrder(jf, names)
+	order, err := resolveOrder(jf, calls)
 	if err != nil {
 		return nil, err
 	}
-	return bindSteps(jf, order, names[0], plan.Args, globals)
+	return bindSteps(jf, order, globals)
 }
 
-// bindSteps pairs each recipe in order with its parameter scope. Only the
-// requested recipe receives args; dependencies take no arguments. It is pure.
-func bindSteps(jf *ast.Justfile, order []*ast.Recipe, requested string, args []string, globals eval.Scope) ([]step, error) {
-	steps := make([]step, 0, len(order))
-	for _, r := range order {
-		var given []string
-		if r.Name == requested {
-			given = args
-		}
-		scope, err := bindParams(jf, r, given, globals)
-		if err != nil {
+// requested returns the calls the plan asks for. Plan.Calls when set, else
+// Plan.Recipes, with Plan.Args going to the only recipe; with no recipes at
+// all, the first recipe of the file. Every recipe must exist. It is pure.
+func requested(plan Plan) ([]Call, error) {
+	jf := plan.Justfile
+	calls := plan.Calls
+	if len(calls) == 0 {
+		var err error
+		if calls, err = legacyCalls(jf, plan.Recipes, plan.Args); err != nil {
 			return nil, err
 		}
-		steps = append(steps, step{recipe: r, scope: scope})
 	}
-	return steps, nil
+	for _, c := range calls {
+		if findRecipe(jf, c.Recipe) == nil {
+			return nil, usage("justfile does not contain recipe `%s`", c.Recipe)
+		}
+	}
+	return calls, nil
 }
 
-// targets returns the names to run: names itself, or the first recipe of jf
-// when names is empty. Every name must be a recipe of jf. It is pure.
-func targets(jf *ast.Justfile, names []string) ([]string, error) {
+// legacyCalls turns a list of names and one argument list into calls: the
+// arguments belong to the only name, or to the first recipe of jf when there
+// are no names. Several names with arguments are a usage error. It is pure.
+func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 	if len(names) == 0 {
 		if len(jf.Recipes) == 0 {
 			return nil, usage("justfile contains no recipes")
 		}
-		return []string{jf.Recipes[0].Name}, nil
+		return []Call{{Recipe: jf.Recipes[0].Name, Args: args}}, nil
 	}
-	for _, n := range names {
-		if findRecipe(jf, n) == nil {
-			return nil, usage("justfile does not contain recipe `%s`", n)
+	if len(args) > 0 && len(names) > 1 {
+		return nil, usage("positional arguments need exactly one requested recipe, but %d were requested", len(names))
+	}
+	calls := make([]Call, len(names))
+	for i, n := range names {
+		calls[i] = Call{Recipe: n}
+	}
+	calls[0].Args = args
+	return calls, nil
+}
+
+// bindSteps pairs each call in order with its parameter scope. Dependencies
+// take no arguments. It is pure.
+func bindSteps(jf *ast.Justfile, order []call, globals eval.Scope) ([]step, error) {
+	steps := make([]step, 0, len(order))
+	for _, c := range order {
+		scope, err := bindParams(jf, c.recipe, c.args, globals)
+		if err != nil {
+			return nil, err
 		}
+		steps = append(steps, step{recipe: c.recipe, scope: scope})
 	}
-	return names, nil
+	return steps, nil
 }
 
 // findRecipe returns the recipe of jf named name, or nil. It is pure.
@@ -185,10 +216,11 @@ func evalPass(file string, pending []ast.Assignment, scope eval.Scope) ([]ast.As
 	return rest, first
 }
 
-// resolveOrder returns the recipes named by names together with their
-// dependencies, each once, in run order: a recipe's dependencies come before
-// it, in declaration order. It is pure.
-func resolveOrder(jf *ast.Justfile, names []string) ([]*ast.Recipe, error) {
+// resolveOrder returns the calls together with their dependencies, each
+// once, in run order: a recipe's dependencies come before it, in declaration
+// order. As upstream does, a recipe runs once per distinct list of
+// arguments, so `c 1 c 2 c 1` runs `c` twice. It is pure.
+func resolveOrder(jf *ast.Justfile, calls []Call) ([]call, error) {
 	o := orderer{
 		jf:     jf,
 		byName: make(map[string]*ast.Recipe, len(jf.Recipes)),
@@ -197,8 +229,8 @@ func resolveOrder(jf *ast.Justfile, names []string) ([]*ast.Recipe, error) {
 	for i := range jf.Recipes {
 		o.byName[jf.Recipes[i].Name] = &jf.Recipes[i]
 	}
-	for _, n := range names {
-		if err := o.visit(n, nil); err != nil {
+	for _, c := range calls {
+		if err := o.visit(c.Recipe, c.Args, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -210,16 +242,17 @@ type orderer struct {
 	jf     *ast.Justfile
 	byName map[string]*ast.Recipe
 	seen   map[string]bool
-	order  []*ast.Recipe
+	order  []call
 }
 
-// visit appends name's dependencies and then name itself, unless name was
-// already visited. from is the recipe that depends on name, or nil for a
-// requested recipe. A recipe is marked before its dependencies are visited,
-// so a cycle the analyzer missed cannot loop forever. It is pure apart from
-// updating o.
-func (o *orderer) visit(name string, from *ast.Recipe) error {
-	if o.seen[name] {
+// visit appends name's dependencies and then name itself with args, unless
+// that call was already visited. from is the recipe that depends on name, or
+// nil for a requested recipe. A call is marked before its dependencies are
+// visited, so a cycle the analyzer missed cannot loop forever. It is pure
+// apart from updating o.
+func (o *orderer) visit(name string, args []string, from *ast.Recipe) error {
+	key := callKey(name, args)
+	if o.seen[key] {
 		return nil
 	}
 	r, ok := o.byName[name]
@@ -227,14 +260,21 @@ func (o *orderer) visit(name string, from *ast.Recipe) error {
 		return &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: from.Line,
 			Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, name)}
 	}
-	o.seen[name] = true
+	o.seen[key] = true
 	for _, d := range r.Deps {
-		if err := o.visit(d, r); err != nil {
+		if err := o.visit(d, nil, r); err != nil {
 			return err
 		}
 	}
-	o.order = append(o.order, r)
+	o.order = append(o.order, call{recipe: r, args: args})
 	return nil
+}
+
+// callKey identifies a recipe called with args. The argument count and a NUL
+// separator, which no argument contains, keep distinct calls distinct (`c`
+// and `c ""` among them). It is pure.
+func callKey(name string, args []string) string {
+	return fmt.Sprintf("%s\x00%d\x00%s", name, len(args), strings.Join(args, "\x00"))
 }
 
 // bindParams returns globals extended with r's parameters: each takes the
@@ -426,8 +466,17 @@ func (inv *invocation) line(s step, line ast.Line) (int, error) {
 	if code == 0 || infallible(line.Prefix) {
 		return 0, nil
 	}
-	fmt.Fprint(inv.stderr, failureMessage(s.recipe.Name, line.Line, code))
-	return exitCode(code), nil
+	return inv.failed(s.recipe.Name, line.Line, code), nil
+}
+
+// failed writes the failure message for a command that exited with code,
+// unless the plan is quiet, as upstream's -q silences it, and returns the
+// invocation's exit code. Impure: it writes to Stderr.
+func (inv *invocation) failed(recipe string, line, code int) int {
+	if !inv.plan.Quiet {
+		fmt.Fprint(inv.stderr, failureMessage(recipe, line, code))
+	}
+	return exitCode(code)
 }
 
 // startFailure turns an error from the process runner into the result of a

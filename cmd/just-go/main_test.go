@@ -125,7 +125,9 @@ func TestRunExplicitJustfileResolvesAgainstWorkDir(t *testing.T) {
 	}
 }
 
-func TestRunUsageErrorsExitOne(t *testing.T) {
+// TestRunCommandLineErrorsExitTwo pins upstream: its argument parser exits
+// with 2, where errors in the justfile or the request exit with 1.
+func TestRunCommandLineErrorsExitTwo(t *testing.T) {
 	files := map[string]string{"/w/justfile": "a:\n"}
 	for _, tc := range []struct {
 		name string
@@ -134,11 +136,12 @@ func TestRunUsageErrorsExitOne(t *testing.T) {
 	}{
 		{"unknown flag", []string{"--bogus"}, "error: unexpected argument '--bogus' found\n"},
 		{"missing flag value", []string{"-f"}, "error: a value is required for '--justfile <JUSTFILE>' but none was supplied\n"},
+		{"-q does not silence them", []string{"-q", "--bogus"}, "error: unexpected argument '--bogus' found\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := runFake(t, files, nil, tc.args...)
-			if got.code != 1 || got.stderr != tc.want {
-				t.Errorf("run = %d, %q; want 1, %q", got.code, got.stderr, tc.want)
+			if got.code != 2 || got.stderr != tc.want {
+				t.Errorf("run = %d, %q; want 2, %q", got.code, got.stderr, tc.want)
 			}
 		})
 	}
@@ -154,13 +157,76 @@ func TestRunParseErrorKeepsLocation(t *testing.T) {
 	}
 }
 
-func TestRunRuntimeErrorExitsOne(t *testing.T) {
-	// Two requested recipes cannot take positional arguments (the runner
-	// reports a usage error), so run must print it and return 1.
-	files := map[string]string{"/w/justfile": "a x:\n  echo\nb:\n  echo\n"}
-	got := runFake(t, files, nil, "a", "1", "b")
-	if got.code != 1 || !strings.HasPrefix(got.stderr, "error: positional arguments need exactly one") {
-		t.Errorf("run = %d, %q; want 1 and the runner's usage error", got.code, got.stderr)
+func TestRunAnalysisErrorExitsOne(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "a:\n  echo {{nope}}\n"}, nil)
+	if got.code != 1 || !strings.HasPrefix(got.stderr, "error: ") || !strings.Contains(got.stderr, "nope") {
+		t.Errorf("run = %d, %q; want 1 and an error naming the variable", got.code, got.stderr)
+	}
+}
+
+// TestRunGroupsArgumentsPerRecipe is the case from upstream: with `d:` and
+// `c x:`, `d c 1` runs d and then c with x=1, `c 1 c 2 c 1` runs c twice.
+func TestRunGroupsArgumentsPerRecipe(t *testing.T) {
+	files := map[string]string{"/w/justfile": "d:\n  echo d\nc x:\n  echo c{{x}}\n"}
+	for _, tc := range []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"d", "c", "1"}, []string{"echo d", "echo c1"}},
+		{[]string{"c", "1", "d", "c", "2"}, []string{"echo c1", "echo d", "echo c2"}},
+		{[]string{"c", "1", "c", "2", "c", "1"}, []string{"echo c1", "echo c2"}},
+	} {
+		got := runFake(t, files, nil, tc.args...)
+		var cmds []string
+		for _, s := range got.proc.Specs {
+			cmds = append(cmds, s.Argv[len(s.Argv)-1])
+		}
+		if got.code != 0 || !reflect.DeepEqual(cmds, tc.want) {
+			t.Errorf("run %q = %d, %q (stderr %q); want 0, %q", tc.args, got.code, cmds, got.stderr, tc.want)
+		}
+	}
+}
+
+func TestRunArgumentCountMismatchExitsOne(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "c x:\n  echo\n"}, nil, "c")
+	if want := "error: recipe `c` got 0 positional arguments but takes 1\n"; got.code != 1 || got.stderr != want || len(got.proc.Specs) != 0 {
+		t.Errorf("run = %d, %q with %d commands; want 1, %q, none", got.code, got.stderr, len(got.proc.Specs), want)
+	}
+}
+
+// TestRunQuietSuppressesErrors pins upstream's -q: the exit status is the
+// same and nothing is written, whether the error is a failing recipe, an
+// unknown recipe, a missing justfile or a wrong number of arguments.
+func TestRunQuietSuppressesErrors(t *testing.T) {
+	files := map[string]string{"/w/justfile": "a:\n  exit 3\nc x:\n  echo\n"}
+	for _, tc := range []struct {
+		name  string
+		files map[string]string
+		codes []int
+		args  []string
+		want  int
+	}{
+		{"recipe failure", files, []int{3}, []string{"-q", "a"}, 3},
+		{"unknown recipe", files, nil, []string{"-q", "nope"}, 1},
+		{"no justfile", nil, nil, []string{"-q"}, 1},
+		{"argument count mismatch", files, nil, []string{"c", "-q"}, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := runFake(t, tc.files, tc.codes, tc.args...)
+			if got.code != tc.want || got.stderr != "" || got.stdout != "" {
+				t.Errorf("run %q = %d, %q, %q; want %d and no output", tc.args, got.code, got.stdout, got.stderr, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunListShowsParameterDefaults(t *testing.T) {
+	// Defaults are shown as written (corpus: "foo PARAM='foo'", "a Z=\"\\t z\"").
+	src := "a b='B' c=\"C d\":\n  echo\nz q:\n"
+	got := runFake(t, map[string]string{"/w/justfile": src}, nil, "--list")
+	want := "Available recipes:\n    a b='B' c=\"C d\"\n    z q\n"
+	if got.code != 0 || got.stdout != want {
+		t.Errorf("run --list = %d, %q; want 0, %q", got.code, got.stdout, want)
 	}
 }
 
@@ -257,34 +323,35 @@ func TestSelectRecipes(t *testing.T) {
 		{Name: "b"},
 		{Name: "c", Params: []string{"z"}},
 	}
+	call := func(recipe string, args ...string) just.Call {
+		return just.Call{Recipe: recipe, Args: append([]string(nil), args...)}
+	}
 	for _, tc := range []struct {
-		name        string
-		words       []string
-		wantRecipes []string
-		wantArgs    []string
+		name  string
+		words []string
+		want  []just.Call
 	}{
-		{"none", nil, nil, nil},
-		{"one recipe", []string{"b"}, []string{"b"}, []string{}},
-		{"arguments fill parameters", []string{"a", "1", "2"}, []string{"a"}, []string{"1", "2"}},
-		{"fewer words than parameters", []string{"a", "1"}, []string{"a"}, []string{"1"}},
-		{"later words are recipes", []string{"a", "1", "2", "b"}, []string{"a", "b"}, []string{"1", "2"}},
+		{"none", nil, nil},
+		{"one recipe", []string{"b"}, []just.Call{call("b")}},
+		{"arguments fill parameters", []string{"a", "1", "2"}, []just.Call{call("a", "1", "2")}},
+		{"fewer words than parameters", []string{"a", "1"}, []just.Call{call("a", "1")}},
+		{"later words are recipes", []string{"a", "1", "2", "b"}, []just.Call{call("a", "1", "2"), call("b")}},
+		{"a later recipe takes its own arguments", []string{"b", "c", "1"}, []just.Call{call("b"), call("c", "1")}},
+		{"every recipe takes its own arguments", []string{"c", "1", "a", "2", "3", "c", "4"},
+			[]just.Call{call("c", "1"), call("a", "2", "3"), call("c", "4")}},
+		{"a recipe name can be an argument", []string{"c", "b", "b"}, []just.Call{call("c", "b"), call("b")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			recipes, args, err := selectRecipes(infos, tc.words)
-			if err != nil || !reflect.DeepEqual(recipes, tc.wantRecipes) || len(args) != len(tc.wantArgs) {
-				t.Errorf("selectRecipes = %q, %q, %v; want %q, %q", recipes, args, err, tc.wantRecipes, tc.wantArgs)
-			}
-			for i := range tc.wantArgs {
-				if args[i] != tc.wantArgs[i] {
-					t.Errorf("args = %q, want %q", args, tc.wantArgs)
-				}
+			got, err := selectRecipes(infos, tc.words)
+			if err != nil || !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("selectRecipes = %+v, %v; want %+v", got, err, tc.want)
 			}
 		})
 	}
 }
 
 func TestSelectRecipesUnknownName(t *testing.T) {
-	infos := []just.RecipeInfo{{Name: "a", Params: []string{"x", "y"}}}
+	infos := []just.RecipeInfo{{Name: "a", Params: []string{"x", "y"}}, {Name: "b"}}
 	for _, tc := range []struct {
 		name    string
 		words   []string
@@ -292,9 +359,10 @@ func TestSelectRecipesUnknownName(t *testing.T) {
 	}{
 		{"unknown first", []string{"nope"}, "nope"},
 		{"unknown later (corpus misc::argument_mismatch_more)", []string{"a", "1", "2", "3"}, "3"},
+		{"unknown stops at the first", []string{"b", "nope", "worse"}, "nope"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := selectRecipes(infos, tc.words)
+			_, err := selectRecipes(infos, tc.words)
 			want := "justfile does not contain recipe `" + tc.missing + "`"
 			var de *diag.Error
 			if !errors.As(err, &de) || de.Kind != diag.KindUsage || de.Msg != want {
@@ -306,11 +374,11 @@ func TestSelectRecipesUnknownName(t *testing.T) {
 
 func TestSelectRecipesCopiesArguments(t *testing.T) {
 	words := []string{"a", "1"}
-	_, args, err := selectRecipes([]just.RecipeInfo{{Name: "a", Params: []string{"x"}}}, words)
+	calls, err := selectRecipes([]just.RecipeInfo{{Name: "a", Params: []string{"x"}}}, words)
 	if err != nil {
 		t.Fatal(err)
 	}
-	args[0] = "changed"
+	calls[0].Args[0] = "changed"
 	if words[1] != "1" {
 		t.Errorf("selectRecipes aliased its input: words = %q", words)
 	}
@@ -324,6 +392,14 @@ func TestFormatList(t *testing.T) {
 		want  string
 	}{
 		{"empty", nil, "Available recipes:\n"},
+		{
+			"defaults as written (corpus: misc::list_alignment#1)",
+			[]just.RecipeInfo{
+				{Name: "hello", Doc: "this does a thing", Params: []string{"a", "b", "c"}, Defaults: []string{"", "'B\t'", "'C'"}},
+				{Name: "a", Doc: "something else", Params: []string{"Z"}, Defaults: []string{`"\t z"`}},
+			},
+			"Available recipes:\n    a Z=\"\\t z\"           # something else\n    hello a b='B\t' c='C' # this does a thing\n",
+		},
 		{"sorted by name", []just.RecipeInfo{{Name: "b"}, {Name: "a"}}, "Available recipes:\n    a\n    b\n"},
 		{"private hidden", []just.RecipeInfo{{Name: "_p"}, {Name: "a"}}, "Available recipes:\n    a\n"},
 		{

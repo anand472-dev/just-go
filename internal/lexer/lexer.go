@@ -32,7 +32,7 @@ type TokenKind int
 // Token kinds.
 const (
 	Ident    TokenKind = iota
-	String             // Text is the unescaped contents
+	String             // Text is the unescaped contents; Raw is the source text with its quotes
 	Assign             // :=
 	Equals             // =
 	Colon              // :
@@ -57,6 +57,7 @@ const (
 type Token struct {
 	Kind TokenKind
 	Text string
+	Raw  string // for String, the source text including quotes and escapes; empty otherwise
 	Line int
 	Col  int
 }
@@ -112,6 +113,12 @@ func (l *lexer) mark() mark { return mark{l.line, l.col} }
 
 func (l *lexer) emit(kind TokenKind, text string, at mark) {
 	l.toks = append(l.toks, Token{Kind: kind, Text: text, Line: at.line, Col: at.col})
+}
+
+// emitString emits a String token whose source text began at byte offset
+// start and ends at the current position.
+func (l *lexer) emitString(text string, start int, at mark) {
+	l.toks = append(l.toks, Token{Kind: String, Text: text, Raw: string(l.src[start:l.pos]), Line: at.line, Col: at.col})
 }
 
 func (l *lexer) errAt(at mark, msg string) error {
@@ -300,13 +307,13 @@ func (l *lexer) lexComment() {
 
 // lexRaw lexes a single-quoted string: no escapes, line breaks allowed.
 func (l *lexer) lexRaw() error {
-	at := l.mark()
+	at, start := l.mark(), l.pos
 	l.skip(1)
 	var text []byte
 	for l.pos < len(l.src) {
 		if l.peek() == '\'' {
 			l.skip(1)
-			l.emit(String, string(text), at)
+			l.emitString(string(text), start, at)
 			return nil
 		}
 		text = append(text, l.bump()...)
@@ -316,14 +323,14 @@ func (l *lexer) lexRaw() error {
 
 // lexCooked lexes a double-quoted string with backslash escapes.
 func (l *lexer) lexCooked() error {
-	at := l.mark()
+	at, start := l.mark(), l.pos
 	l.skip(1)
 	var text []byte
 	for l.pos < len(l.src) {
 		switch l.peek() {
 		case '"':
 			l.skip(1)
-			l.emit(String, string(text), at)
+			l.emitString(string(text), start, at)
 			return nil
 		case '\\':
 			out, err := l.lexEscape(at)

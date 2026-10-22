@@ -44,6 +44,10 @@ type Recipe struct {
 type Param struct {
 	Name    string
 	Default Expr // nil when the parameter has no default
+	// DefaultText is the default as written, with its quotes, and with single
+	// spaces around `+`; it is what `--list` shows. Empty when there is no
+	// default.
+	DefaultText string
 }
 
 // Prefix is the set of marks that may precede a recipe line.

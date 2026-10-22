@@ -40,9 +40,17 @@ type Options struct {
 	Stderr     io.Writer   // nil discards; receives echoed commands and failure messages
 	Recipes    []string    // recipes to run; empty means the first recipe in the file
 	Args       []string    // positional arguments for the single requested recipe
+	Calls      []Call      // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
 	Quiet      bool        // suppress command echo, as if `set quiet` held
 	FS         sys.FS      // nil uses the OS implementation from internal/sys
 	Exec       sys.Process // nil uses the OS implementation from internal/sys
+}
+
+// Call is one recipe to run with the positional arguments for its own
+// parameters, as one group of a command line such as `just build release test`.
+type Call struct {
+	Recipe string
+	Args   []string
 }
 
 // Result is the outcome of a run. ExitCode is the status of the command that
@@ -57,6 +65,10 @@ type RecipeInfo struct {
 	Name   string
 	Doc    string   // the doc comment above the recipe, without the leading "# "; empty when absent
 	Params []string // parameter names in declaration order; never nil
+	// Defaults is parallel to Params: each default as written in the justfile,
+	// quotes included ("'x'", `"x"`, "(a + 'b')"), or "" for a parameter with
+	// none. Never nil.
+	Defaults []string
 }
 
 // Justfile is a parsed and analyzed justfile, ready to inspect or run. It is
@@ -119,10 +131,11 @@ func (j *Justfile) Recipes() []RecipeInfo {
 	infos := make([]RecipeInfo, len(j.tree.Recipes))
 	for i, r := range j.tree.Recipes {
 		params := make([]string, len(r.Params))
+		defaults := make([]string, len(r.Params))
 		for k, p := range r.Params {
-			params[k] = p.Name
+			params[k], defaults[k] = p.Name, p.DefaultText
 		}
-		infos[i] = RecipeInfo{Name: r.Name, Doc: r.Doc, Params: params}
+		infos[i] = RecipeInfo{Name: r.Name, Doc: r.Doc, Params: params, Defaults: defaults}
 	}
 	return infos
 }
@@ -145,6 +158,7 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		Justfile: j.tree,
 		Recipes:  opts.Recipes,
 		Args:     opts.Args,
+		Calls:    runnerCalls(opts.Calls),
 		Env:      opts.Env,
 		WorkDir:  dir,
 		Stdin:    opts.Stdin,
@@ -160,4 +174,13 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 // no file location. Pure.
 func usage(msg string) *diag.Error {
 	return &diag.Error{Kind: diag.KindUsage, Msg: msg}
+}
+
+// runnerCalls converts the library's calls to the runner's. Pure.
+func runnerCalls(calls []Call) []runner.Call {
+	out := make([]runner.Call, len(calls))
+	for i, c := range calls {
+		out[i] = runner.Call{Recipe: c.Recipe, Args: c.Args}
+	}
+	return out
 }

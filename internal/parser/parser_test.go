@@ -61,7 +61,7 @@ func TestParseRecipeWithParamsAndDeps(t *testing.T) {
 		File: "justfile",
 		Recipes: []ast.Recipe{{
 			Name:   "build",
-			Params: []ast.Param{{Name: "target", Default: lit("debug")}},
+			Params: []ast.Param{{Name: "target", Default: lit("debug"), DefaultText: `"debug"`}},
 			Deps:   []string{"test"},
 			Lines: []ast.Line{{
 				Prefix: ast.PrefixNone,
@@ -249,9 +249,9 @@ func TestParseParams(t *testing.T) {
 		Name: "r", Line: 1,
 		Params: []ast.Param{
 			{Name: "a"},
-			{Name: "b", Default: lit("1")},
-			{Name: "c", Default: ref("d")},
-			{Name: "e", Default: ast.Concat{Left: ref("f"), Right: lit("g")}},
+			{Name: "b", Default: lit("1"), DefaultText: `"1"`},
+			{Name: "c", Default: ref("d"), DefaultText: "d"},
+			{Name: "e", Default: ast.Concat{Left: ref("f"), Right: lit("g")}, DefaultText: "(f + 'g')"},
 		},
 	})
 }
@@ -401,4 +401,17 @@ func TestParseIsDeterministicAndDoesNotModifyInput(t *testing.T) {
 	if string(src) != orig {
 		t.Error("Parse modified its input")
 	}
+}
+
+// TestParseParamDefaultTextKeepsQuotes checks the default as written, which
+// --list shows: the quote style and escapes survive, spacing is normalized.
+func TestParseParamDefaultTextKeepsQuotes(t *testing.T) {
+	wantRecipe(t, "r a='x y' b=\"t\\tz\" c=(d+'e'):\n", ast.Recipe{
+		Name: "r", Line: 1,
+		Params: []ast.Param{
+			{Name: "a", Default: lit("x y"), DefaultText: "'x y'"},
+			{Name: "b", Default: lit("t\tz"), DefaultText: `"t\tz"`},
+			{Name: "c", Default: ast.Concat{Left: ref("d"), Right: lit("e")}, DefaultText: "(d + 'e')"},
+		},
+	})
 }

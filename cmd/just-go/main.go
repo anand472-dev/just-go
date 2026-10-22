@@ -43,13 +43,17 @@ func workingDir(getwd func() (string, error)) string {
 
 // run is the whole command: it parses args, loads the justfile found from
 // workDir (or named by -f), then lists or runs recipes, and returns the exit
-// status. A recipe failure returns the recipe's status; a usage or load error
-// prints "error: <message>" to stderr and returns 1. Impure: it reads fsys,
-// runs processes through exec and writes to the given streams.
+// status. A recipe failure returns the recipe's status. A command-line error
+// (an unknown flag, a flag without its value) prints "error: <message>" and
+// returns 2, as upstream's argument parser does. Any other usage, load or
+// runtime error returns 1, and prints "error: <message>" unless -q was given,
+// which silences every message of the run itself. Impure: it reads fsys, runs
+// processes through exec and writes to the given streams.
 func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.Writer, fsys sys.FS, exec sys.Process) int {
 	cfg, err := parseArgs(args)
 	if err != nil {
-		return fail(stderr, err)
+		report(stderr, err)
+		return exitUsage
 	}
 	opts := just.Options{
 		Justfile:   resolve(workDir, cfg.justfile),
@@ -64,28 +68,43 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	}
 	jf, err := just.Load(opts)
 	if err != nil {
-		return fail(stderr, err)
+		return fail(stderr, cfg.quiet, err)
 	}
 	if cfg.list {
 		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
 		return 0
 	}
-	opts.Recipes, opts.Args, err = selectRecipes(jf.Recipes(), cfg.words)
+	opts.Calls, err = selectRecipes(jf.Recipes(), cfg.words)
 	if err != nil {
-		return fail(stderr, err)
+		return fail(stderr, cfg.quiet, err)
 	}
 	res, err := jf.Run(context.Background(), opts)
 	if err != nil {
-		return fail(stderr, err)
+		return fail(stderr, cfg.quiet, err)
 	}
 	return res.ExitCode
 }
 
-// fail writes "error: <message>" for err to stderr and returns the failure
-// status 1. Impure: it writes to stderr.
-func fail(stderr io.Writer, err error) int {
+// Exit statuses of run besides a recipe's own: exitFailure for an error in
+// the justfile or the request, exitUsage for an error in the command line.
+const (
+	exitFailure = 1
+	exitUsage   = 2
+)
+
+// fail reports err on stderr, unless quiet, and returns exitFailure. Impure:
+// it writes to stderr.
+func fail(stderr io.Writer, quiet bool, err error) int {
+	if !quiet {
+		report(stderr, err)
+	}
+	return exitFailure
+}
+
+// report writes "error: <message>" for err to stderr. Impure: it writes to
+// stderr.
+func report(stderr io.Writer, err error) {
 	_, _ = fmt.Fprintf(stderr, "error: %s\n", describe(err))
-	return 1
 }
 
 // describe is the message of err. A diagnostic without a location, such as a
@@ -250,33 +269,30 @@ func setFlag(cfg *config, long, value string) {
 	}
 }
 
-// selectRecipes turns the positional words into the recipes to run and the
-// arguments for the first of them. As upstream does, the word after a recipe
-// name is that recipe's argument while it has parameters left to fill; the
-// remaining words are further recipe names. A word that is not a recipe is a
-// usage error. With no words, it selects nothing and the library runs the
-// first recipe. Pure.
-func selectRecipes(infos []just.RecipeInfo, words []string) (recipes, args []string, err error) {
-	if len(words) == 0 {
-		return nil, nil, nil
-	}
+// selectRecipes groups the positional words into the recipes to run, each
+// with its own arguments, as upstream does: a word names a recipe, and the
+// words after it, up to as many as the recipe has parameters, are its
+// arguments; the next word names the next recipe. So with `d:` and `c x:`,
+// `d c 1` runs d, then c with x=1. A name that is not a recipe is a usage
+// error, reported before anything runs. Too few arguments for a recipe is
+// left to the library, which words it as upstream does. With no words it
+// selects nothing and the library runs the first recipe. Pure.
+func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error) {
 	params := make(map[string]int, len(infos))
 	for _, info := range infos {
 		params[info.Name] = len(info.Params)
 	}
-	n, ok := params[words[0]]
-	if !ok {
-		return nil, nil, missingRecipe(words[0])
-	}
-	take := min(n, len(words)-1)
-	args = append([]string(nil), words[1:1+take]...)
-	recipes = append([]string{words[0]}, words[1+take:]...)
-	for _, name := range recipes {
-		if _, ok := params[name]; !ok {
-			return nil, nil, missingRecipe(name)
+	var calls []just.Call
+	for i := 0; i < len(words); {
+		n, ok := params[words[i]]
+		if !ok {
+			return nil, missingRecipe(words[i])
 		}
+		take := min(n, len(words)-i-1)
+		calls = append(calls, just.Call{Recipe: words[i], Args: append([]string(nil), words[i+1:i+1+take]...)})
+		i += 1 + take
 	}
-	return recipes, args, nil
+	return calls, nil
 }
 
 // missingRecipe is the error for a word that names no recipe, worded as
@@ -293,7 +309,7 @@ const (
 
 // listEntry is one line of --list output.
 type listEntry struct {
-	signature string // name and parameter names
+	signature string // name and parameters, with their defaults
 	width     int    // display width of signature
 	doc       string
 }
@@ -324,10 +340,24 @@ func listEntries(infos []just.RecipeInfo) []listEntry {
 		if strings.HasPrefix(info.Name, "_") {
 			continue
 		}
-		sig := strings.Join(append([]string{info.Name}, info.Params...), " ")
+		sig := signature(info)
 		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc})
 	}
 	return entries
+}
+
+// signature is the recipe's name followed by its parameters, each with its
+// default as written (`b='B'`). Pure.
+func signature(info just.RecipeInfo) string {
+	words := make([]string, 0, 1+len(info.Params))
+	words = append(words, info.Name)
+	for i, name := range info.Params {
+		if i < len(info.Defaults) && info.Defaults[i] != "" {
+			name += "=" + info.Defaults[i]
+		}
+		words = append(words, name)
+	}
+	return strings.Join(words, " ")
 }
 
 // alignWidth is the widest signature that is not too wide to carry its doc

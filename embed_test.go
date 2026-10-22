@@ -247,8 +247,8 @@ func TestParseErrorsNameTheFile(t *testing.T) {
 func TestRecipesReportsNameDocAndParams(t *testing.T) {
 	j := mustParse(t, "# builds it\nbuild target mode='fast':\n\techo hi\n\ntest:\n\techo t\n")
 	want := []RecipeInfo{
-		{Name: "build", Doc: "builds it", Params: []string{"target", "mode"}},
-		{Name: "test", Params: []string{}},
+		{Name: "build", Doc: "builds it", Params: []string{"target", "mode"}, Defaults: []string{"", "'fast'"}},
+		{Name: "test", Params: []string{}, Defaults: []string{}},
 	}
 	if got := j.Recipes(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Recipes = %+v, want %+v", got, want)
@@ -260,6 +260,32 @@ func TestRecipesReturnsFreshSlices(t *testing.T) {
 	j.Recipes()[0].Params[0] = "changed"
 	if got := j.Recipes()[0].Params[0]; got != "a" {
 		t.Errorf("Params[0] = %q after caller mutation, want %q", got, "a")
+	}
+}
+
+func TestRecipesReportsDefaultsAsWritten(t *testing.T) {
+	j := mustParse(t, "r a='x y' b=\"t\\tz\" c=a d=(a + 'e'):\n\techo hi\n")
+	want := []string{"'x y'", `"t\tz"`, "a", "(a + 'e')"}
+	if got := j.Recipes()[0].Defaults; !reflect.DeepEqual(got, want) {
+		t.Errorf("Defaults = %q, want %q", got, want)
+	}
+}
+
+// TestRunCallsCarryOwnArguments runs two calls of one recipe with different
+// arguments, which Recipes and Args cannot express.
+func TestRunCallsCarryOwnArguments(t *testing.T) {
+	j := mustParse(t, "a:\n\techo a\nb x:\n\techo {{x}}\n")
+	proc := &sysfake.FakeProcess{}
+	opts := Options{WorkDir: "/w", Exec: proc, Calls: []Call{{Recipe: "a"}, {Recipe: "b", Args: []string{"1"}}, {Recipe: "b", Args: []string{"2"}}}}
+	if _, err := j.Run(context.Background(), opts); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	var got []string
+	for _, s := range proc.Specs {
+		got = append(got, s.Argv[len(s.Argv)-1])
+	}
+	if want := []string{"echo a", "echo 1", "echo 2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("commands = %q, want %q", got, want)
 	}
 }
 
