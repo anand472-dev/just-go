@@ -444,25 +444,25 @@ func (l *lexer) lexComment() error {
 // delimiter.
 func (l *lexer) lexString() error {
 	at, start := l.mark(), l.pos
-	delim := stringDelimiter(l.src[l.pos:])
+	quote := stringDelimiter(l.src[l.pos:])
 	kind, what := String, "string"
-	if delim[0] == '`' {
+	if quote[0] == '`' {
 		kind, what = Backtick, "backtick"
 	}
-	l.skip(len(delim))
+	l.skip(len(quote))
 	body := l.pos
 	escape := false
 	for l.pos < len(l.src) {
-		if !escape && bytes.HasPrefix(l.src[l.pos:], delim) {
+		if !escape && bytes.HasPrefix(l.src[l.pos:], quote) {
 			text := string(l.src[body:l.pos])
-			l.skip(len(delim))
+			l.skip(len(quote))
 			l.emitString(kind, text, start, at)
 			return nil
 		}
-		escape = delim[0] == '"' && !escape && l.peek() == '\\'
+		escape = quote[0] == '"' && !escape && l.peek() == '\\'
 		l.bump()
 	}
-	return l.errWidth(at, len(delim), "unterminated "+what)
+	return l.errWidth(at, len(quote), "unterminated "+what)
 }
 
 // stringDelimiter returns the delimiter of the string literal that starts
