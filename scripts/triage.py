@@ -130,8 +130,10 @@ MODULE = re.compile(r"^(?:\[[^\]]*\]\s*)?(?:mod|import)\??\s", re.M)
 HEADER = re.compile(r"^@?(" + IDENT + r")([^:=]*?):(?![=])(.*)$")
 INTERPOLATION = re.compile(r"\{\{(.*?)\}\}")
 GRAMMAR_KEYWORDS = re.compile(r"^(?:export|unexport|alias)\s", re.M)
-PARSE_ERRORS = ("error: Expected ", "error: unknown start of token",
-                "error: unknown setting")
+PARSE_ERRORS = ("error: expected ", "error: unknown start of token",
+                "error: unknown setting", "error: unexpected closing delimiter",
+                "error: mismatched closing delimiter",
+                "error: unpaired carriage return", "error: unterminated ")
 
 
 def justfile_texts(case):
@@ -266,9 +268,22 @@ def setting_group(sources):
     return None
 
 
+def code_lines(source):
+    """The lines of source, with each line of code that ends in a backslash
+    joined to the line it continues, as the lexer joins them. Pure."""
+    lines = []
+    for line in source.splitlines():
+        if lines and lines[-1].endswith("\\") \
+                and lines[-1][:1] not in (" ", "\t"):
+            lines[-1] = lines[-1][:-1] + line.lstrip()
+        else:
+            lines.append(line)
+    return lines
+
+
 def has_shebang(source):
     """Whether a recipe body starts with #!. Pure."""
-    lines = source.splitlines()
+    lines = code_lines(source)
     for i, line in enumerate(lines[1:], 1):
         if line.lstrip().startswith("#!") and line[:1] in (" ", "\t") \
                 and lines[i - 1][:1] not in (" ", "\t", ""):

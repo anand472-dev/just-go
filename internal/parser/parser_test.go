@@ -199,16 +199,28 @@ func TestParseSetQuiet(t *testing.T) {
 	}
 }
 
+// What upstream expects at each point of the grammar, as its error messages
+// list it. Every message in these tests was checked against the oracle.
+const (
+	value     = "backtick, '!', '[', identifier, '(', '/', or string"
+	afterWord = "'&&', '!=', '!~', '||', ']', ',', '==', '=~', '+', '++', or '/'"
+	afterName = "'&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '/'"
+	afterDeps = "'&&', '*', '::', comment, end of file, end of line, identifier, indent, or '('"
+	item      = "'@', '[', comment, end of file, end of line, or identifier"
+)
+
 func TestParseSettingErrors(t *testing.T) {
 	wantError(t, "set nope\n", 1, 5, "unknown setting `nope`")
-	wantError(t, "set shell\n", 1, 10, "Expected ':=', but found end of line")
-	wantError(t, "set shell :=\n", 1, 13, "Expected '[', but found end of line")
-	wantError(t, "set shell := []\n", 1, 15, "Expected string, but found ']'")
-	wantError(t, "set shell := [,]\n", 1, 15, "Expected string, but found ','")
-	wantError(t, "set shell := \"a\"\n", 1, 14, "Expected '[', but found string")
-	wantError(t, "set shell := [\"a\" \"b\"]\n", 1, 19, "Expected string or ']', but found string")
-	wantError(t, "set shell := [\"a\"\n", 1, 18, "Expected string or ']', but found end of line")
-	wantError(t, "set quiet := true\n", 1, 11, "Expected end of line, but found ':='")
+	wantError(t, "set shell\n", 1, 10, "expected ':=', but found end of line")
+	wantError(t, "set shell :=\n", 1, 13, "expected '[', but found end of line")
+	wantError(t, "set shell := []\n", 1, 15, "expected "+value+", but found ']'")
+	wantError(t, "set shell := [,]\n", 1, 15, "expected "+value+", but found ','")
+	wantError(t, "set shell := \"a\"\n", 1, 14, "expected '[', but found string")
+	wantError(t, "set shell := [\"a\" \"b\"]\n", 1, 19, "expected "+afterWord+", but found string")
+	wantError(t, "set shell := [\"a\"\n", 1, 19, "expected "+afterWord+", but found end of file")
+	wantError(t, "set quiet := maybe\n", 1, 14, "expected keyword `true` or `false` but found identifier `maybe`")
+	wantError(t, "set quiet := \"true\"\n", 1, 14, "expected identifier, but found string")
+	wantError(t, "set quiet := true foo\n", 1, 19, "expected comment, end of file, or end of line, but found identifier")
 }
 
 func TestParseSetCanStillNameARecipeOrVariable(t *testing.T) {
@@ -279,11 +291,11 @@ func TestParseSourceOrder(t *testing.T) {
 }
 
 func TestParseAssignmentErrors(t *testing.T) {
-	wantError(t, "x := \n", 1, 6, "Expected an expression, but found end of line")
-	wantError(t, "x := a +\n", 1, 9, "Expected an expression, but found end of line")
-	wantError(t, "x := (a\n", 1, 8, "Expected '+' or ')', but found end of line")
-	wantError(t, "x := (\n", 1, 7, "Expected an expression, but found end of line")
-	wantError(t, "x := a b\n", 1, 8, "Expected end of line, but found identifier")
+	wantError(t, "x := \n", 1, 6, "expected "+value+", but found end of line")
+	wantError(t, "x := a +\n", 1, 9, "expected "+value+", but found end of line")
+	wantError(t, "x := (a\n", 1, 9, "expected '&&', '!=', '!~', '||', '==', '=~', '(', ')', '+', '++', or '/', but found end of file")
+	wantError(t, "x := (\n", 1, 8, "expected "+value+", but found end of file")
+	wantError(t, "x := a b\n", 1, 8, "expected "+afterName+", but found identifier")
 }
 
 func TestParseParams(t *testing.T) {
@@ -299,23 +311,23 @@ func TestParseParams(t *testing.T) {
 }
 
 func TestParseRecipeHeaderErrors(t *testing.T) {
-	wantError(t, "@\n", 1, 2, "Expected a recipe name, but found end of line")
-	wantError(t, "r x\n", 1, 4, "Expected ':', ':=', or a parameter, but found end of line")
-	wantError(t, "r (x):\n", 1, 3, "Expected ':', ':=', or a parameter, but found '('")
-	wantError(t, "r x=:\n", 1, 5, "Expected an expression, but found ':'")
-	wantError(t, "r: a (b)\n", 1, 6, "Expected end of line, but found '('")
-	wantError(t, "r: a := b\n", 1, 6, "Expected end of line, but found ':='")
+	wantError(t, "@\n", 1, 2, "expected identifier, but found end of line")
+	wantError(t, "r x\n", 1, 4, "expected '*', ':', '$', '=', identifier, or '+', but found end of line")
+	wantError(t, "r 'x':\n", 1, 3, "expected '*', ':', '$', identifier, or '+', but found string")
+	wantError(t, "r x=:\n", 1, 5, "expected backtick, '!', '[', identifier, '(', or string, but found ':'")
+	wantError(t, "r: a 'b'\n", 1, 6, "expected "+afterDeps+", but found string")
+	wantError(t, "r: a := b\n", 1, 6, "expected "+afterDeps+", but found ':='")
 }
 
 func TestParseTopLevelErrors(t *testing.T) {
-	wantError(t, ": x\n", 1, 1, "Expected a recipe, an assignment, or a setting, but found ':'")
-	wantError(t, "  x\n", 1, 1, "Expected a recipe, an assignment, or a setting, but found indentation")
-	wantError(t, "r:\n  x\n\"s\"\n", 3, 1, "Expected a recipe, an assignment, or a setting, but found string")
+	wantError(t, ": x\n", 1, 1, "expected "+item+", but found ':'")
+	wantError(t, "  x\n", 1, 1, "expected "+item+", but found indent")
+	wantError(t, "r:\n  x\n\"s\"\n", 3, 1, "expected "+item+", but found string")
 }
 
 func TestParseLexErrorsPassThrough(t *testing.T) {
 	wantError(t, "x := \"abc\n", 1, 6, "unterminated string")
-	wantError(t, "x := $\n", 1, 6, "unknown start of token '$'")
+	wantError(t, "x := %\n", 1, 6, "unknown start of token '%'")
 }
 
 func TestParseRecipeBodies(t *testing.T) {
@@ -377,8 +389,8 @@ func TestParseInterpolationErrors(t *testing.T) {
 	wantError(t, "r:\n  {{\n", 2, 3, "unterminated interpolation")
 	wantError(t, "r:\n  x {{ a\n", 2, 5, "unterminated interpolation")
 	wantError(t, "r:\n  x {{ a\n  echo $HOME\n", 2, 5, "unterminated interpolation")
-	wantError(t, "r:\n  {{ }}\n", 2, 6, "Expected an expression, but found '}}'")
-	wantError(t, "r:\n  {{ a b }}\n", 2, 8, "Expected '+' or '}}', but found identifier")
+	wantError(t, "r:\n  {{ }}\n", 2, 6, "expected "+value+", but found '}}'")
+	wantError(t, "r:\n  {{ a b }}\n", 2, 8, "expected '&&', '!=', '!~', '||', '==', '=~', '}}', '(', '+', '++', or '/', but found identifier")
 }
 
 func TestParseMixedIndentationIsError(t *testing.T) {
@@ -593,6 +605,7 @@ func TestParseErrorWidths(t *testing.T) {
 		{"r:\n  a\n\t\tb\n", 2},
 		{"x := \n", 1},
 		{"x :=", 0},
+		{"r:\n  {{ # hello\n  }}\n", 7}, // interpolation::comment_in_interopolation#1
 	}
 	for _, c := range cases {
 		_, err := parser.Parse("justfile", []byte(c.src))
@@ -631,7 +644,7 @@ func TestParseStringEscapeErrorsComeFromTheParser(t *testing.T) {
 	wantError(t, "set shell := [\"\\u\"]\n", 1, 15, "unterminated unicode escape sequence")
 	wantError(t, "r:\n  {{ \"\\q\" }}\n", 2, 6, "`\\q` is not a valid escape sequence")
 	wantError(t, "x := \"\\q\"\ny := 'abc\n", 2, 6, "unterminated string")
-	wantError(t, "x := a b\ny := \"\\q\"\n", 1, 8, "Expected end of line, but found identifier")
+	wantError(t, "x := a b\ny := \"\\q\"\n", 1, 8, "expected "+afterName+", but found identifier")
 	_, err := parser.Parse("justfile", []byte("x := \"a\\q\" + 'b'\n"))
 	var de *diag.Error
 	if !errors.As(err, &de) || de.Width != 5 {
@@ -659,5 +672,43 @@ func TestParseExtraIndentWidthCountsTheEscapeSource(t *testing.T) {
 	}
 	if got, want := jf.Recipes[0].Lines[1].ExtraIndent, (ast.Span{Line: 3, Col: 3, Width: 9}); got != want {
 		t.Errorf("ExtraIndent = %+v, want %+v", got, want)
+	}
+}
+
+// TestParseCorpusErrors pins each parse-time case of the error_messages,
+// delimiters and parser corpus groups: the category, the location and the
+// message, which is copied from the corpus case named in each row.
+func TestParseCorpusErrors(t *testing.T) {
+	cases := []struct {
+		id, src   string
+		line, col int
+		msg       string
+	}{
+		{"error_messages::unexpected_character#1", "&~", 1, 2, "expected character `&`"},
+		{"error_messages::file_path_is_indented_if_justfile_is_long#1", strings.Repeat("\n", 19) + "foo", 20, 4,
+			"expected '*', ':', '$', identifier, or '+', but found end of file"},
+		{"delimiters::mismatched_delimiter#1", "(]", 1, 2,
+			"mismatched closing delimiter `]`, did you mean to close the `(` on line 1?"},
+		{"delimiters::unexpected_delimiter#1", "]", 1, 1, "unexpected closing delimiter `]`"},
+		{"parser::backslash_eof#1", "foo:\n\\", 2, 1, "expected escape sequence but found end-of-file"},
+	}
+	for _, c := range cases {
+		t.Run(c.id, func(t *testing.T) {
+			wantError(t, c.src, c.line, c.col, c.msg)
+		})
+	}
+}
+
+// TestParseDelimiterContinuation pins delimiters::paren_continuation#1 and
+// delimiters::bracket_continuation#1: a line break inside an open delimiter
+// is whitespace, and a shell list may end in a comma.
+func TestParseDelimiterContinuation(t *testing.T) {
+	jf := mustParse(t, "x := (\n      'a'\n          +\n  'b'\n)\n\nfoo:\n  echo {{x}}\n")
+	if want := (ast.Concat{Left: lit("a"), Right: lit("b")}); len(jf.Assignments) != 1 || jf.Assignments[0].Value != want {
+		t.Errorf("paren_continuation: Assignments = %+v, want x := %+v", jf.Assignments, want)
+	}
+	jf = mustParse(t, "set shell := [\n  'sh',\n  '-cu',\n]\n\nfoo:\n  echo foo\n")
+	if want := []string{"sh", "-cu"}; !reflect.DeepEqual(jf.Settings.Shell, want) {
+		t.Errorf("bracket_continuation: Shell = %q, want %q", jf.Settings.Shell, want)
 	}
 }

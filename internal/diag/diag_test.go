@@ -48,6 +48,15 @@ func TestWithSourceQuotesTheLine(t *testing.T) {
 	}
 }
 
+// Only a CRLF line break loses its carriage return. Upstream quotes a
+// carriage return that ends the file, where the lexer reports it as unpaired.
+func TestWithSourceKeepsACarriageReturnThatEndsTheFile(t *testing.T) {
+	de := &diag.Error{Kind: diag.KindParse, File: "justfile", Line: 1, Col: 6}
+	if diag.WithSource(de, []byte("x := \\\r")); de.Source != "x := \\\r" {
+		t.Errorf("Source = %q, want %q", de.Source, "x := \\\r")
+	}
+}
+
 func TestWithSourceLeavesOtherErrorsAlone(t *testing.T) {
 	plain := errors.New("plain")
 	if got := diag.WithSource(plain, []byte("x")); got != plain {

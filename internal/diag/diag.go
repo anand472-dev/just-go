@@ -79,14 +79,17 @@ func WithSource(err error, src []byte) error {
 	return err
 }
 
-// sourceLine returns line n (1-based) of src without its line break, a
-// leading byte order mark or a trailing carriage return; "" past the end.
-// Pure.
+// sourceLine returns line n (1-based) of src without its line break ("\n" or
+// "\r\n") or a leading byte order mark; "" past the end. As in upstream, a
+// carriage return that ends the file is not a line break, and stays. Pure.
 func sourceLine(src []byte, n int) string {
 	src = bytes.TrimPrefix(src, []byte("\xEF\xBB\xBF"))
 	lines := bytes.Split(src, []byte("\n"))
-	if n > len(lines) {
+	switch {
+	case n > len(lines):
 		return ""
+	case n == len(lines):
+		return string(lines[n-1])
 	}
 	return string(bytes.TrimSuffix(lines[n-1], []byte("\r")))
 }

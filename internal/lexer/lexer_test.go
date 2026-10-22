@@ -151,22 +151,60 @@ func TestLexEmptySourceIsJustEOF(t *testing.T) {
 }
 
 func TestLexPunctuation(t *testing.T) {
-	wantTokens(t, "@-a: b, +c = (d)\n", []lexer.Token{
+	wantTokens(t, "@a: b, +c = (d)\n", []lexer.Token{
 		tok(lexer.At, "@", 1, 1),
-		tok(lexer.Dash, "-", 1, 2),
-		tok(lexer.Ident, "a", 1, 3),
-		tok(lexer.Colon, ":", 1, 4),
-		tok(lexer.Ident, "b", 1, 6),
-		tok(lexer.Comma, ",", 1, 7),
-		tok(lexer.Plus, "+", 1, 9),
-		tok(lexer.Ident, "c", 1, 10),
-		tok(lexer.Equals, "=", 1, 12),
-		tok(lexer.LParen, "(", 1, 14),
-		tok(lexer.Ident, "d", 1, 15),
-		tok(lexer.RParen, ")", 1, 16),
-		tok(lexer.Newline, "\n", 1, 17),
+		tok(lexer.Ident, "a", 1, 2),
+		tok(lexer.Colon, ":", 1, 3),
+		tok(lexer.Ident, "b", 1, 5),
+		tok(lexer.Comma, ",", 1, 6),
+		tok(lexer.Plus, "+", 1, 8),
+		tok(lexer.Ident, "c", 1, 9),
+		tok(lexer.Equals, "=", 1, 11),
+		tok(lexer.LParen, "(", 1, 13),
+		tok(lexer.Ident, "d", 1, 14),
+		tok(lexer.RParen, ")", 1, 15),
+		tok(lexer.Newline, "\n", 1, 16),
 		tok(lexer.EOF, "", 2, 1),
 	})
+}
+
+// TestLexOperatorsOfTheFullLanguage checks that the lexer knows every
+// operator upstream's lexer does, the longest first, so that a parse error
+// names the token upstream names. A non-leading byte order mark is a token.
+func TestLexOperatorsOfTheFullLanguage(t *testing.T) {
+	wantTokens(t, "&& * ! != !~ || :: == =~ ++ $ / ? \uFEFF", []lexer.Token{
+		tok(lexer.AmpAmp, "&&", 1, 1),
+		tok(lexer.Asterisk, "*", 1, 4),
+		tok(lexer.Bang, "!", 1, 6),
+		tok(lexer.BangEquals, "!=", 1, 8),
+		tok(lexer.BangTilde, "!~", 1, 11),
+		tok(lexer.BarBar, "||", 1, 14),
+		tok(lexer.ColonColon, "::", 1, 17),
+		tok(lexer.EqualsEquals, "==", 1, 20),
+		tok(lexer.EqualsTilde, "=~", 1, 23),
+		tok(lexer.PlusPlus, "++", 1, 26),
+		tok(lexer.Dollar, "$", 1, 29),
+		tok(lexer.Slash, "/", 1, 31),
+		tok(lexer.QuestionMark, "?", 1, 33),
+		tok(lexer.ByteOrderMark, "\uFEFF", 1, 35),
+		tok(lexer.Newline, "", 1, 36),
+		tok(lexer.EOF, "", 1, 36),
+	})
+}
+
+// TestTokenKindNamesAreUpstreams checks the names error messages use.
+func TestTokenKindNamesAreUpstreams(t *testing.T) {
+	want := map[lexer.TokenKind]string{
+		lexer.AmpAmp: "'&&'", lexer.Backtick: "backtick", lexer.ByteOrderMark: "byte order mark",
+		lexer.Assign: "':='", lexer.EOF: "end of file", lexer.Newline: "end of line",
+		lexer.Ident: "identifier", lexer.Indent: "indent", lexer.Close: "'}}'", lexer.Interp: "'{{'",
+		lexer.QuestionMark: "?", lexer.String: "string", lexer.Text: "command text",
+	}
+	for kind, name := range want {
+		if got := kind.String(); got != name {
+			t.Errorf("TokenKind(%d).String() = %q, want %q", int(kind), got, name)
+		}
+	}
 }
 
 func TestLexIdentifiersMayContainDashesDigitsAndUnderscores(t *testing.T) {
@@ -456,16 +494,108 @@ func TestLexInterpolationMayStartTheBodyLineAndSpanLines(t *testing.T) {
 	})
 }
 
-func TestLexInterpolationInAnAssignment(t *testing.T) {
+// Only body text has interpolations. In code, as in upstream, braces are
+// delimiters, one at a time.
+func TestLexBracesInCodeAreDelimiters(t *testing.T) {
 	wantTokens(t, "x := {{y}}\n", []lexer.Token{
 		tok(lexer.Ident, "x", 1, 1),
 		tok(lexer.Assign, ":=", 1, 3),
-		tok(lexer.Interp, "{{", 1, 6),
+		tok(lexer.LBrace, "{", 1, 6),
+		tok(lexer.LBrace, "{", 1, 7),
 		tok(lexer.Ident, "y", 1, 8),
-		tok(lexer.Close, "}}", 1, 9),
+		tok(lexer.RBrace, "}", 1, 9),
+		tok(lexer.RBrace, "}", 1, 10),
 		tok(lexer.Newline, "\n", 1, 11),
 		tok(lexer.EOF, "", 2, 1),
 	})
+}
+
+// A line break inside an open delimiter is whitespace, as is the indentation
+// after it (delimiters::paren_continuation#1). When the input ends inside
+// one, the added line break is where upstream puts the end of the file: just
+// past the last line break, on the line it ends.
+func TestLexLineBreakInsideDelimiterIsWhitespace(t *testing.T) {
+	wantTokens(t, "x := (\n  'a'\n)\n", []lexer.Token{
+		tok(lexer.Ident, "x", 1, 1),
+		tok(lexer.Assign, ":=", 1, 3),
+		tok(lexer.LParen, "(", 1, 6),
+		tok(lexer.String, "a", 2, 3),
+		tok(lexer.RParen, ")", 3, 1),
+		tok(lexer.Newline, "\n", 3, 2),
+		tok(lexer.EOF, "", 4, 1),
+	})
+	wantTokens(t, "x := [\r\n", []lexer.Token{
+		tok(lexer.Ident, "x", 1, 1),
+		tok(lexer.Assign, ":=", 1, 3),
+		tok(lexer.LBracket, "[", 1, 6),
+		tok(lexer.Newline, "", 1, 9),
+		tok(lexer.EOF, "", 2, 1),
+	})
+}
+
+// The delimiters::mismatched_delimiter#1 and delimiters::unexpected_delimiter#1
+// corpus cases, and a mismatch across lines that the oracle reports the same
+// way.
+func TestLexClosingDelimiterErrors(t *testing.T) {
+	wantParseError(t, "(]", 1, 2, "mismatched closing delimiter `]`, did you mean to close the `(` on line 1?")
+	wantParseError(t, "]", 1, 1, "unexpected closing delimiter `]`")
+	wantParseError(t, "(\n[\n}", 3, 1, "mismatched closing delimiter `}`, did you mean to close the `[` on line 2?")
+	wantParseError(t, "x := a }}", 1, 8, "unexpected closing delimiter `}`")
+}
+
+// Inside an interpolation `}}` closes it only when no delimiter is open
+// there; otherwise it is a closing brace.
+func TestLexInterpolationEndNeedsNoOpenDelimiter(t *testing.T) {
+	wantParseError(t, "r:\n  {{ ( }}\n", 2, 8, "mismatched closing delimiter `}`, did you mean to close the `(` on line 2?")
+	wantTokens(t, "r:\n  {{ (a) }}", []lexer.Token{
+		tok(lexer.Ident, "r", 1, 1),
+		tok(lexer.Colon, ":", 1, 2),
+		tok(lexer.Newline, "\n", 1, 3),
+		tok(lexer.Indent, "  ", 2, 1),
+		tok(lexer.Interp, "{{", 2, 3),
+		tok(lexer.LParen, "(", 2, 6),
+		tok(lexer.Ident, "a", 2, 7),
+		tok(lexer.RParen, ")", 2, 8),
+		tok(lexer.Close, "}}", 2, 10),
+		tok(lexer.Newline, "", 2, 12),
+		tok(lexer.EOF, "", 2, 12),
+	})
+}
+
+// error_messages::unexpected_character#1: a lone `&` or `|` is reported at
+// the character after it.
+func TestLexDigraphErrors(t *testing.T) {
+	wantParseError(t, "&~", 1, 2, "expected character `&`")
+	wantParseError(t, "&", 1, 2, "expected character `&` but found end-of-file")
+	wantParseError(t, "x := a |b", 1, 9, "expected character `|`")
+}
+
+// A backslash in code joins the next line, and is an error before anything
+// else (parser::backslash_eof#1 for the end of the input).
+func TestLexEscapes(t *testing.T) {
+	wantTokens(t, "x := 'a' \\\n  + 'b'", []lexer.Token{
+		tok(lexer.Ident, "x", 1, 1),
+		tok(lexer.Assign, ":=", 1, 3),
+		tok(lexer.String, "a", 1, 6),
+		tok(lexer.Plus, "+", 2, 3),
+		tok(lexer.String, "b", 2, 5),
+		tok(lexer.Newline, "", 2, 8),
+		tok(lexer.EOF, "", 2, 8),
+	})
+	wantParseError(t, "foo:\n\\", 2, 1, "expected escape sequence but found end-of-file")
+	wantParseError(t, "x := \\a", 1, 6, "`\\a` is not a valid escape sequence")
+	wantParseErrorWidth(t, "x := \\\r", 1, 6, 2, "unpaired carriage return")
+}
+
+// Backticks are lexed like strings, so an unterminated one is reported as
+// upstream reports it.
+func TestLexBackticks(t *testing.T) {
+	toks, err := lexer.Lex("justfile", []byte("x := `ls`"))
+	if err != nil || toks[2] != (lexer.Token{Kind: lexer.Backtick, Text: "ls", Raw: "`ls`", Line: 1, Col: 6}) {
+		t.Errorf("Lex = %+v, %v", toks, err)
+	}
+	wantParseError(t, "x := `a", 1, 6, "unterminated backtick")
+	wantParseErrorWidth(t, "x := ```a", 1, 6, 3, "unterminated backtick")
 }
 
 func TestLexBlankAndWhitespaceOnlyLinesEmitOnlyNewline(t *testing.T) {
@@ -504,23 +634,33 @@ func TestLexBackslashAtEndOfInputUnterminatesString(t *testing.T) {
 }
 
 // An interpolation the input never closes is reported at its opening braces,
-// as upstream does, even when the lexer meets a character of the full
-// language that the subset does not know.
+// as upstream does, even with a delimiter open inside it. A character that
+// starts no token is reported first, wherever it is.
 func TestLexUnterminatedInterpolation(t *testing.T) {
 	wantParseErrorWidth(t, "r:\n\techo {{ x\n\techo $HOME\n", 2, 7, 2, "unterminated interpolation")
 	wantParseErrorWidth(t, "r:\n  x {{ a\n", 2, 5, 2, "unterminated interpolation")
 	wantParseErrorWidth(t, "r:\n  x {{", 2, 5, 2, "unterminated interpolation")
-	wantParseError(t, "r:\n  x {{ $ }}\n", 2, 8, "unknown start of token '$'")
-	wantParseError(t, "x := $", 1, 6, "unknown start of token '$'")
+	wantParseErrorWidth(t, "r:\n  {{ (\n", 2, 3, 2, "unterminated interpolation")
+	wantParseError(t, "r:\n  x {{ % }}\n", 2, 8, "unknown start of token '%'")
+	wantParseError(t, "r:\n  x {{ %\n", 2, 8, "unknown start of token '%'")
 	wantParseError(t, "r:\n  {{ 'a }}\n", 2, 6, "unterminated string")
 }
 
+// Upstream names a character that starts no token, and gives its code point
+// unless it is printable ASCII (misc::unknown_start_of_token_* corpus cases).
 func TestLexUnknownStartOfToken(t *testing.T) {
-	wantParseError(t, "x := $", 1, 6, "unknown start of token '$'")
-	wantParseError(t, "a\n\u00e9", 2, 1, "unknown start of token 'é'")
-	wantParseError(t, "x\r", 1, 2, "unknown start of token '\\r'")
-	wantParseError(t, "{ x", 1, 1, "unknown start of token '{'")
+	wantParseError(t, "x := %", 1, 6, "unknown start of token '%'")
+	wantParseError(t, "a\n\u00e9", 2, 1, "unknown start of token 'é' (U+00E9)")
+	wantParseError(t, "x := \x00", 1, 6, "unknown start of token '\x00' (U+0000)")
+	wantParseError(t, "\u200b", 1, 1, "unknown start of token '\u200b' (U+200B)")
+	wantParseError(t, "-", 1, 1, "unknown start of token '-'")
 	wantParseError(t, "9", 1, 1, "unknown start of token '9'")
+}
+
+// A carriage return in code must start a CRLF line break.
+func TestLexUnpairedCarriageReturn(t *testing.T) {
+	wantParseError(t, "x\r", 1, 2, "unpaired carriage return")
+	wantParseError(t, "x\ry", 1, 2, "unpaired carriage return")
 }
 
 func TestLexInvalidUTF8InsideTextAndStringsIsKept(t *testing.T) {
@@ -554,7 +694,7 @@ func TestLexIsDeterministicAndDoesNotModifyInput(t *testing.T) {
 }
 
 func TestLexErrorCarriesFileName(t *testing.T) {
-	_, err := lexer.Lex("sub/justfile", []byte("$"))
+	_, err := lexer.Lex("sub/justfile", []byte("%"))
 	if err == nil || !strings.HasPrefix(err.Error(), "sub/justfile:1:1: ") {
 		t.Fatalf("error = %v, want prefix sub/justfile:1:1: ", err)
 	}

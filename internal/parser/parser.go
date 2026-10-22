@@ -38,6 +38,10 @@ type parser struct {
 	file string
 	toks []lexer.Token // always ends with EOF
 	pos  int
+	// expected holds a bit for each token kind the grammar has looked for
+	// since it last consumed a token. As upstream does, an unexpected token
+	// is reported with this set.
+	expected uint64
 	// doc is the text of the most recent top-level comment, and docLine the
 	// line it was on. A recipe on the next line adopts it, unless docShebang
 	// says it is a `#!` line at the very start of the file, which upstream
@@ -47,6 +51,33 @@ type parser struct {
 	docShebang bool
 }
 
+// kinds returns the set of the given token kinds. Pure.
+func kinds(ks ...lexer.TokenKind) uint64 {
+	var set uint64
+	for _, k := range ks {
+		set |= 1 << k
+	}
+	return set
+}
+
+var (
+	// valueStart is what upstream's parse_value looks for: the start of a
+	// string, a backtick, a name or call, a group, a list, or a negation.
+	valueStart = kinds(lexer.Bang, lexer.String, lexer.Backtick, lexer.Ident, lexer.LParen, lexer.LBracket)
+	// operandEnd is what upstream looks for after an operand: the path join
+	// and list concatenation operators. Concatenation is probed on its own.
+	operandEnd = kinds(lexer.Slash, lexer.PlusPlus)
+	// exprEnd is what upstream looks for after a whole operand chain: the
+	// comparison and logical operators.
+	exprEnd = kinds(lexer.BangEquals, lexer.EqualsTilde, lexer.BangTilde, lexer.EqualsEquals, lexer.AmpAmp, lexer.BarBar)
+	// headerEnd is what upstream looks for after a recipe's dependencies,
+	// besides the end of the line: another dependency, one with arguments,
+	// the subsequents' `&&`, and the body.
+	headerEnd = kinds(lexer.Ident, lexer.Asterisk, lexer.LParen, lexer.AmpAmp, lexer.Indent)
+	// itemStart is what upstream looks for where an item may start.
+	itemStart = kinds(lexer.EOF, lexer.LBracket, lexer.Comment, lexer.Newline, lexer.Ident, lexer.At)
+)
+
 // peek returns the current token.
 func (p *parser) peek() lexer.Token { return p.toks[p.pos] }
 
@@ -55,13 +86,39 @@ func (p *parser) peekAt(n int) lexer.Token {
 	return p.toks[min(p.pos+n, len(p.toks)-1)]
 }
 
-// next consumes and returns the current token. It never moves past EOF.
+// next consumes and returns the current token, and forgets what the grammar
+// looked for before it. It never moves past EOF.
 func (p *parser) next() lexer.Token {
 	t := p.toks[p.pos]
 	if t.Kind != lexer.EOF {
 		p.pos++
 	}
+	p.expected = 0
 	return t
+}
+
+// is reports whether the current token is of the given kind, and records that
+// the grammar looked for it.
+func (p *parser) is(kind lexer.TokenKind) bool {
+	p.expected |= 1 << kind
+	return p.peek().Kind == kind
+}
+
+// accept consumes the current token if it is of the given kind.
+func (p *parser) accept(kind lexer.TokenKind) bool {
+	if p.is(kind) {
+		p.next()
+		return true
+	}
+	return false
+}
+
+// expect consumes a token of the given kind or reports an unexpected token.
+func (p *parser) expect(kind lexer.TokenKind) (lexer.Token, error) {
+	if p.is(kind) {
+		return p.next(), nil
+	}
+	return lexer.Token{}, p.unexpected()
 }
 
 // errAt reports msg at t, covering the whole token.
@@ -69,12 +126,54 @@ func (p *parser) errAt(t lexer.Token, msg string) error {
 	return &diag.Error{Kind: diag.KindParse, File: p.file, Line: t.Line, Col: t.Col, Width: tokenWidth(t), Msg: msg}
 }
 
-// tokenWidth is the width of t in the source, in runes. Pure.
+// tokenWidth is the width of t in the source, in runes: a comment's covers
+// its `#`. Pure.
 func tokenWidth(t lexer.Token) int {
-	if t.Raw != "" {
+	switch {
+	case t.Raw != "":
 		return utf8.RuneCountInString(t.Raw)
+	case t.Kind == lexer.Comment:
+		return utf8.RuneCountInString(t.Text) + 1
 	}
 	return utf8.RuneCountInString(t.Text)
+}
+
+// unexpected reports the current token as upstream does: it lists every kind
+// of token the grammar looked for since the last one it consumed.
+func (p *parser) unexpected() error {
+	t := p.peek()
+	return p.errAt(t, fmt.Sprintf("expected %s, but found %s", expectedList(p.expected), found(t)))
+}
+
+// expectedList names the kinds in set in upstream's order, joined as
+// upstream's List::or joins them. A byte order mark is never listed. Pure.
+func expectedList(set uint64) string {
+	var names []string
+	for k := lexer.TokenKind(0); k < 64; k++ {
+		if set&(1<<k) != 0 && k != lexer.ByteOrderMark {
+			names = append(names, k.String())
+		}
+	}
+	return orList(names)
+}
+
+// orList joins names with commas and a final "or", as upstream's List::or
+// does: "a", "a or b", "a, b, or c". Pure.
+func orList(names []string) string {
+	if len(names) < 3 {
+		return strings.Join(names, " or ")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + ", or " + names[len(names)-1]
+}
+
+// found names t for an error message. The line break the lexer adds at the
+// end of the input is the end of the file, which is all upstream sees there.
+// Pure.
+func found(t lexer.Token) string {
+	if t.Kind == lexer.Newline && t.Text == "" {
+		return lexer.EOF.String()
+	}
+	return t.Kind.String()
 }
 
 // stringValue consumes the current token, a String, and returns its value.
@@ -82,40 +181,6 @@ func tokenWidth(t lexer.Token) int {
 // earlier parse errors and every lex error come first.
 func (p *parser) stringValue() (string, error) {
 	return lexer.StringValue(p.file, p.next())
-}
-
-// unexpected reports that t is not what the grammar needs next.
-func (p *parser) unexpected(t lexer.Token, want string) error {
-	return p.errAt(t, fmt.Sprintf("Expected %s, but found %s", want, describe(t)))
-}
-
-// expect consumes a token of the given kind or reports want.
-func (p *parser) expect(kind lexer.TokenKind, want string) (lexer.Token, error) {
-	t := p.peek()
-	if t.Kind != kind {
-		return t, p.unexpected(t, want)
-	}
-	return p.next(), nil
-}
-
-// describe names a token for an error message.
-func describe(t lexer.Token) string {
-	if name, ok := tokenNames()[t.Kind]; ok {
-		return name
-	}
-	return "'" + t.Text + "'"
-}
-
-func tokenNames() map[lexer.TokenKind]string {
-	return map[lexer.TokenKind]string{
-		lexer.Ident:   "identifier",
-		lexer.String:  "string",
-		lexer.Newline: "end of line",
-		lexer.EOF:     "end of file",
-		lexer.Indent:  "indentation",
-		lexer.Text:    "text",
-		lexer.Comment: "comment",
-	}
 }
 
 func (p *parser) justfile() (*ast.Justfile, error) {
@@ -128,8 +193,10 @@ func (p *parser) justfile() (*ast.Justfile, error) {
 	return jf, nil
 }
 
-// item parses one top-level item into jf.
+// item parses one top-level item into jf. Attributes, which start with `[`,
+// are not part of the subset, but upstream looks for them first.
 func (p *parser) item(jf *ast.Justfile) error {
+	p.expected |= itemStart
 	t := p.peek()
 	switch t.Kind {
 	case lexer.Newline:
@@ -141,7 +208,7 @@ func (p *parser) item(jf *ast.Justfile) error {
 	case lexer.At, lexer.Ident:
 		return p.statement(jf)
 	default:
-		return p.unexpected(t, "a recipe, an assignment, or a setting")
+		return p.unexpected()
 	}
 	return nil
 }
@@ -171,69 +238,87 @@ func (p *parser) isSetting() bool {
 	return false
 }
 
-// endLine consumes an optional trailing comment and the line break.
+// endLine consumes an optional trailing comment and the line break. The line
+// break the lexer adds at the end of the input stands for upstream's end of
+// file, which also ends a line.
 func (p *parser) endLine() error {
-	if p.peek().Kind == lexer.Comment {
-		p.next()
-	}
-	_, err := p.expect(lexer.Newline, "end of line")
+	p.accept(lexer.Comment)
+	p.is(lexer.EOF)
+	_, err := p.expect(lexer.Newline)
 	return err
 }
 
 func (p *parser) setting(jf *ast.Justfile) error {
 	p.next() // set
 	name := p.next()
+	var err error
 	switch name.Text {
 	case "quiet":
-		jf.Settings.Quiet = true
+		jf.Settings.Quiet, err = p.setBool()
 	case "shell":
-		shell, err := p.shell()
-		if err != nil {
-			return err
-		}
-		jf.Settings.Shell = shell
+		jf.Settings.Shell, err = p.shell()
 	default:
 		return p.errAt(name, fmt.Sprintf("unknown setting `%s`", name.Text))
+	}
+	if err != nil {
+		return err
 	}
 	return p.endLine()
 }
 
-// shell parses `:= ["cmd", "arg", ...]`, after the setting name.
+// setBool parses the optional `:= true` or `:= false` of a boolean setting,
+// after its name. Without one the setting is on.
+func (p *parser) setBool() (bool, error) {
+	if !p.accept(lexer.Assign) {
+		return true, nil
+	}
+	t, err := p.expect(lexer.Ident)
+	switch {
+	case err != nil:
+		return false, err
+	case t.Text == "true" || t.Text == "false":
+		return t.Text == "true", nil
+	}
+	return false, p.errAt(t, fmt.Sprintf("expected keyword `true` or `false` but found identifier `%s`", t.Text))
+}
+
+// shell parses `:= ["cmd", "arg", ...]`, after the setting name. A trailing
+// comma is allowed.
 func (p *parser) shell() ([]string, error) {
-	if _, err := p.expect(lexer.Assign, "':='"); err != nil {
+	if _, err := p.expect(lexer.Assign); err != nil {
 		return nil, err
 	}
-	if _, err := p.expect(lexer.LBracket, "'['"); err != nil {
+	if _, err := p.expect(lexer.LBracket); err != nil {
 		return nil, err
-	}
-	if t := p.peek(); t.Kind != lexer.String {
-		return nil, p.unexpected(t, "string")
 	}
 	var words []string
 	for {
-		word, err := p.stringValue()
+		word, err := p.shellWord()
 		if err != nil {
 			return nil, err
 		}
 		words = append(words, word)
-		if !p.moreWords() {
+		if !p.accept(lexer.Comma) || p.is(lexer.RBracket) {
 			break
 		}
 	}
-	if _, err := p.expect(lexer.RBracket, "string or ']'"); err != nil {
+	if _, err := p.expect(lexer.RBracket); err != nil {
 		return nil, err
 	}
 	return words, nil
 }
 
-// moreWords consumes the comma after a shell word, and reports whether
-// another word follows it. A trailing comma is allowed.
-func (p *parser) moreWords() bool {
-	if p.peek().Kind != lexer.Comma {
-		return false
+// shellWord parses one word of a shell setting. Upstream takes any
+// expression there; the subset takes a string literal, and reports anything
+// else as upstream reports a token that starts no expression.
+func (p *parser) shellWord() (string, error) {
+	p.expected |= valueStart | kinds(lexer.Slash)
+	if p.peek().Kind != lexer.String {
+		return "", p.unexpected()
 	}
-	p.next()
-	return p.peek().Kind == lexer.String
+	word, err := p.stringValue()
+	p.expected |= operandEnd | kinds(lexer.Plus) | exprEnd
+	return word, err
 }
 
 func (p *parser) assignment(jf *ast.Justfile) error {
@@ -247,24 +332,36 @@ func (p *parser) assignment(jf *ast.Justfile) error {
 	return p.endLine()
 }
 
-// expr parses `atom ('+' atom)*`, left associative.
+// expr parses `operand ('+' operand)*`, left associative. Upstream also
+// looks for comparison and logical operators after it, which the subset does
+// not have.
 func (p *parser) expr() (ast.Expr, error) {
-	left, err := p.atom()
-	for err == nil && p.peek().Kind == lexer.Plus {
-		p.next()
+	left, err := p.operand()
+	for err == nil && p.accept(lexer.Plus) {
 		var right ast.Expr
-		if right, err = p.atom(); err == nil {
+		if right, err = p.operand(); err == nil {
 			left = ast.Concat{Left: left, Right: right}
 		}
 	}
 	if err != nil {
 		return nil, err
 	}
+	p.expected |= exprEnd
 	return left, nil
 }
 
-// atom parses a string, a variable, or a parenthesised expression.
-func (p *parser) atom() (ast.Expr, error) {
+// operand parses a value. Upstream also looks for a `/` before it and a `/`
+// or `++` after it, which the subset does not have.
+func (p *parser) operand() (ast.Expr, error) {
+	p.is(lexer.Slash)
+	v, err := p.value()
+	p.expected |= operandEnd
+	return v, err
+}
+
+// value parses a string, a variable, or a parenthesised expression.
+func (p *parser) value() (ast.Expr, error) {
+	p.expected |= valueStart
 	t := p.peek()
 	switch t.Kind {
 	case lexer.String:
@@ -275,12 +372,13 @@ func (p *parser) atom() (ast.Expr, error) {
 		return ast.StringLit{Value: value}, nil
 	case lexer.Ident:
 		p.next()
+		p.is(lexer.LParen) // a call, which upstream would parse here
 		return ast.Var{Name: t.Text, Line: t.Line, Col: t.Col}, nil
 	case lexer.LParen:
 		p.next()
 		return p.group()
 	}
-	return nil, p.unexpected(t, "an expression")
+	return nil, p.unexpected()
 }
 
 // group parses the rest of a parenthesised expression.
@@ -289,7 +387,7 @@ func (p *parser) group() (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.expect(lexer.RParen, "'+' or ')'"); err != nil {
+	if _, err := p.expect(lexer.RParen); err != nil {
 		return nil, err
 	}
 	return e, nil
@@ -297,11 +395,8 @@ func (p *parser) group() (ast.Expr, error) {
 
 func (p *parser) recipe(jf *ast.Justfile) error {
 	start := p.peek()
-	quiet := start.Kind == lexer.At
-	if quiet {
-		p.next()
-	}
-	name, err := p.expect(lexer.Ident, "a recipe name")
+	quiet := p.accept(lexer.At)
+	name, err := p.expect(lexer.Ident)
 	if err != nil {
 		return err
 	}
@@ -322,34 +417,46 @@ func (p *parser) recipe(jf *ast.Justfile) error {
 	return nil
 }
 
-// header parses parameters, the colon, and dependencies, through the line break.
+// header parses parameters, the colon, and dependencies, through the line
+// break. Upstream also looks for exported (`$`) and variadic (`+`, `*`)
+// parameters, which the subset does not have.
 func (p *parser) header(r *ast.Recipe) error {
-	for p.peek().Kind == lexer.Ident {
+	for p.isParam() {
 		param, err := p.param()
 		if err != nil {
 			return err
 		}
 		r.Params = append(r.Params, param)
 	}
-	if _, err := p.expect(lexer.Colon, "':', ':=', or a parameter"); err != nil {
+	p.is(lexer.Plus)
+	p.is(lexer.Asterisk)
+	if _, err := p.expect(lexer.Colon); err != nil {
 		return err
 	}
-	for p.peek().Kind == lexer.Ident {
+	for p.is(lexer.Ident) {
 		d := p.next()
 		r.Deps = append(r.Deps, ast.Dep{Name: d.Text, Line: d.Line, Col: d.Col})
+		p.is(lexer.ColonColon) // a module path, which upstream would parse here
 	}
+	p.expected |= headerEnd
 	return p.endLine()
+}
+
+// isParam reports whether a parameter starts at the current token.
+func (p *parser) isParam() bool {
+	param := p.is(lexer.Ident)
+	p.is(lexer.Dollar)
+	return param
 }
 
 func (p *parser) param() (ast.Param, error) {
 	name := p.next()
 	param := ast.Param{Name: name.Text, Line: name.Line, Col: name.Col}
-	if p.peek().Kind != lexer.Equals {
+	if !p.accept(lexer.Equals) {
 		return param, nil
 	}
-	p.next()
 	from := p.pos
-	def, err := p.atom()
+	def, err := p.value()
 	param.Default = def
 	param.DefaultText = defaultText(p.toks[from:p.pos])
 	return param, err
@@ -551,7 +658,7 @@ func (p *parser) interpolation() (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.expect(lexer.Close, "'+' or '}}'"); err != nil {
+	if _, err := p.expect(lexer.Close); err != nil {
 		return nil, err
 	}
 	return e, nil
