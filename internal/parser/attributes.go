@@ -264,15 +264,37 @@ func (p *parser) checkSignals(args []attributeArg) error {
 }
 
 // checkGroup reports a group that an earlier `[group]` of the same item
-// already names. The message shows the group as written.
+// already names. The message shows the group as written. An argument that is
+// not a string literal, which checkLiterals has ruled out, is an internal
+// error. It is pure.
 func (p *parser) checkGroup(name lexer.Token, group attributeArg, set *attributeSet) error {
+	value, ok := groupName(group.expr)
+	if !ok {
+		return p.errAt(group.token, "internal error: the argument of `[group]` is not a string literal")
+	}
 	for _, earlier := range set.attrs {
-		if earlier.Name == ast.AttrGroup && earlier.Args[0].(ast.StringLit).Value == group.expr.(ast.StringLit).Value {
+		if earlier.Name != ast.AttrGroup {
+			continue
+		}
+		if len(earlier.Args) != 1 {
+			return p.errAt(name, "internal error: an earlier `[group]` does not have one argument")
+		}
+		other, ok := groupName(earlier.Args[0])
+		if !ok {
+			return p.errAt(name, "internal error: the argument of an earlier `[group]` is not a string literal")
+		}
+		if other == value {
 			return p.errAt(name, fmt.Sprintf("`[group(%s)]` attribute first used on line %d is duplicated on line %d",
 				group.token.Raw, earlier.Line, name.Line))
 		}
 	}
 	return nil
+}
+
+// groupName returns the value of e if it is a string literal. It is pure.
+func groupName(e ast.Expr) (string, bool) {
+	lit, ok := e.(ast.StringLit)
+	return lit.Value, ok
 }
 
 // argumentCountMessage words a wrong number of arguments as upstream's

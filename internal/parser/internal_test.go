@@ -1,10 +1,12 @@
 package parser
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
 	"gitea.com/wimwian/just-go/internal/ast"
+	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/lexer"
 )
 
@@ -75,5 +77,40 @@ func TestSpecRankIsAlphabetical(t *testing.T) {
 	}
 	if specRank("doc") >= specRank("no-cd") || specRank("nope") != -1 {
 		t.Errorf("ranks: doc %d, no-cd %d, nope %d", specRank("doc"), specRank("no-cd"), specRank("nope"))
+	}
+}
+
+// checkLiterals rules out an argument of `[group]` that is not a string
+// literal, so checkGroup's checked assertions are reached only by a value the
+// parser did not build. Each mismatch is an internal error and not a panic.
+func TestCheckGroupReportsAMismatchedArgument(t *testing.T) {
+	lit := ast.StringLit{Value: "a"}
+	token := lexer.Token{Line: 3, Col: 2}
+	for _, tc := range []struct {
+		name    string
+		group   ast.Expr
+		earlier []ast.Attribute
+		want    string
+	}{
+		{"the new argument", ast.Var{Name: "x"}, nil, "internal error: the argument of `[group]` is not a string literal"},
+		{"an earlier argument", lit, []ast.Attribute{{Name: ast.AttrGroup, Args: []ast.Expr{ast.Var{Name: "x"}}}},
+			"internal error: the argument of an earlier `[group]` is not a string literal"},
+		{"an earlier group without one", lit, []ast.Attribute{{Name: ast.AttrGroup}},
+			"internal error: an earlier `[group]` does not have one argument"},
+		{"another attribute is skipped", lit, []ast.Attribute{{Name: ast.AttrPrivate}}, ""},
+		{"a different group", lit, []ast.Attribute{{Name: ast.AttrGroup, Args: []ast.Expr{ast.StringLit{Value: "b"}}}}, ""},
+	} {
+		p := &parser{file: "justfile"}
+		err := p.checkGroup(token, attributeArg{expr: tc.group, token: token}, &attributeSet{attrs: tc.earlier})
+		if tc.want == "" {
+			if err != nil {
+				t.Errorf("%s: checkGroup = %v, want nil", tc.name, err)
+			}
+			continue
+		}
+		var de *diag.Error
+		if !errors.As(err, &de) || de.Msg != tc.want {
+			t.Errorf("%s: checkGroup = %v, want %q", tc.name, err, tc.want)
+		}
 	}
 }

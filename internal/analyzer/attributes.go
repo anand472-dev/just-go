@@ -59,16 +59,21 @@ func attributeReferences(jf *ast.Justfile, a *ast.Attribute, globals, locals map
 }
 
 // constError is the diagnostic of the error of a const evaluation, or nil
-// for none. It is pure.
+// for none. settings.ConstValue returns only a *diag.Error or a
+// *settings.ListError; any other error is reported as an internal error, with
+// its text, and not a panic. It is pure.
 func constError(_ string, err error) *diag.Error {
 	var listed *settings.ListError
+	var located *diag.Error
 	switch {
 	case err == nil:
 		return nil
 	case errors.As(err, &listed):
 		return listed.Diag
+	case errors.As(err, &located):
+		return located
 	}
-	return err.(*diag.Error)
+	return &diag.Error{Kind: diag.KindAnalysis, Msg: "internal error: unexpected error in a const context: " + err.Error()}
 }
 
 // duplicateDefault reports the second recipe, in the order of their names,
