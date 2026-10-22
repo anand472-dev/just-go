@@ -21,11 +21,11 @@ func conditional(c ast.Conditional, scope Scope, cmd Commander) (string, error) 
 	if !ok || c.Else == nil {
 		return "", errLists()
 	}
-	holds, err := holds(cmp, scope, cmd)
+	taken, err := holds(cmp, scope, cmd)
 	if err != nil {
 		return "", err
 	}
-	if holds {
+	if taken {
 		return EvaluateWith(c.Then, scope, cmd)
 	}
 	return EvaluateWith(c.Else, scope, cmd)
@@ -42,11 +42,11 @@ func holds(cmp ast.Comparison, scope Scope, cmd Commander) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	holds, failure := Compare(cmp, left, right)
+	taken, failure := Compare(cmp, left, right)
 	if failure != nil {
 		return false, failure
 	}
-	return holds, nil
+	return taken, nil
 }
 
 // assertion evaluates the condition of a, which is the empty string when it

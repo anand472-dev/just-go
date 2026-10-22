@@ -232,14 +232,14 @@ func (c *consts) branching(e ast.Expr) (string, error) {
 // conditional evaluates the condition of cond, and only the branch it picks.
 // A conditional that needs `set lists` is refused as a list is. It is pure.
 func (c *consts) conditional(cond ast.Conditional) (string, error) {
-	holds, err := c.holds(cond.Cond)
+	taken, err := c.holds(cond.Cond)
 	if err != nil {
 		return "", err
 	}
 	switch {
 	case cond.Else == nil:
 		return "", c.listed()
-	case holds:
+	case taken:
 		return c.expr(cond.Then)
 	}
 	return c.expr(cond.Else)
@@ -248,8 +248,8 @@ func (c *consts) conditional(cond ast.Conditional) (string, error) {
 // assertion evaluates the condition of a, which gives the empty string when it
 // holds. It is pure.
 func (c *consts) assertion(a ast.Assert) (string, error) {
-	holds, err := c.holds(a.Cond)
-	if err != nil || holds {
+	taken, err := c.holds(a.Cond)
+	if err != nil || taken {
 		return "", err
 	}
 	message := "`" + a.Text + "`"
@@ -280,11 +280,11 @@ func (c *consts) holds(condition ast.Expr) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	holds, failure := eval.Compare(cmp, left, right)
+	taken, failure := eval.Compare(cmp, left, right)
 	if failure != nil {
 		return false, c.fault(failure)
 	}
-	return holds, nil
+	return taken, nil
 }
 
 // fault is the error of a failed assert or a bad pattern, which fails the

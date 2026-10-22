@@ -74,9 +74,10 @@ func TestEvaluateConditionalErrorsComeFromTheOperandsAndBranches(t *testing.T) {
 		"then":  ast.Conditional{Cond: compare("==", str(""), str("")), Then: bad, Else: str("")},
 		"else":  ast.Conditional{Cond: compare("!=", str(""), str("")), Then: str(""), Else: bad},
 	} {
-		_, err := Evaluate(e, Scope{})
-		requireRuntime(t, err, "variable `b` not defined")
-		_ = name
+		t.Run(name, func(t *testing.T) {
+			_, err := Evaluate(e, Scope{})
+			requireRuntime(t, err, "variable `b` not defined")
+		})
 	}
 }
 
@@ -90,9 +91,10 @@ func TestEvaluateRefusesWhatNeedsLists(t *testing.T) {
 		"plain condition": ast.Conditional{Cond: str("a"), Then: str("t"), Else: str("e")},
 		"assert plain":    ast.Assert{Cond: str("a")},
 	} {
-		_, err := Evaluate(e, nil)
-		requireRuntime(t, err, "list values are not supported")
-		_ = name
+		t.Run(name, func(t *testing.T) {
+			_, err := Evaluate(e, nil)
+			requireRuntime(t, err, "list values are not supported")
+		})
 	}
 }
 
