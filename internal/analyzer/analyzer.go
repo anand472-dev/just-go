@@ -1,14 +1,14 @@
 // Package analyzer checks a parsed justfile for semantic errors that upstream
 // reports before anything runs: settings set twice or together that cannot be,
 // settings that cannot be evaluated, misordered parameters, duplicate
-// parameter, recipe and variable
-// names, uses of the features of `set lists` in a file that does not set it, recipe lines with extra leading whitespace, uses of undefined
-// variables, calls of undefined functions or with the wrong number of
-// arguments, circular variable definitions, and dependencies that name no
-// recipe, that form a cycle, or that are given too few or too many arguments,
-// expressions in attributes (`[confirm]`, `[doc]`, `[env]`, `[timestamp]` and
-// `[working-directory]`) that cannot be evaluated, and a second recipe with
-// `[default]`.
+// parameter, recipe and variable names, uses of the features of `set lists` in
+// a file that does not set it, recipe lines with extra leading whitespace,
+// uses of undefined variables, calls of undefined functions or with the wrong
+// number of arguments, circular variable definitions, and dependencies that
+// name no recipe, that form a cycle, or that are given too few or too many
+// arguments, expressions in attributes (`[confirm]`, `[doc]`, `[env]`,
+// `[timestamp]` and `[working-directory]`) that cannot be evaluated, and a
+// second recipe with `[default]`.
 //
 // The package is pure: every function reads the syntax tree it is given and
 // returns a value. None performs I/O, none mutates its input, and there is no

@@ -2,13 +2,13 @@
 //
 // Parse is pure: it reads only its arguments and performs no I/O.
 //
-// The subset is: `set` statements (see settings.go), assignments
-// (also written `export` or `eager`), and recipes with parameters (also
-// written `$name`), defaults, dependencies (with arguments, and after `&&`)
-// and a body. Each may be preceded by attributes (see attributes.go): a
-// recipe takes any, an assignment `[private]`, a setting none, and any of
-// them the operating-system attributes (`[linux]`, `[unix]`, ...), which leave
-// the item out of the result on the systems they do not name (see ParseFor).
+// The subset is: `set` statements (see settings.go), assignments (also written
+// `export` or `eager`), and recipes with parameters (also written `$name`),
+// defaults, dependencies (with arguments, and after `&&`) and a body. Each may
+// be preceded by attributes (see attributes.go): a recipe takes any, an
+// assignment `[private]`, a setting none, and any of them the operating-system
+// attributes (`[linux]`, `[unix]`, ...), which leave the item out of the
+// result on the systems they do not name (see ParseFor).
 //
 // Expressions are strings, backticks, variables, calls, sums, and the
 // comparisons `==`, `!=`, `=~` and `!~` in the condition of `if` (with `else`

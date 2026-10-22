@@ -249,13 +249,14 @@ type config struct {
 	shellArgs  []string // --shell-arg, in order; it may repeat; nil when absent
 }
 
-// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable, --yes, --shell PATH,
-// --shell-arg ARG (which may repeat) and positional words. Flags come before
-// the words: as upstream's argument parser takes its trailing positional
-// arguments, the first word and everything after it are words, even when
-// they start with a dash, so `a -v` passes -v to recipe a. Before the first
-// word, "--" ends flag parsing and is dropped. A short flag may be clustered
-// (-lq) and a value may be attached (-fPATH, --justfile=PATH). Pure.
+// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable,
+// --yes, --shell PATH, --shell-arg ARG (which may repeat) and positional
+// words. Flags come before the words: as upstream's argument parser takes its
+// trailing positional arguments, the first word and everything after it are
+// words, even when they start with a dash, so `a -v` passes -v to recipe a.
+// Before the first word, "--" ends flag parsing and is dropped. A short flag
+// may be clustered (-lq) and a value may be attached (-fPATH,
+// --justfile=PATH). Pure.
 func parseArgs(args []string) (config, error) {
 	var cfg config
 	for i := 0; i < len(args); i++ {

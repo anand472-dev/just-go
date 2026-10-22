@@ -197,9 +197,10 @@ func BenchmarkAnalyzeSettings(b *testing.B) {
 	}
 }
 
-// A row named by a case id is that case of the corpus; the others are the same
-// rule in another place. The message and position are the oracle's. A use of a list feature is an error unless the
-// file says `set lists`, and the first one in the file is the one reported.
+// A use of a list feature is an error unless the file says `set lists`, and
+// the first one in the file is the one reported. A row named by a case id is
+// that case of the corpus; the others are the same rule in another place. The
+// message and position are the oracle's.
 func TestAnalyzeListFeaturesNeedTheListsSetting(t *testing.T) {
 	for _, tc := range []struct {
 		name, src        string
