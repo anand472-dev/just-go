@@ -113,12 +113,13 @@ func (r *assignmentResolver) circular(a ast.Assignment) *diag.Error {
 	return fail(r.jf, at, "variable `%s` depends on its own value: `%s`", a.Name, circle(cycle))
 }
 
-// undefinedInRecipe checks one recipe's parameter defaults and body against
-// the globals. A parameter default sees the globals and the parameters
-// before it. A body line sees the globals and every parameter. A call of an
+// undefinedInRecipe checks one recipe's parameter defaults, the arguments of
+// its dependencies and its body against the globals. A parameter default sees
+// the globals and the parameters before it. A dependency argument and a body
+// line see the globals and every parameter. A call of an
 // unknown function, or with the wrong number of arguments, and a variable
 // that is not defined are each reported at the name concerned. It is pure.
-func undefinedInRecipe(jf *ast.Justfile, r ast.Recipe, globals map[string]struct{}) *diag.Error {
+func undefinedInRecipe(jf *ast.Justfile, r *ast.Recipe, globals map[string]struct{}) *diag.Error {
 	params := make(map[string]struct{}, len(r.Params))
 	check := func(ref ast.Expr) *diag.Error { return checkReference(jf, ref, globals, params) }
 	for _, p := range r.Params {
@@ -127,10 +128,28 @@ func undefinedInRecipe(jf *ast.Justfile, r ast.Recipe, globals map[string]struct
 		}
 		params[p.Name] = struct{}{}
 	}
+	if err := dependencyArguments(r, check); err != nil {
+		return err
+	}
 	for _, l := range r.Lines {
 		for _, part := range l.Parts {
 			if err := references(part, check); err != nil {
 				return err
+			}
+		}
+	}
+	return nil
+}
+
+// dependencyArguments checks the calls and variables in the arguments of the
+// dependencies of r, those before the body first, with check. It is pure.
+func dependencyArguments(r *ast.Recipe, check func(ast.Expr) *diag.Error) *diag.Error {
+	for _, deps := range dependencyLists(r) {
+		for _, d := range deps {
+			for _, arg := range d.Args {
+				if err := references(arg, check); err != nil {
+					return err
+				}
 			}
 		}
 	}

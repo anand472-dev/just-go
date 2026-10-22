@@ -37,6 +37,24 @@ func Evaluate(e ast.Expr, scope Scope) (string, error) {
 	}
 }
 
+// EvaluateAll returns the string value of each of exprs, in order, looking
+// variables up in scope. It stops at the first error Evaluate reports. With no
+// expressions it returns nil. EvaluateAll is pure.
+func EvaluateAll(exprs []ast.Expr, scope Scope) ([]string, error) {
+	if len(exprs) == 0 {
+		return nil, nil
+	}
+	values := make([]string, len(exprs))
+	for i, e := range exprs {
+		v, err := Evaluate(e, scope)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = v
+	}
+	return values, nil
+}
+
 // lookup returns the value of v in scope, or an error if it has none. It is
 // pure.
 func lookup(v ast.Var, scope Scope) (string, error) {

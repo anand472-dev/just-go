@@ -31,3 +31,24 @@ func BenchmarkParse(b *testing.B) {
 		}
 	}
 }
+
+// generateDependencyArguments returns a justfile of n recipes in which each
+// passes arguments to two dependencies, one of them after `&&`.
+func generateDependencyArguments(n int) []byte {
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, "r%d x='a': (r%d x + 'b' 'c') && (r%d x)\n  echo {{x}}\n", i, i+1, i+2)
+	}
+	return []byte(b.String())
+}
+
+func BenchmarkParseDependencyArguments(b *testing.B) {
+	src := generateDependencyArguments(500)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(src)))
+	for b.Loop() {
+		if _, err := parser.Parse("justfile", src); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

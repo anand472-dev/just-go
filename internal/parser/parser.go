@@ -3,7 +3,8 @@
 // Parse is pure: it reads only its arguments and performs no I/O.
 //
 // The subset is: `set shell := [...]`, `set quiet`, assignments, and recipes
-// with parameters, defaults, dependencies and a body. A recipe body is every
+// with parameters, defaults, dependencies (with arguments, and after `&&`)
+// and a body. A recipe body is every
 // following line that starts with indentation. Blank lines belong to the body
 // only when more indented lines follow them, and they are dropped. The first
 // body line fixes the recipe's indentation; each later line must start with it,
@@ -49,6 +50,9 @@ type parser struct {
 	doc        string
 	docLine    int
 	docShebang bool
+	// depth is the number of expressions being parsed, each inside the
+	// last. Upstream refuses to go deeper than recursionLimit.
+	depth int
 }
 
 // kinds returns the set of the given token kinds. Pure.
@@ -332,10 +336,22 @@ func (p *parser) assignment(jf *ast.Justfile) error {
 	return p.endLine()
 }
 
-// expr parses `operand ('+' operand)*`, left associative. Upstream also
+// expr parses `operand ('+' operand)*`, left associative, nested inside at
+// most recursionLimit other expressions, as upstream allows. Upstream also
 // looks for comparison and logical operators after it, which the subset does
 // not have.
 func (p *parser) expr() (ast.Expr, error) {
+	if p.depth == recursionLimit {
+		return nil, p.errAt(p.peek(), "parsing recursion depth exceeded")
+	}
+	p.depth++
+	e, err := p.sum()
+	p.depth--
+	return e, err
+}
+
+// sum parses `operand ('+' operand)*` for expr.
+func (p *parser) sum() (ast.Expr, error) {
 	left, err := p.operand()
 	for err == nil && p.accept(lexer.Plus) {
 		var right ast.Expr
@@ -457,13 +473,72 @@ func (p *parser) header(r *ast.Recipe) error {
 	if _, err := p.expect(lexer.Colon); err != nil {
 		return err
 	}
-	for p.is(lexer.Ident) {
-		d := p.next()
-		r.Deps = append(r.Deps, ast.Dep{Name: d.Text, Line: d.Line, Col: d.Col})
-		p.is(lexer.ColonColon) // a module path, which upstream would parse here
+	var err error
+	if r.Deps, err = p.dependencies(); err != nil {
+		return err
+	}
+	if p.accept(lexer.AmpAmp) {
+		if r.Subsequents, err = p.dependencies(); err != nil {
+			return err
+		}
+		if r.Subsequents == nil {
+			return p.unexpected()
+		}
+		p.expected |= headerEnd &^ kinds(lexer.AmpAmp)
+		return p.endLine()
 	}
 	p.expected |= headerEnd
 	return p.endLine()
+}
+
+// dependencies parses dependencies for as long as one starts at the current
+// token. It returns nil when there are none.
+func (p *parser) dependencies() ([]ast.Dependency, error) {
+	var deps []ast.Dependency
+	for {
+		d, ok, err := p.dependency()
+		if err != nil || !ok {
+			return deps, err
+		}
+		deps = append(deps, d)
+	}
+}
+
+// dependency parses a dependency if one starts at the current token: a name,
+// or a name and its arguments in parentheses. Upstream also takes a `*`
+// before the parenthesis, a mapped dependency, which needs `set lists` and
+// is not part of the subset; it is left to the caller to report.
+func (p *parser) dependency() (ast.Dependency, bool, error) {
+	if p.is(lexer.Ident) {
+		return p.dependencyName(), true, nil
+	}
+	if p.is(lexer.Asterisk) || !p.is(lexer.LParen) {
+		return ast.Dependency{}, false, nil
+	}
+	p.next()
+	name, err := p.expect(lexer.Ident)
+	if err != nil {
+		return ast.Dependency{}, false, err
+	}
+	d := ast.Dependency{Name: name.Text, Line: name.Line, Col: name.Col}
+	p.is(lexer.ColonColon) // a module path, which upstream would parse here
+	for !p.accept(lexer.RParen) {
+		p.is(lexer.Asterisk) // a starred argument, which needs a mapped dependency
+		arg, err := p.expr()
+		if err != nil {
+			return ast.Dependency{}, false, err
+		}
+		d.Args = append(d.Args, arg)
+	}
+	return d, true, nil
+}
+
+// dependencyName consumes the name of a dependency written without
+// arguments. The current token is an identifier.
+func (p *parser) dependencyName() ast.Dependency {
+	d := p.next()
+	p.is(lexer.ColonColon) // a module path, which upstream would parse here
+	return ast.Dependency{Name: d.Text, Line: d.Line, Col: d.Col}
 }
 
 // isParam reports whether a parameter starts at the current token.

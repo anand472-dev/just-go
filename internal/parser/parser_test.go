@@ -35,9 +35,8 @@ func strip(jf *ast.Justfile) *ast.Justfile {
 	for i := range jf.Recipes {
 		r := &jf.Recipes[i]
 		r.Col = 0
-		for k := range r.Deps {
-			r.Deps[k].Line, r.Deps[k].Col = 0, 0
-		}
+		stripDependencies(r.Deps)
+		stripDependencies(r.Subsequents)
 		for k := range r.Params {
 			p := &r.Params[k]
 			p.Line, p.Col, p.Default = 0, 0, stripExpr(p.Default)
@@ -51,6 +50,16 @@ func strip(jf *ast.Justfile) *ast.Justfile {
 		}
 	}
 	return jf
+}
+
+func stripDependencies(deps []ast.Dependency) {
+	for k := range deps {
+		d := &deps[k]
+		d.Line, d.Col = 0, 0
+		for n := range d.Args {
+			d.Args[n] = stripExpr(d.Args[n])
+		}
+	}
 }
 
 func stripExpr(e ast.Expr) ast.Expr {
@@ -110,7 +119,7 @@ func TestParseRecipeWithParamsAndDeps(t *testing.T) {
 		Recipes: []ast.Recipe{{
 			Name:   "build",
 			Params: []ast.Param{{Name: "target", Default: lit("debug"), DefaultText: `"debug"`}},
-			Deps:   []ast.Dep{{Name: "test"}},
+			Deps:   []ast.Dependency{{Name: "test"}},
 			Lines: []ast.Line{{
 				Prefix: ast.PrefixNone,
 				Parts:  []ast.Expr{txt("cargo build "), ref("target")},
@@ -212,7 +221,13 @@ const (
 	afterWord = "'&&', '!=', '!~', '||', ']', ',', '==', '=~', '+', '++', or '/'"
 	afterName = "'&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '/'"
 	afterDeps = "'&&', '*', '::', comment, end of file, end of line, identifier, indent, or '('"
-	item      = "'@', '[', comment, end of file, end of line, or identifier"
+	// afterSubsequents is what follows the dependencies after `&&`, which
+	// cannot be followed by another.
+	afterSubsequents = "'*', '::', comment, end of file, end of line, identifier, indent, or '('"
+	// startOfArgument is what upstream looks for after the name of a
+	// parenthesised dependency.
+	startOfArgument = "'*', backtick, '!', '[', '::', identifier, '(', ')', '/', or string"
+	item            = "'@', '[', comment, end of file, end of line, or identifier"
 )
 
 func TestParseSettingErrors(t *testing.T) {
@@ -323,6 +338,83 @@ func TestParseRecipeHeaderErrors(t *testing.T) {
 	wantError(t, "r x=:\n", 1, 5, "expected backtick, '!', '[', identifier, '(', or string, but found ':'")
 	wantError(t, "r: a 'b'\n", 1, 6, "expected "+afterDeps+", but found string")
 	wantError(t, "r: a := b\n", 1, 6, "expected "+afterDeps+", but found ':='")
+}
+
+// TestParseDependencyArguments covers `(name arg...)` and `&&`: the
+// arguments are expressions, and the dependencies after `&&` are kept apart.
+func TestParseDependencyArguments(t *testing.T) {
+	call := ast.Call{Name: "f", Args: []ast.Expr{lit("q")}}
+	cases := []struct {
+		name, src string
+		deps, sub []ast.Dependency
+	}{
+		{"plain", "r: a b\n", []ast.Dependency{{Name: "a"}, {Name: "b"}}, nil},
+		{"string argument", "r: (a 'x')\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x")}}}, nil},
+		{"no arguments", "r: (a)\n", []ast.Dependency{{Name: "a"}}, nil},
+		{"several arguments", "r: (a 'x' y)\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x"), ref("y")}}}, nil},
+		{"concatenation is one argument", "r: (a 'x' + y 'z')\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{
+			ast.Concat{Left: lit("x"), Right: ref("y")}, lit("z")}}}, nil},
+		{"call argument", "r: (a f('q'))\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{call}}}, nil},
+		{"group argument", "r: (a ('x'))\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x")}}}, nil},
+		{"mixed", "r: p (a 'x') q\n", []ast.Dependency{{Name: "p"}, {Name: "a", Args: []ast.Expr{lit("x")}}, {Name: "q"}}, nil},
+		{"line breaks inside parentheses", "r: (\na 'x'\n)\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x")}}}, nil},
+		{"subsequents", "r: a && b (c 'x')\n", []ast.Dependency{{Name: "a"}},
+			[]ast.Dependency{{Name: "b"}, {Name: "c", Args: []ast.Expr{lit("x")}}}},
+		{"only subsequents", "r: && (c 'x')\n", nil, []ast.Dependency{{Name: "c", Args: []ast.Expr{lit("x")}}}},
+		{"string touching a name", "r: (a b'c')\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{ref("b"), lit("c")}}}, nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := mustParse(t, c.src).Recipes[0]
+			if !reflect.DeepEqual(r.Deps, c.deps) || !reflect.DeepEqual(r.Subsequents, c.sub) {
+				t.Errorf("Parse(%q) Deps = %+v, Subsequents = %+v\nwant %+v, %+v", c.src, r.Deps, r.Subsequents, c.deps, c.sub)
+			}
+		})
+	}
+}
+
+// TestParseDependencyErrors pins the messages and locations of malformed
+// dependencies; each was produced by oracle/bin/just.
+func TestParseDependencyErrors(t *testing.T) {
+	wantError(t, "a: (", 1, 5, "expected identifier, but found end of file")
+	wantError(t, "a: ()", 1, 5, "expected identifier, but found ')'")
+	wantError(t, "a: (b", 1, 6, "expected "+startOfArgument+", but found end of file")
+	wantError(t, "b x:\na: (b ,)", 2, 7, "expected "+startOfArgument+", but found ','")
+	wantError(t, "b x:\na: && (b ,)", 2, 10, "expected "+startOfArgument+", but found ','")
+	wantError(t, "a: &&\n", 1, 6, "expected '*', identifier, or '(', but found end of line")
+	wantError(t, "a: b &&\n", 1, 8, "expected '*', identifier, or '(', but found end of line")
+	wantError(t, "a: && b &&\n", 1, 9, "expected "+afterSubsequents+", but found '&&'")
+	wantError(t, "a: && b c !\n", 1, 11, "expected "+afterSubsequents+", but found '!'")
+}
+
+// TestParseDependencyArgumentPositions checks that the arguments carry the
+// positions the analyzer reports errors at.
+func TestParseDependencyArgumentPositions(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("r: (d 'x' yy) && (e zz)\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := jf.Recipes[0]
+	if got, want := r.Deps[0].Args[1], (ast.Var{Name: "yy", Line: 1, Col: 11}); got != want {
+		t.Errorf("argument = %+v, want %+v", got, want)
+	}
+	if d := r.Subsequents[0]; d.Line != 1 || d.Col != 19 || d.Args[0] != (ast.Var{Name: "zz", Line: 1, Col: 21}) {
+		t.Errorf("subsequent = %+v", d)
+	}
+}
+
+// TestParseRecursionLimit pins the depth at which upstream stops parsing
+// nested parentheses, as oracle/bin/just does: 255 are accepted, and the
+// 256th is reported at the token after it.
+func TestParseRecursionLimit(t *testing.T) {
+	nested := func(n int) string {
+		return "foo: (x " + strings.Repeat("(", n) + "'a'" + strings.Repeat(")", n) + ")\n"
+	}
+	if _, err := parser.Parse("justfile", []byte(nested(255))); err != nil {
+		t.Errorf("255 levels: %v", err)
+	}
+	wantError(t, nested(256), 1, 265, "parsing recursion depth exceeded")
+	wantError(t, nested(300), 1, 265, "parsing recursion depth exceeded")
 }
 
 func TestParseTopLevelErrors(t *testing.T) {
@@ -575,7 +667,7 @@ func TestParsePositionsOfRecipeNames(t *testing.T) {
 	if r.Line != 2 || r.Col != 2 {
 		t.Errorf("recipe at %d:%d, want 2:2", r.Line, r.Col)
 	}
-	if want := []ast.Dep{{Name: "d1", Line: 2, Col: 18}, {Name: "d2", Line: 2, Col: 22}}; !reflect.DeepEqual(r.Deps, want) {
+	if want := []ast.Dependency{{Name: "d1", Line: 2, Col: 18}, {Name: "d2", Line: 2, Col: 22}}; !reflect.DeepEqual(r.Deps, want) {
 		t.Errorf("Deps = %+v, want %+v", r.Deps, want)
 	}
 	if p, q := r.Params[0], r.Params[1]; p.Line != 2 || p.Col != 4 || q.Col != 6 ||

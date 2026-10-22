@@ -14,6 +14,7 @@ import (
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/eval"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/sys"
 	"gitea.com/wimwian/just-go/internal/sys/sysfake"
@@ -354,6 +355,132 @@ func TestRunCallsRunOncePerArgumentList(t *testing.T) {
 	}
 }
 
+// TestRunDependencyReceivesItsArguments is `a: (c 'x')`: the dependency's
+// parameter takes the argument.
+func TestRunDependencyReceivesItsArguments(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "a: (c 'x')\n\techo a\nc y:\n\techo c {{y}}\n", fake)
+	mustRun(t, plan)
+	if want := []string{"echo c x", "echo a"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunDependencyArgumentsAreEvaluatedInTheCallersScope checks that an
+// argument sees the globals and the parameters of the recipe that names the
+// dependency, and that a default fills in for an argument left out.
+func TestRunDependencyArgumentsAreEvaluatedInTheCallersScope(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	src := "g := 'G'\na p='P' q='Q': (c g p + q) (c 'y')\n\techo a\nc x y='d':\n\techo c {{x}} {{y}}\n"
+	plan, _, _ := newPlan(t, src, fake)
+	plan.Calls = []Call{{Recipe: "a", Args: []string{"1"}}}
+	mustRun(t, plan)
+	if want := []string{"echo c G 1Q", "echo c y d", "echo a"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunSameDependencyWithDifferentArgumentsRunsTwice checks that a
+// recipe runs once per distinct argument list: the repeated list is dropped,
+// and a call that leaves the argument out is a list of its own.
+func TestRunSameDependencyWithDifferentArgumentsRunsTwice(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	src := "a: (c '1') (c '2') (c '1') c\n\techo a\nc x='-':\n\techo c {{x}}\n"
+	plan, _, _ := newPlan(t, src, fake)
+	mustRun(t, plan)
+	if want := []string{"echo c 1", "echo c 2", "echo c -", "echo a"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunDependencyArgumentsReachNestedDependencies is a chain in which each
+// recipe passes its parameter on.
+func TestRunDependencyArgumentsReachNestedDependencies(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	src := "a: (b 'x')\nb p: (c p + '!')\n\techo b {{p}}\nc q:\n\techo c {{q}}\n"
+	plan, _, _ := newPlan(t, src, fake)
+	mustRun(t, plan)
+	if want := []string{"echo c x!", "echo b x"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunSubsequentsRunAfterTheBody covers `&&`; the expected orders are the
+// ones oracle/bin/just gives, and several are cases of the subsequents corpus
+// group.
+func TestRunSubsequentsRunAfterTheBody(t *testing.T) {
+	for _, c := range []struct {
+		name, src string
+		call      Call
+		want      []string
+	}{
+		{"after the body", "foo: && bar\n\techo foo\nbar:\n\techo bar\n", Call{Recipe: "foo"},
+			[]string{"echo foo", "echo bar"}},
+		{"with arguments", "foo: && (bar 'hello')\n\techo foo\nbar x:\n\techo {{x}}\n", Call{Recipe: "foo"},
+			[]string{"echo foo", "echo hello"}},
+		{"priors, then the body, then subsequents", "a: b && c\n\techo a\nb:\n\techo b\nc:\n\techo c\n",
+			Call{Recipe: "a"}, []string{"echo b", "echo a", "echo c"}},
+		{"even when already run as a prior", "a: b && b\n\techo a\nb:\n\techo b\n",
+			Call{Recipe: "a"}, []string{"echo b", "echo a", "echo b"}},
+		{"duplicates of one list run once", "a: && b c\n\techo a\nb: d\n\techo b\nc: d\n\techo c\nd:\n\techo d\n",
+			Call{Recipe: "a"}, []string{"echo a", "echo d", "echo b", "echo c"}},
+		{"the subsequents of a subsequent", "a: && b\n\techo a\nb: && c\n\techo b\nc:\n\techo c\n",
+			Call{Recipe: "a"}, []string{"echo a", "echo b", "echo c"}},
+		{"the caller's parameters", "a x: && (b x + '?')\n\techo a {{x}}\nb y:\n\techo b {{y}}\n",
+			Call{Recipe: "a", Args: []string{"1"}}, []string{"echo a 1", "echo b 1?"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fake := &sysfake.FakeProcess{}
+			plan, _, _ := newPlan(t, c.src, fake)
+			plan.Calls = []Call{c.call}
+			mustRun(t, plan)
+			if !reflect.DeepEqual(commands(fake), c.want) {
+				t.Fatalf("commands = %q; want %q", commands(fake), c.want)
+			}
+		})
+	}
+}
+
+// TestRunSubsequentsDoNotRunAfterAFailure is subsequents::failure#1.
+func TestRunSubsequentsDoNotRunAfterAFailure(t *testing.T) {
+	fake := &sysfake.FakeProcess{Codes: []int{0, 1}}
+	plan, _, stderr := newPlan(t, "foo: && bar\n\techo foo\n\tfalse\nbar:\n\techo bar\n", fake)
+	res := mustRun(t, plan)
+	if want := []string{"echo foo", "false"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+	if res.ExitCode != 1 || !strings.HasSuffix(stderr.String(), "error: recipe `foo` failed on line 3 with exit code 1\n") {
+		t.Fatalf("exit = %d, stderr = %q", res.ExitCode, stderr.String())
+	}
+}
+
+// TestRunTerminatesOnACycleTheAnalyzerMissed checks that a justfile that was
+// not analyzed cannot loop: `a: && a` runs the body once.
+func TestRunTerminatesOnACycleTheAnalyzerMissed(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "a: && a\n\techo a\n", fake)
+	mustRun(t, plan)
+	if want := []string{"echo a"}; !reflect.DeepEqual(commands(fake), want) {
+		t.Fatalf("commands = %q; want %q", commands(fake), want)
+	}
+}
+
+// TestRunDependencyArgumentErrorsComeBeforeAnything checks that an argument
+// that cannot be evaluated, or does not fit the dependency, stops the run
+// before any command runs.
+func TestRunDependencyArgumentErrorsComeBeforeAnything(t *testing.T) {
+	fake := &sysfake.FakeProcess{}
+	plan, _, _ := newPlan(t, "a: b (c nope)\nb:\n\techo b\nc y:\n\techo c\n", fake)
+	_, err := Run(context.Background(), plan)
+	requireDiag(t, err, diag.KindRuntime, 1, "variable `nope` not defined")
+	plan, _, _ = newPlan(t, "a: b (c 'x' 'y')\nb:\n\techo b\nc y:\n\techo c\n", fake)
+	_, err = Run(context.Background(), plan)
+	requireDiag(t, err, diag.KindUsage, 0, "recipe `c` got 2 positional arguments but only takes 1\nusage:\n    just c y")
+	if len(fake.Specs) != 0 {
+		t.Fatalf("ran %d lines; want none", len(fake.Specs))
+	}
+}
+
 func TestRunCallsReportUnknownRecipeAndArgumentMismatch(t *testing.T) {
 	fake := &sysfake.FakeProcess{}
 	plan, _, _ := newPlan(t, "c x:\n\techo c\n", fake)
@@ -541,7 +668,7 @@ func chain(n int) *ast.Justfile {
 	for i := 0; i < n; i++ {
 		r := ast.Recipe{Name: fmt.Sprintf("r%d", i), Line: i + 1}
 		if i+1 < n {
-			r.Deps = []ast.Dep{{Name: fmt.Sprintf("r%d", i+1)}}
+			r.Deps = []ast.Dependency{{Name: fmt.Sprintf("r%d", i+1)}}
 		}
 		jf.Recipes = append(jf.Recipes, r)
 	}
@@ -549,7 +676,7 @@ func chain(n int) *ast.Justfile {
 }
 
 func TestResolveOrderChain(t *testing.T) {
-	order, err := resolveOrder(chain(200), []Call{{Recipe: "r0"}})
+	order, err := resolveOrder(chain(200), []Call{{Recipe: "r0"}}, eval.Scope{})
 	if err != nil {
 		t.Fatalf("resolveOrder: %v", err)
 	}
@@ -564,7 +691,31 @@ func BenchmarkResolveOrder(b *testing.B) {
 	calls := []Call{{Recipe: "r0"}}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := resolveOrder(jf, calls); err != nil {
+		if _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkResolveOrderArguments walks a chain in which each recipe passes
+// its parameter on to the next, and has one subsequent. Every recipe has two
+// different calls of the next, so the walk is 2^n steps long and n is small.
+func BenchmarkResolveOrderArguments(b *testing.B) {
+	const n = 10
+	jf := &ast.Justfile{File: "justfile"}
+	for i := 0; i < n; i++ {
+		r := ast.Recipe{Name: fmt.Sprintf("r%d", i), Line: i + 1, Params: []ast.Param{{Name: "p", Default: ast.StringLit{Value: "d"}}}}
+		if i+1 < n {
+			next := fmt.Sprintf("r%d", i+1)
+			r.Deps = []ast.Dependency{{Name: next, Args: []ast.Expr{ast.Concat{Left: ast.Var{Name: "p"}, Right: ast.StringLit{Value: "x"}}}}}
+			r.Subsequents = []ast.Dependency{{Name: next, Args: []ast.Expr{ast.Var{Name: "p"}}}}
+		}
+		jf.Recipes = append(jf.Recipes, r)
+	}
+	calls := []Call{{Recipe: "r0"}}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := resolveOrder(jf, calls, eval.Scope{}); err != nil {
 			b.Fatal(err)
 		}
 	}

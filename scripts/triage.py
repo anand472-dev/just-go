@@ -23,7 +23,6 @@ The groups, in the order the rules are tried (the first that matches wins):
   backtick           a backtick expression
   conditional        an `if` expression
   builtin:<family>   a call to a builtin function
-  dependency-args    dependency arguments or subsequent dependencies
   grammar            any other syntax outside the implemented subset, or a
                      parse error worded differently from upstream's
   core-defect        uses only the implemented subset and still fails
@@ -300,18 +299,6 @@ def builtin_group(expressions):
     return None
 
 
-def has_dependency_args(source):
-    """Whether a recipe header passes dependency arguments or names
-    subsequent dependencies. Pure."""
-    for line in source.splitlines():
-        if line[:1] in (" ", "\t", "#", "[") or line.startswith("set "):
-            continue
-        match = HEADER.match(line)
-        if match and ("(" in match.group(3) or "&&" in match.group(3)):
-            return True
-    return False
-
-
 def syntax_group(sources):
     """The group for a syntax feature the sources use, or None. Pure."""
     exprs = "\n".join(expression_text(s) for s in sources)
@@ -330,8 +317,6 @@ def syntax_group(sources):
     names |= set(re.findall(r"=\s*([A-Z_]+)", exprs)) & CONSTANTS
     if names:
         return "builtin:constants", "uses the constant " + min(names)
-    if any(has_dependency_args(s) for s in sources):
-        return "dependency-args", "passes dependency arguments"
     return None
 
 

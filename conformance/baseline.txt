@@ -3,6 +3,7 @@ byte_order_mark::dont_mention_byte_order_mark_in_errors#1
 byte_order_mark::ignore_leading_byte_order_mark#1
 byte_order_mark::non_leading_byte_order_mark_produces_error#1
 delimiters::bracket_continuation#1
+delimiters::dependency_continuation#1
 delimiters::interpolation_continuation#1
 delimiters::mismatched_delimiter#1
 delimiters::paren_continuation#1
@@ -18,6 +19,7 @@ fallback::doesnt_work_with_justfile#1
 fallback::requires_setting#1
 format_string::format_backticks_are_forbidden#1
 function_definitions::undefined_in_assignment#1
+function_definitions::undefined_in_dependency_argument#1
 function_definitions::undefined_in_interpolation#1
 function_definitions::undefined_in_recipe_parameter_default#1
 guards::guard_lines_are_ignored_without_setting#1
@@ -49,7 +51,11 @@ misc::complex_dependencies#1
 misc::default#1
 misc::default_string#1
 misc::default_variable#1
+misc::dependency_argument_assignment#1
+misc::dependency_argument_parameter#1
+misc::dependency_argument_string#1
 misc::dependency_takes_arguments_at_least#1
+misc::dependency_takes_arguments_at_most#1
 misc::dependency_takes_arguments_exact#1
 misc::duplicate_dependency_no_args#1
 misc::duplicate_parameter#1
@@ -131,6 +137,7 @@ quiet::quiet_setting_with_quiet_line#1
 quiet::quiet_setting_with_quiet_recipe#1
 quiet::quiet_shebang#1
 quiet::stderr#1
+recursion_limit::bugfix#1
 resolve::shell_on_custom_path#1
 run::dont_run_duplicate_recipes#1
 search::dot_justfile_conflicts_with_justfile#1
@@ -146,6 +153,9 @@ shell::recipe_shell_not_found_error_message#1
 shell::shell_arg_override#1
 shell::shell_args#1
 shell::shell_override#1
+shell_expansion::shell_expanded_strings_do_not_conflict_with_dependencies#1
+shell_expansion::shell_expanded_strings_do_not_conflict_with_dependencies#2
+shell_expansion::shell_expanded_strings_do_not_conflict_with_dependencies#3
 shell_expansion::shell_expanded_strings_must_not_have_whitespace#1
 slash_operator::default_un_parenthesized#1
 slash_operator::no_lhs_un_parenthesized#1
@@ -169,6 +179,14 @@ string::unterminated_indented_raw_string#1
 string::unterminated_indented_string#1
 string::unterminated_raw_string#1
 string::unterminated_string#1
+subsequents::argument#1
+subsequents::circular_dependency#1
+subsequents::duplicate_subsequents_dont_run#1
+subsequents::failure#1
+subsequents::subsequents_run_even_if_already_ran_as_prior#1
+subsequents::success#1
+subsequents::unknown#1
+subsequents::unknown_argument#1
 undefined_variables::parameter_default_unknown_variable_in_expression#1
 undefined_variables::unknown_first_variable_in_binary_call#1
 undefined_variables::unknown_second_variable_in_binary_call#1

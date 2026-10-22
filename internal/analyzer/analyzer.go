@@ -4,7 +4,7 @@
 // names, recipe lines with extra leading whitespace, uses of undefined
 // variables, calls of undefined functions or with the wrong number of
 // arguments, circular variable definitions, and dependencies that name no
-// recipe, that form a cycle, or that need arguments a dependency cannot give.
+// recipe, that form a cycle, or that are given too few or too many arguments.
 //
 // The package is pure: every function reads the syntax tree it is given and
 // returns a value. None performs I/O, none mutates its input, and there is no
@@ -32,10 +32,10 @@ import (
 // arguments); then, recipe by recipe in source order, a duplicate name and
 // lines with extra leading whitespace; then the recipes, resolved in name
 // order, each after the recipes it depends on (its dependencies, then its
-// parameter defaults, then its body, then the argument counts of its
-// dependencies). The first error decides the result. Each error is located
-// where upstream locates it: at the name, dependency, variable or text it is
-// about, with Width covering it.
+// parameter defaults, then the arguments of its dependencies, then its body,
+// then the argument counts of its dependencies). The first error decides the
+// result. Each error is located where upstream locates it: at the name,
+// dependency, variable or text it is about, with Width covering it.
 func Analyze(jf *ast.Justfile) error {
 	if err := checkParameters(jf); err != nil {
 		return err

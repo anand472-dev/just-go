@@ -327,7 +327,8 @@ func wantAt(t *testing.T, src string, line, col, width int, msg string) {
 
 // TestAnalyzeCircularDependencyMatchesUpstream pins the category, the
 // location and the cycle text of each circular-dependency case of the misc
-// and subsequents corpus groups. The cycle is reported at the dependency that
+// corpus group, and of the subsequents group in
+// TestAnalyzeCorpusDiagnostics. The cycle is reported at the dependency that
 // closes it, in the recipe that names it.
 func TestAnalyzeCircularDependencyMatchesUpstream(t *testing.T) {
 	cases := []struct {
@@ -405,6 +406,13 @@ func TestAnalyzeCorpusDiagnostics(t *testing.T) {
 			"call to undefined function `foo`"},
 		{"function_definitions::undefined_in_recipe_parameter_default#1", "bar x=foo():", 1, 7, 3,
 			"call to undefined function `foo`"},
+		{"function_definitions::undefined_in_dependency_argument#1", "bar x:\nfoo: (bar baz())\n", 2, 11, 3,
+			"call to undefined function `baz`"},
+		{"misc::dependency_takes_arguments_at_most#1", "a FOO LUZ='hello':\nb: (a '0' '1' '2')\n", 2, 5, 1,
+			"dependency `a` got 3 arguments but takes at most 2 arguments"},
+		{"subsequents::circular_dependency#1", "foo: && foo\n", 1, 9, 3, "recipe `foo` depends on itself"},
+		{"subsequents::unknown#1", "foo: && bar\n", 1, 9, 3, "recipe `foo` has unknown dependency `bar`"},
+		{"subsequents::unknown_argument#1", "bar x:\n\nfoo: && (bar y)\n", 3, 14, 1, "variable `y` not defined"},
 	}
 	for _, c := range cases {
 		t.Run(c.id, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
@@ -485,6 +493,47 @@ func TestAnalyzeAcceptsKnownFunctions(t *testing.T) {
 	src := "a := uppercase('x') + arch() + env('A') + env('A', 'b') + join('a', 'b') + join('a', 'b', 'c')\n" +
 		"b := cache_dir() + invocation_dir_native() + style('error') + shell('x') + shell('x', 'y')\n" +
 		"r x=lowercase(a):\n  echo {{replace(x, 'a', b)}} {{trim(uppercase(a))}}\n"
+	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+		t.Errorf("Analyze = %v, want nil", err)
+	}
+}
+
+// TestAnalyzeDependencyArguments pins the checks of the arguments of a
+// dependency and their order, each row produced by oracle/bin/just on the
+// same source. A dependency is resolved first, then the defaults, then the
+// arguments of every dependency (priors, then subsequents), then the body,
+// then the argument counts.
+func TestAnalyzeDependencyArguments(t *testing.T) {
+	cases := []struct {
+		name, src        string
+		line, col, width int
+		msg              string
+	}{
+		{"undefined variable", "a: (c nope)\nc y:\n", 1, 7, 4, "variable `nope` not defined"},
+		{"undefined variable in a subsequent", "a: && (c nope)\nc y:\n", 1, 10, 4, "variable `nope` not defined"},
+		{"undefined function", "a: (c baz('x'))\nc y:\n", 1, 7, 3, "call to undefined function `baz`"},
+		{"too many", "a: (c 'x' 'y')\nc y:\n", 1, 5, 1, "dependency `c` got 2 arguments but takes 1 argument"},
+		{"too few", "a: (c)\nc y z='1':\n", 1, 5, 1, "dependency `c` got 0 arguments but takes at least 1 argument"},
+		{"too few in a subsequent", "a: && (c)\nc y z:\n", 1, 8, 1, "dependency `c` got 0 arguments but takes 2 arguments"},
+		{"defaults come first", "a x=nope3: (c nope)\nc y:\n", 1, 5, 5, "variable `nope3` not defined"},
+		{"arguments come before the body", "a: (c nope)\n  echo {{nope2}}\nc y:\n", 1, 7, 4, "variable `nope` not defined"},
+		{"dependencies come before arguments", "a: (c nope) d\nc y:\n", 1, 13, 1, "recipe `a` has unknown dependency `d`"},
+		{"arguments come before counts", "a: (c 'x' 'y') && (c nope)\nc y:\n", 1, 22, 4, "variable `nope` not defined"},
+		{"recipes in name order", "a: (c nope2)\nb: (c 'x' 'y')\nc y:\n", 1, 7, 5, "variable `nope2` not defined"},
+		{"cycle through arguments", "a x: (a x)\n", 1, 7, 1, "recipe `a` depends on itself"},
+		{"cycle through a subsequent", "a x: && (a '1')\n", 1, 10, 1, "recipe `a` depends on itself"},
+		{"cycle between recipes", "a: (b 'x')\nb y: && (a)\n", 2, 10, 1, "recipe `b` has circular dependency `a -> b -> a`"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
+	}
+}
+
+// TestAnalyzeAcceptsDependencyArguments checks that arguments see the
+// globals and every parameter of the recipe that names the dependency, and
+// that a defaulted parameter may be left out.
+func TestAnalyzeAcceptsDependencyArguments(t *testing.T) {
+	src := "g := 'a'\nr p q='1': (d g p + q + 'x') && (d q)\n  echo\nd x y='-':\n  echo {{x}}\n"
 	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
 		t.Errorf("Analyze = %v, want nil", err)
 	}

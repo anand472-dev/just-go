@@ -138,3 +138,37 @@ func BenchmarkEvaluate(b *testing.B) {
 		}
 	}
 }
+
+func TestEvaluateAll(t *testing.T) {
+	args := []ast.Expr{ast.StringLit{Value: "a"}, ast.Var{Name: "x"}, ast.Concat{Left: ast.Var{Name: "x"}, Right: ast.StringLit{Value: "!"}}}
+	got, err := EvaluateAll(args, Scope{"x": "1"})
+	if err != nil || len(got) != 3 || got[0] != "a" || got[1] != "1" || got[2] != "1!" {
+		t.Fatalf("got %q, %v; want [a 1 1!]", got, err)
+	}
+}
+
+func TestEvaluateAllOfNothingIsNil(t *testing.T) {
+	if got, err := EvaluateAll(nil, nil); err != nil || got != nil {
+		t.Fatalf("got %#v, %v; want nil", got, err)
+	}
+}
+
+func TestEvaluateAllStopsAtTheFirstError(t *testing.T) {
+	args := []ast.Expr{ast.Var{Name: "a", Line: 1, Col: 1}, ast.Var{Name: "b", Line: 1, Col: 3}}
+	got, err := EvaluateAll(args, Scope{})
+	requireRuntime(t, err, "variable `a` not defined")
+	if got != nil {
+		t.Errorf("got %q with an error; want nil", got)
+	}
+}
+
+func BenchmarkEvaluateAll(b *testing.B) {
+	args := []ast.Expr{ast.StringLit{Value: "a"}, ast.Var{Name: "x"}, ast.Concat{Left: ast.Var{Name: "x"}, Right: ast.Var{Name: "x"}}}
+	scope := Scope{"x": "value"}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := EvaluateAll(args, scope); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

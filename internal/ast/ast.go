@@ -1,8 +1,8 @@
 // Package ast defines the syntax tree for the core justfile subset.
 //
 // It is pure: it holds data and performs no I/O. Expression nodes are value
-// types, so a consumer switches on ast.Text, ast.StringLit, ast.Var and
-// ast.Concat.
+// types, so a consumer switches on ast.Text, ast.StringLit, ast.Var,
+// ast.Concat and ast.Call.
 //
 // Positions are 1-based lines and rune columns of the token they describe, as
 // in diag.Error. A name's width is its length, since names are ASCII.
@@ -41,15 +41,24 @@ type Recipe struct {
 	// `#` and surrounding space. It is empty if there is none.
 	Doc    string
 	Params []Param
-	Deps   []Dep
-	Lines  []Line
-	Line   int
-	Col    int
+	// Deps run before the recipe's body, in order.
+	Deps []Dependency
+	// Subsequents are the dependencies written after `&&`. They run after
+	// the body, in order.
+	Subsequents []Dependency
+	Lines       []Line
+	Line        int
+	Col         int
 }
 
-// Dep is a dependency named in a recipe header. Line and Col locate the name.
-type Dep struct {
+// Dependency is a recipe named in a recipe header, with the arguments it is
+// run with: `name`, or `(name arg...)`. Line and Col locate the name. A
+// Dependency cannot be compared with ==, because the arguments are a slice.
+type Dependency struct {
 	Name string
+	// Args are the argument expressions, evaluated in the scope of the recipe
+	// that names the dependency. Nil when it is written without parentheses.
+	Args []Expr
 	Line int
 	Col  int
 }

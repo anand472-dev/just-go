@@ -37,6 +37,7 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 2: brace escapes and string literal forms | 142 | 142 | 1853 | 16 |
 | Compat Task 3: parser error wording, delimiters, and code escapes | 168 | 168 | 1827 | 16 |
 | Compat Task 4: analyzer checks and function calls | 177 | 177 | 1818 | 16 |
+| Compat Task 5: dependency arguments and subsequents | 195 | 195 | 1800 | 16 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the

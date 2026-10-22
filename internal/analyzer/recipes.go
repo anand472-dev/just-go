@@ -12,8 +12,8 @@ import (
 type recipeResolver struct {
 	jf         *ast.Justfile
 	globals    map[string]struct{}
-	byName     map[string]ast.Recipe
-	unresolved map[string]ast.Recipe
+	byName     map[string]*ast.Recipe
+	unresolved map[string]*ast.Recipe
 	resolved   map[string]bool
 	stack      []string
 }
@@ -28,14 +28,17 @@ func resolveRecipes(jf *ast.Justfile) *diag.Error {
 	r := &recipeResolver{
 		jf:         jf,
 		globals:    make(map[string]struct{}, len(jf.Assignments)),
-		byName:     make(map[string]ast.Recipe, len(jf.Recipes)),
-		unresolved: make(map[string]ast.Recipe, len(jf.Recipes)),
+		byName:     make(map[string]*ast.Recipe, len(jf.Recipes)),
+		unresolved: make(map[string]*ast.Recipe, len(jf.Recipes)),
 		resolved:   make(map[string]bool, len(jf.Recipes)),
 	}
 	for _, a := range jf.Assignments {
 		r.globals[a.Name] = struct{}{}
 	}
-	for _, rec := range jf.Recipes {
+	// The maps hold pointers: a Recipe is too large to be stored in a map
+	// without an allocation per entry.
+	for i := range jf.Recipes {
+		rec := &jf.Recipes[i]
 		r.unresolved[rec.Name] = rec
 		r.byName[rec.Name] = rec
 	}
@@ -53,11 +56,13 @@ func resolveRecipes(jf *ast.Justfile) *diag.Error {
 }
 
 // resolve checks rec after its dependencies. It is pure.
-func (r *recipeResolver) resolve(rec ast.Recipe) *diag.Error {
+func (r *recipeResolver) resolve(rec *ast.Recipe) *diag.Error {
 	r.stack = append(r.stack, rec.Name)
-	for _, dep := range rec.Deps {
-		if err := r.dependency(rec, dep); err != nil {
-			return err
+	for _, deps := range dependencyLists(rec) {
+		for _, dep := range deps {
+			if err := r.dependency(rec, dep); err != nil {
+				return err
+			}
 		}
 	}
 	r.stack = r.stack[:len(r.stack)-1]
@@ -71,27 +76,45 @@ func (r *recipeResolver) resolve(rec ast.Recipe) *diag.Error {
 	return nil
 }
 
-// argumentCounts reports the first dependency of rec whose recipe has a
-// required parameter. A dependency in the core subset passes no arguments,
-// so that recipe cannot be run as one; upstream rejects the justfile. Every
-// dependency is resolved by now. It is pure.
-func (r *recipeResolver) argumentCounts(rec ast.Recipe) *diag.Error {
-	for _, dep := range rec.Deps {
-		want := required(r.byName[dep.Name])
-		if want == 0 {
-			continue
+// argumentCounts reports the first dependency of rec that is given too few or
+// too many arguments for the parameters of its recipe. Every dependency is
+// resolved by now. It is pure.
+func (r *recipeResolver) argumentCounts(rec *ast.Recipe) *diag.Error {
+	for _, deps := range dependencyLists(rec) {
+		for _, dep := range deps {
+			callee := r.byName[dep.Name]
+			found, lo, hi := len(dep.Args), required(callee), len(callee.Params)
+			if found < lo || found > hi {
+				return fail(r.jf, name(dep.Line, dep.Col, dep.Name), "dependency `%s` got %s but takes %s",
+					dep.Name, count(found, "argument"), takes(found, lo, hi))
+			}
 		}
-		takes := count(want, "argument")
-		if want < len(r.byName[dep.Name].Params) {
-			takes = "at least " + takes
-		}
-		return fail(r.jf, name(dep.Line, dep.Col, dep.Name), "dependency `%s` got 0 arguments but takes %s", dep.Name, takes)
 	}
 	return nil
 }
 
+// dependencyLists returns the dependencies of rec before its body and those
+// after it, in the order upstream resolves them. It returns an array, so that
+// ranging over it allocates nothing. It is pure.
+func dependencyLists(rec *ast.Recipe) [2][]ast.Dependency {
+	return [2][]ast.Dependency{rec.Deps, rec.Subsequents}
+}
+
+// takes words the number of arguments a recipe accepts, as upstream's
+// DependencyArgumentCountMismatch does: exactly lo when lo is hi, else at
+// least lo when found is below it, else at most hi. It is pure.
+func takes(found, lo, hi int) string {
+	switch {
+	case lo == hi:
+		return count(lo, "argument")
+	case found < lo:
+		return "at least " + count(lo, "argument")
+	}
+	return "at most " + count(hi, "argument")
+}
+
 // required counts the parameters of rec that have no default. It is pure.
-func required(rec ast.Recipe) int {
+func required(rec *ast.Recipe) int {
 	n := 0
 	for _, p := range rec.Params {
 		if p.Default == nil {
@@ -112,7 +135,7 @@ func count(n int, noun string) string {
 
 // dependency checks that dep, named by rec, is a recipe that can be resolved
 // before rec. It is pure.
-func (r *recipeResolver) dependency(rec ast.Recipe, dep ast.Dep) *diag.Error {
+func (r *recipeResolver) dependency(rec *ast.Recipe, dep ast.Dependency) *diag.Error {
 	if r.resolved[dep.Name] {
 		return nil
 	}
@@ -130,7 +153,7 @@ func (r *recipeResolver) dependency(rec ast.Recipe, dep ast.Dep) *diag.Error {
 
 // circular builds the error for rec depending on dep, which is being
 // resolved, at the dependency. It is pure.
-func (r *recipeResolver) circular(rec ast.Recipe, dep string, at ast.Span) *diag.Error {
+func (r *recipeResolver) circular(rec *ast.Recipe, dep string, at ast.Span) *diag.Error {
 	cycle := cycleFrom(r.stack, dep)
 	if len(cycle) == 2 {
 		return fail(r.jf, at, "recipe `%s` depends on itself", rec.Name)

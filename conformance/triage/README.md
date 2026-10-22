@@ -48,14 +48,13 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 | `backtick` | Uses a backtick expression. |
 | `conditional` | Uses an `if` expression. |
 | `builtin:<family>` | Calls a builtin function, or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
-| `dependency-args` | Passes arguments to a dependency or has `&&` subsequents. |
 | `grammar` | Uses other syntax outside the implemented subset (`alias`, `export`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
 | `core-defect` | Uses only the implemented subset and still fails. Must be empty. |
 | `other` | Fails for a reason no rule above explains. |
 
 ## Current counts
 
-From the run recorded in `groups.json`: 177 pass, 1818 fail, 16 skip, of
+From the run recorded in `groups.json`: 195 pass, 1800 fail, 16 skip, of
 2011 cases.
 
 | Family | Cases |
@@ -65,12 +64,11 @@ From the run recorded in `groups.json`: 177 pass, 1818 fail, 16 skip, of
 | `attribute` | 220 |
 | `module` | 157 |
 | `setting:*` | 112 |
-| `grammar` | 69 |
+| `grammar` | 71 |
 | `builtin:*` | 58 |
 | `backtick` | 39 |
 | `completions` | 40 |
 | `dotenv` | 30 |
-| `dependency-args` | 20 |
 | `conditional` | 16 |
 | `shebang` | 14 |
 | `core-defect` | 0 |

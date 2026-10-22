@@ -66,12 +66,6 @@ type Result struct {
 	ExitCode int
 }
 
-// call is a recipe together with the arguments it is run with.
-type call struct {
-	recipe *ast.Recipe
-	args   []string
-}
-
 // step is one recipe to run, with the scope its lines are rendered in.
 type step struct {
 	recipe *ast.Recipe
@@ -79,7 +73,8 @@ type step struct {
 }
 
 // Run runs plan.Recipes and their dependencies. Each dependency runs before
-// the recipe that names it, at most once per invocation. Argument counts,
+// the recipe that names it, or after it when it follows `&&`, at most once
+// per invocation and list of arguments. Argument counts,
 // assignments and parameter defaults are checked before any command runs;
 // such failures are returned as a *diag.Error and nothing is written.
 //
@@ -104,7 +99,8 @@ func Run(ctx context.Context, plan Plan) (Result, error) {
 }
 
 // prepare resolves the requested recipes into steps in run order, binding
-// every recipe's parameters. It is pure.
+// every recipe's parameters and evaluating the arguments of its dependencies.
+// It is pure.
 func prepare(plan Plan) ([]step, error) {
 	jf := plan.Justfile
 	calls, err := requested(plan)
@@ -115,11 +111,7 @@ func prepare(plan Plan) ([]step, error) {
 	if err != nil {
 		return nil, err
 	}
-	order, err := resolveOrder(jf, calls)
-	if err != nil {
-		return nil, err
-	}
-	return bindSteps(jf, order, globals)
+	return resolveOrder(jf, calls, globals)
 }
 
 // requested returns the calls the plan asks for. Plan.Calls when set, else
@@ -161,20 +153,6 @@ func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 	}
 	calls[0].Args = args
 	return calls, nil
-}
-
-// bindSteps pairs each call in order with its parameter scope. Dependencies
-// take no arguments. It is pure.
-func bindSteps(jf *ast.Justfile, order []call, globals eval.Scope) ([]step, error) {
-	steps := make([]step, 0, len(order))
-	for _, c := range order {
-		scope, err := bindParams(jf, c.recipe, c.args, globals)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, step{recipe: c.recipe, scope: scope})
-	}
-	return steps, nil
 }
 
 // findRecipe returns the recipe of jf named name, or nil. It is pure.
@@ -224,57 +202,92 @@ func evalPass(file string, pending []ast.Assignment, scope eval.Scope) ([]ast.As
 	return rest, first
 }
 
-// resolveOrder returns the calls together with their dependencies, each
-// once, in run order: a recipe's dependencies come before it, in declaration
-// order. As upstream does, a recipe runs once per distinct list of
+// resolveOrder returns the steps that run calls and their dependencies, in
+// run order, as upstream runs them. A recipe's dependencies come before it,
+// in declaration order, each with the arguments evaluated in the scope of the
+// recipe that names it. The dependencies after `&&` come after it, and
+// recipes already run do not count for them: they run, with their own
+// dependencies, once per list. A recipe runs once per distinct list of
 // arguments, so `c 1 c 2 c 1` runs `c` twice. It is pure.
-func resolveOrder(jf *ast.Justfile, calls []Call) ([]call, error) {
+func resolveOrder(jf *ast.Justfile, calls []Call, globals eval.Scope) ([]step, error) {
 	o := orderer{
-		jf:     jf,
-		byName: make(map[string]*ast.Recipe, len(jf.Recipes)),
-		seen:   make(map[string]bool, len(jf.Recipes)),
+		jf:      jf,
+		globals: globals,
+		byName:  make(map[string]*ast.Recipe, len(jf.Recipes)),
+		active:  make(map[string]bool),
 	}
 	for i := range jf.Recipes {
 		o.byName[jf.Recipes[i].Name] = &jf.Recipes[i]
 	}
+	ran := make(map[string]bool, len(jf.Recipes))
 	for _, c := range calls {
-		if err := o.visit(ast.Dep{Name: c.Recipe}, c.Args, nil); err != nil {
+		if err := o.visit(o.byName[c.Recipe], c.Args, ran); err != nil {
 			return nil, err
 		}
 	}
-	return o.order, nil
+	return o.steps, nil
 }
 
 // orderer holds the state of one resolveOrder walk.
 type orderer struct {
-	jf     *ast.Justfile
-	byName map[string]*ast.Recipe
-	seen   map[string]bool
-	order  []call
+	jf      *ast.Justfile
+	globals eval.Scope
+	byName  map[string]*ast.Recipe
+	// active holds the calls being visited, which a cycle the analyzer missed
+	// would enter again.
+	active map[string]bool
+	steps  []step
 }
 
-// visit appends the dependencies of dep's recipe and then the recipe itself
-// with args, unless that call was already visited. from is the recipe that
-// names dep, or nil for a requested recipe, which requested has checked. A
-// call is marked before its dependencies are visited, so a cycle the
-// analyzer missed cannot loop forever. It is pure apart from updating o.
-func (o *orderer) visit(dep ast.Dep, args []string, from *ast.Recipe) error {
-	key := callKey(dep.Name, args)
-	if o.seen[key] {
+// visit appends the steps of r called with args: its dependencies, the recipe
+// itself, then its subsequents. Nothing is appended if ran, the calls already
+// visited in this list of dependencies, has the call. A call is marked before
+// its dependencies are visited, so a cycle the analyzer missed cannot loop
+// forever. It is pure apart from updating o and ran.
+func (o *orderer) visit(r *ast.Recipe, args []string, ran map[string]bool) error {
+	key := callKey(r.Name, args)
+	if ran[key] || o.active[key] {
 		return nil
 	}
-	r, ok := o.byName[dep.Name]
-	if !ok {
-		return &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: dep.Line, Col: dep.Col, Width: len(dep.Name),
-			Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, dep.Name)}
+	ran[key] = true
+	o.active[key] = true
+	err := o.expand(r, args, ran)
+	delete(o.active, key)
+	return err
+}
+
+// expand appends the steps of r called with args, for visit. It is pure apart
+// from updating o and ran.
+func (o *orderer) expand(r *ast.Recipe, args []string, ran map[string]bool) error {
+	scope, err := bindParams(o.jf, r, args, o.globals)
+	if err != nil {
+		return err
 	}
-	o.seen[key] = true
-	for _, d := range r.Deps {
-		if err := o.visit(d, nil, r); err != nil {
+	if err := o.dependencies(r, r.Deps, scope, ran); err != nil {
+		return err
+	}
+	o.steps = append(o.steps, step{recipe: r, scope: scope})
+	return o.dependencies(r, r.Subsequents, scope, make(map[string]bool, len(r.Subsequents)))
+}
+
+// dependencies visits deps, the dependencies of from, evaluating each one's
+// arguments in scope, the scope of from. It is pure apart from updating o and
+// ran.
+func (o *orderer) dependencies(from *ast.Recipe, deps []ast.Dependency, scope eval.Scope, ran map[string]bool) error {
+	for _, d := range deps {
+		callee, ok := o.byName[d.Name]
+		if !ok {
+			return &diag.Error{Kind: diag.KindAnalysis, File: o.jf.File, Line: d.Line, Col: d.Col, Width: len(d.Name),
+				Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, d.Name)}
+		}
+		args, err := eval.EvaluateAll(d.Args, scope)
+		if err != nil {
+			return locate(err, o.jf.File, d.Line)
+		}
+		if err := o.visit(callee, args, ran); err != nil {
 			return err
 		}
 	}
-	o.order = append(o.order, call{recipe: r, args: args})
 	return nil
 }
 
