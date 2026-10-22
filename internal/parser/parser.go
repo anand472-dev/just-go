@@ -71,10 +71,17 @@ func (p *parser) errAt(t lexer.Token, msg string) error {
 
 // tokenWidth is the width of t in the source, in runes. Pure.
 func tokenWidth(t lexer.Token) int {
-	if t.Kind == lexer.String {
+	if t.Raw != "" {
 		return utf8.RuneCountInString(t.Raw)
 	}
 	return utf8.RuneCountInString(t.Text)
+}
+
+// stringValue consumes the current token, a String, and returns its value.
+// Like upstream, the parser processes a string's escapes as it meets it, so
+// earlier parse errors and every lex error come first.
+func (p *parser) stringValue() (string, error) {
+	return lexer.StringValue(p.file, p.next())
 }
 
 // unexpected reports that t is not what the grammar needs next.
@@ -199,22 +206,34 @@ func (p *parser) shell() ([]string, error) {
 	if _, err := p.expect(lexer.LBracket, "'['"); err != nil {
 		return nil, err
 	}
-	first, err := p.expect(lexer.String, "string")
-	if err != nil {
-		return nil, err
+	if t := p.peek(); t.Kind != lexer.String {
+		return nil, p.unexpected(t, "string")
 	}
-	words := []string{first.Text}
-	for p.peek().Kind == lexer.Comma {
-		p.next()
-		if p.peek().Kind != lexer.String {
+	var words []string
+	for {
+		word, err := p.stringValue()
+		if err != nil {
+			return nil, err
+		}
+		words = append(words, word)
+		if !p.moreWords() {
 			break
 		}
-		words = append(words, p.next().Text)
 	}
 	if _, err := p.expect(lexer.RBracket, "string or ']'"); err != nil {
 		return nil, err
 	}
 	return words, nil
+}
+
+// moreWords consumes the comma after a shell word, and reports whether
+// another word follows it. A trailing comma is allowed.
+func (p *parser) moreWords() bool {
+	if p.peek().Kind != lexer.Comma {
+		return false
+	}
+	p.next()
+	return p.peek().Kind == lexer.String
 }
 
 func (p *parser) assignment(jf *ast.Justfile) error {
@@ -249,8 +268,11 @@ func (p *parser) atom() (ast.Expr, error) {
 	t := p.peek()
 	switch t.Kind {
 	case lexer.String:
-		p.next()
-		return ast.StringLit{Value: t.Text}, nil
+		value, err := p.stringValue()
+		if err != nil {
+			return nil, err
+		}
+		return ast.StringLit{Value: value}, nil
 	case lexer.Ident:
 		p.next()
 		return ast.Var{Name: t.Text, Line: t.Line, Col: t.Col}, nil
@@ -433,6 +455,7 @@ type physical struct {
 // the recipe's indentation; whitespace beyond it stays in the text.
 func (p *parser) bodyLine(t lexer.Token, indent string) (physical, error) {
 	extra := strings.TrimPrefix(t.Text, indent)
+	width := p.leadingTextWidth(extra)
 	parts, err := p.parts(extra)
 	if err != nil {
 		return physical{}, err
@@ -440,12 +463,22 @@ func (p *parser) bodyLine(t lexer.Token, indent string) (physical, error) {
 	p.next() // the line break: the lexer ends every body line with one
 	phys := physical{parts: parts, line: t.Line}
 	if extra != "" {
-		first, _ := parts[0].(ast.Text)
-		phys.extra = ast.Span{Line: t.Line, Col: t.Col + utf8.RuneCountInString(indent),
-			Width: utf8.RuneCountInString(first.Value)}
+		phys.extra = ast.Span{Line: t.Line, Col: t.Col + utf8.RuneCountInString(indent), Width: width}
 	}
 	phys.parts, phys.continues = cutContinuation(parts)
 	return phys, nil
+}
+
+// leadingTextWidth is the width in runes of the source text that starts a
+// body line: extra, the whitespace beyond the recipe's indentation, and the
+// Text token that follows it, if one does. Upstream underlines that text, as
+// written, when it reports extra leading whitespace.
+func (p *parser) leadingTextWidth(extra string) int {
+	width := utf8.RuneCountInString(extra)
+	if t := p.peek(); t.Kind == lexer.Text {
+		width += tokenWidth(t)
+	}
+	return width
 }
 
 // cutContinuation removes the backslash that ends parts, and reports whether

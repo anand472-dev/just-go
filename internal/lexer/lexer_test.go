@@ -60,6 +60,49 @@ func wantParseErrorWidth(t *testing.T, src string, line, col, width int, msg str
 	}
 }
 
+// stringToken lexes src and returns its one String token.
+func stringToken(t *testing.T, src string) lexer.Token {
+	t.Helper()
+	toks, err := lexer.Lex("justfile", []byte(src))
+	if err != nil {
+		t.Fatalf("Lex(%q) error: %v", src, err)
+	}
+	var strs []lexer.Token
+	for _, tk := range toks {
+		if tk.Kind == lexer.String {
+			strs = append(strs, tk)
+		}
+	}
+	if len(strs) != 1 {
+		t.Fatalf("Lex(%q) has %d String tokens, want 1", src, len(strs))
+	}
+	return strs[0]
+}
+
+// wantValue checks the value of the one string literal in src.
+func wantValue(t *testing.T, src, want string) {
+	t.Helper()
+	got, err := lexer.StringValue("justfile", stringToken(t, src))
+	if err != nil || got != want {
+		t.Errorf("StringValue(%q) = %q, %v; want %q", src, got, err, want)
+	}
+}
+
+// wantValueError checks the error StringValue reports for the one string
+// literal in src.
+func wantValueError(t *testing.T, src string, line, col, width int, msg string) {
+	t.Helper()
+	got, err := lexer.StringValue("justfile", stringToken(t, src))
+	var de *diag.Error
+	if !errors.As(err, &de) {
+		t.Fatalf("StringValue(%q) = %q, %v; want a *diag.Error", src, got, err)
+	}
+	want := diag.Error{Kind: diag.KindParse, File: "justfile", Line: line, Col: col, Width: width, Msg: msg}
+	if *de != want || got != "" {
+		t.Errorf("StringValue(%q) = %q, %+v; want %+v", src, got, *de, want)
+	}
+}
+
 func TestLexSimpleAssignment(t *testing.T) {
 	wantTokens(t, `x := "a"`, []lexer.Token{
 		tok(lexer.Ident, "x", 1, 1),
@@ -134,26 +177,26 @@ func TestLexIdentifiersMayContainDashesDigitsAndUnderscores(t *testing.T) {
 	})
 }
 
-func TestLexCookedStringEscapes(t *testing.T) {
+// A String token's Text is the source between its delimiters. StringValue
+// processes escapes later, as upstream's parser does.
+func TestLexCookedStringKeepsEscapesForStringValue(t *testing.T) {
 	wantTokens(t, `"a\n\r\t\\\"b"`, []lexer.Token{
-		tok(lexer.String, "a\n\r\t\\\"b", 1, 1),
+		tok(lexer.String, `a\n\r\t\\\"b`, 1, 1),
 		tok(lexer.Newline, "", 1, 15),
 		tok(lexer.EOF, "", 1, 15),
 	})
+	wantValue(t, `"a\n\r\t\\\"b"`, "a\n\r\t\\\"b")
 }
 
 func TestLexCookedStringLineContinuation(t *testing.T) {
 	wantTokens(t, "\"a\\\nb\" x", []lexer.Token{
-		tok(lexer.String, "ab", 1, 1),
+		tok(lexer.String, "a\\\nb", 1, 1),
 		tok(lexer.Ident, "x", 2, 4),
 		tok(lexer.Newline, "", 2, 5),
 		tok(lexer.EOF, "", 2, 5),
 	})
-	wantTokens(t, "\"a\\\r\nb\"", []lexer.Token{
-		tok(lexer.String, "ab", 1, 1),
-		tok(lexer.Newline, "", 2, 3),
-		tok(lexer.EOF, "", 2, 3),
-	})
+	wantValue(t, "\"a\\\nb\"", "ab")
+	wantValue(t, "\"a\\\r\nb\"", "ab")
 }
 
 func TestLexRawStringKeepsBackslashes(t *testing.T) {
@@ -162,6 +205,8 @@ func TestLexRawStringKeepsBackslashes(t *testing.T) {
 		tok(lexer.Newline, "", 1, 8),
 		tok(lexer.EOF, "", 1, 8),
 	})
+	wantValue(t, `'a\n"b'`, `a\n"b`)
+	wantValue(t, `'a\'`, `a\`)
 }
 
 func TestLexMultiLineStringKeepsCRLFAndTracksLines(t *testing.T) {
@@ -182,6 +227,162 @@ func TestLexMultiLineStringKeepsCRLFAndTracksLines(t *testing.T) {
 		tok(lexer.Newline, "\n", 2, 3),
 		tok(lexer.EOF, "", 3, 1),
 	})
+	wantValue(t, "\"a\r\nb\"", "a\r\nb")
+}
+
+// Review Focus 3: `{{{{` in a recipe body is an escaped `{{`, even inside
+// quotes, which are plain text there. In upstream's misc::brace_escape the
+// body line `echo '{{{{'` runs as `echo '{{'`.
+func TestLexBraceEscapeInsideString(t *testing.T) {
+	wantTokens(t, "foo:\n  echo '{{{{'\n", []lexer.Token{
+		tok(lexer.Ident, "foo", 1, 1),
+		tok(lexer.Colon, ":", 1, 4),
+		tok(lexer.Newline, "\n", 1, 5),
+		tok(lexer.Indent, "  ", 2, 1),
+		tok(lexer.Text, "echo '{{'", 2, 3),
+		tok(lexer.Newline, "\n", 2, 14),
+		tok(lexer.EOF, "", 3, 1),
+	})
+	// misc::brace_escape_extra: the fifth brace is plain text.
+	wantTokens(t, "\techo '{{{{{'", []lexer.Token{
+		tok(lexer.Indent, "\t", 1, 1),
+		tok(lexer.Text, "echo '{{{'", 1, 2),
+		tok(lexer.Newline, "", 1, 14),
+		tok(lexer.EOF, "", 1, 14),
+	})
+	// Six braces are an escape and then an interpolation.
+	wantTokens(t, "\t{{{{{{x}}", []lexer.Token{
+		tok(lexer.Indent, "\t", 1, 1),
+		tok(lexer.Text, "{{", 1, 2),
+		tok(lexer.Interp, "{{", 1, 6),
+		tok(lexer.Ident, "x", 1, 8),
+		tok(lexer.Close, "}}", 1, 9),
+		tok(lexer.Newline, "", 1, 11),
+		tok(lexer.EOF, "", 1, 11),
+	})
+	// In a string literal `{{{{` is not an escape.
+	wantValue(t, `"{{{{"`, "{{{{")
+	wantValue(t, `'{{{{'`, "{{{{")
+}
+
+// TestLexBraceEscapeTextKeepsSource checks that a Text token's Raw is its
+// source text, escape included, which error widths need.
+func TestLexBraceEscapeTextKeepsSource(t *testing.T) {
+	toks, err := lexer.Lex("justfile", []byte("\t{{{{ x"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := toks[1]; got.Kind != lexer.Text || got.Text != "{{ x" || got.Raw != "{{{{ x" {
+		t.Errorf("Text token = %+v, want Text %q and Raw %q", got, "{{ x", "{{{{ x")
+	}
+}
+
+// Indented strings, opened by three quotes, single or double, lose their
+// common indentation and their blank first and last lines. A cooked one's
+// escapes are processed after that, as upstream does (the string::indented_*
+// corpus cases).
+func TestLexIndentedStringRemovesCommonIndent(t *testing.T) {
+	wantTokens(t, "x := '''\n  foo\n  bar\n'''\n", []lexer.Token{
+		tok(lexer.Ident, "x", 1, 1),
+		tok(lexer.Assign, ":=", 1, 3),
+		tok(lexer.String, "\n  foo\n  bar\n", 1, 6),
+		tok(lexer.Newline, "\n", 4, 4),
+		tok(lexer.EOF, "", 5, 1),
+	})
+	cases := []struct{ src, want string }{
+		{"'''\n  foo\n  bar\n'''", "foo\nbar\n"},
+		{"\"\"\"\n  foo\n  bar\n\"\"\"", "foo\nbar\n"},
+		{"'''\n  foo\\n\n  bar\n'''", "foo\\n\nbar\n"},
+		{"\"\"\"\n  foo\\n\n  bar\n\"\"\"", "foo\n\nbar\n"},
+		{"\"\"\"\n  foo\\\n  bar\n\"\"\"", "foobar\n"},
+		{"'''\r\nfoo\r\n\r\nbar\r\n'''", "foo\r\n\r\nbar\r\n"},
+		{"'''\n\tfoo\n\t  bar\n   '''", "foo\n  bar\n"},
+		{"'''\n  a\n\n b\n  '''", " a\n\nb\n"},
+		{"'''  a'''", "a"},
+		{"''' \t '''", ""},
+		{"''''''", ""},
+		{"''", ""},
+		{"'''a ' b'''", "a ' b"},
+		{"\"\"\"a \\\"\"\" b\"\"\"", "a \"\"\" b"},
+	}
+	for _, c := range cases {
+		wantValue(t, c.src, c.want)
+	}
+}
+
+// The plan names misc::brace_escape#1 here, but that case has no error. The
+// message and location come from the corpus cases string::unterminated_string,
+// string::unterminated_raw_string, string::unterminated_indented_string and
+// string::unterminated_indented_raw_string: upstream reports the string's
+// start and underlines its opening delimiter.
+func TestLexUnterminatedStringMatchesUpstream(t *testing.T) {
+	wantParseErrorWidth(t, "a b= \":\n", 1, 6, 1, "unterminated string")
+	wantParseErrorWidth(t, "a b= ':\n", 1, 6, 1, "unterminated string")
+	wantParseErrorWidth(t, "a b= \"\"\":\n", 1, 6, 3, "unterminated string")
+	wantParseErrorWidth(t, "a b= ''':\n", 1, 6, 3, "unterminated string")
+	wantParseErrorWidth(t, "x := '''\na\n''\n", 1, 6, 3, "unterminated string")
+	wantParseErrorWidth(t, "x := \"a\\\"", 1, 6, 1, "unterminated string")
+}
+
+// StringValue processes escapes as upstream's cook_string does, unicode
+// escapes included (the string::*unicode_escape* corpus cases).
+func TestStringValueEscapes(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{`"\u{1f916}\u{1F916}"`, "\U0001F916\U0001F916"},
+		{`"\u{10FFFF}"`, "\U0010FFFF"},
+		{`"\u{012345}\u{6789a}\u{bcdef}\u{ABCDE}\u{F}"`, "\U00012345\U0006789a\U000bcdef\U000ABCDE\u000F"},
+		{`"\""`, `"`},
+		{"\"\xff\"", "\xff"},
+	}
+	for _, c := range cases {
+		wantValue(t, c.src, c.want)
+	}
+}
+
+// Upstream reports a bad escape at the string, underlining all of it.
+func TestStringValueEscapeErrors(t *testing.T) {
+	cases := []struct {
+		src   string
+		width int
+		msg   string
+	}{
+		{`"ab\q"`, 6, "`\\q` is not a valid escape sequence"},
+		{`"\q\"x"`, 7, "`\\q` is not a valid escape sequence"},
+		{`"é\q"`, 5, "`\\q` is not a valid escape sequence"},
+		{"\"\\`\"", 4, "`\\\\`` is not a valid escape sequence"},
+		{`"\é"`, 4, "`\\\\u{e9}` is not a valid escape sequence"},
+		{"\"a\\\r\"", 5, "`\\\\r` is not a valid escape sequence"},
+		{"\"a\\\rb\"", 6, "`\\\\r` is not a valid escape sequence"},
+		{"\"a\\\t\"", 5, "`\\\\t` is not a valid escape sequence"},
+		{`"\u{}"`, 6, "unicode escape sequences must not be empty"},
+		{`"\u{BadBad}"`, 12, "unicode escape sequence value `BadBad` greater than maximum valid code point `10FFFF`"},
+		{`"\u{D800}"`, 10, "unicode escape sequence value `D800` greater than maximum valid code point `10FFFF`"},
+		{`"\u1234"`, 8, "expected unicode escape sequence delimiter `{` but found `1`"},
+		{`"\u{foo}"`, 9, "expected hex digit [0-9A-Fa-f] but found `o`"},
+		{`"\u {1f916}"`, 12, "expected unicode escape sequence delimiter `{` but found ` `"},
+		{`"\u{FFFFFFFFFF}"`, 16, "unicode escape sequence starting with `\\u{FFFFFFF` longer than six hex digits"},
+		{`"\u{1f917"`, 10, "unterminated unicode escape sequence"},
+		{`"\u"`, 4, "unterminated unicode escape sequence"},
+	}
+	for _, c := range cases {
+		wantValueError(t, "x := "+c.src, 1, 6, c.width, c.msg)
+	}
+}
+
+func BenchmarkStringValue(b *testing.B) {
+	src := []byte("x := \"\"\"\n    first \\u{1f916} line\\t\n    second line\\n\n      third\n    \"\"\"\n")
+	toks, err := lexer.Lex("justfile", src)
+	if err != nil {
+		b.Fatal(err)
+	}
+	str := toks[2]
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := lexer.StringValue("justfile", str); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 func TestLexColumnsCountRunes(t *testing.T) {
@@ -297,14 +498,9 @@ func TestLexUnterminatedStrings(t *testing.T) {
 
 func TestLexBackslashAtEndOfInputUnterminatesString(t *testing.T) {
 	wantParseError(t, `"abc\`, 1, 1, "unterminated string")
-}
-
-// Upstream reports an invalid escape at the string, underlining all of it.
-func TestLexInvalidEscape(t *testing.T) {
-	wantParseErrorWidth(t, `x := "ab\q"`, 1, 6, 6, "`\\q` is not a valid escape sequence")
-	wantParseErrorWidth(t, `x := "\q\"x"`, 1, 6, 7, "`\\q` is not a valid escape sequence")
-	wantParseErrorWidth(t, `x := "é\q`, 1, 6, 4, "`\\q` is not a valid escape sequence")
-	wantParseErrorWidth(t, `x := "\q\`, 1, 6, 4, "`\\q` is not a valid escape sequence")
+	// The lexer only finds the string's end; a bad escape is StringValue's.
+	wantParseError(t, `x := "é\q`, 1, 6, "unterminated string")
+	wantParseError(t, `x := "\q\`, 1, 6, "unterminated string")
 }
 
 // An interpolation the input never closes is reported at its opening braces,

@@ -34,6 +34,7 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Milestone 1 gate, `bin/just-go` from `bfd0b56` | 80 | 80 | 1915 | 16 |
 | After the whole-branch review fixes | 125 | 125 | 1870 | 16 |
 | Compat Task 1: triage and the core-subset defects | 130 | 130 | 1865 | 16 |
+| Compat Task 2: brace escapes and string literal forms | 142 | 142 | 1853 | 16 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the

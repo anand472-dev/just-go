@@ -326,8 +326,6 @@ def grammar_reason(sources, actual, expected):
         keyword = GRAMMAR_KEYWORDS.search(source)
         if keyword:
             return "uses `" + keyword.group(0).strip() + "`"
-    if any("{{{{" in source for source in sources):
-        return "escapes `{{` with `{{{{`"
     if any(marker in actual for marker in PARSE_ERRORS):
         return "just-go reports a parse error: " + first_error(actual)
     if "——▶" in expected:

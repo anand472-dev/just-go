@@ -4,15 +4,18 @@
 //
 // Line structure drives the lexer. A line that starts with a space or tab and
 // has other content is a candidate recipe body line: the lexer emits Indent
-// and then raw Text, with {{ ... }} interpolations lexed as expressions. The
-// parser decides whether such a line really belongs to a recipe. Every other
-// line is lexed as code. A line holding only whitespace yields just a Newline.
+// and then Text, with {{ ... }} interpolations lexed as expressions. In body
+// text "{{{{" is an escaped "{{", as upstream's is. The parser decides whether
+// such a line really belongs to a recipe. Every other line is lexed as code. A
+// line holding only whitespace yields just a Newline.
 //
 // A leading UTF-8 byte order mark is dropped, and "\r\n" is treated as "\n"
 // for line structure: it ends a line, and the Newline token's Text is "\n".
 // Inside string literals the line break bytes are kept verbatim, so a value
-// spanning lines carries the file's own line endings, as upstream does; only a
-// backslash before a line break is a continuation and yields nothing.
+// spanning lines carries the file's own line endings, as upstream does.
+// StringValue turns a String token into its value: it removes an indented
+// string's common indentation and processes a double-quoted string's escapes,
+// where a backslash before a line break is a continuation and yields nothing.
 // Positions are 1-based and count runes, so a BOM or CRLF never shifts a
 // column. Source that does not end in a newline gets a synthetic Newline (with
 // empty Text) before EOF.
@@ -21,6 +24,7 @@ package lexer
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"gitea.com/wimwian/just-go/internal/diag"
@@ -32,7 +36,7 @@ type TokenKind int
 // Token kinds.
 const (
 	Ident    TokenKind = iota
-	String             // Text is the unescaped contents; Raw is the source text with its quotes
+	String             // Text is the source between the delimiters; Raw is the source text with its delimiters
 	Assign             // :=
 	Equals             // =
 	Colon              // :
@@ -45,7 +49,7 @@ const (
 	Interp             // {{
 	Close              // }}
 	Indent             // leading whitespace of a recipe body line; Text is the exact whitespace
-	Text               // literal text inside a recipe body; Text is the raw text
+	Text               // literal text inside a recipe body, with "{{{{" unescaped; Raw is the source text
 	Newline            // "\n"; empty Text when synthesized at the end of the input
 	Comment            // Text is the comment body without '#'
 	LBracket           // [
@@ -57,16 +61,12 @@ const (
 type Token struct {
 	Kind TokenKind
 	Text string
-	Raw  string // for String, the source text including quotes and escapes; empty otherwise
+	Raw  string // for String and Text, the source text, delimiters and escapes included; empty otherwise
 	Line int
 	Col  int
 }
 
 var bom = []byte{0xEF, 0xBB, 0xBF}
-
-// escapes maps the character after a backslash in a cooked string to the byte
-// it stands for.
-var escapes = map[byte]byte{'n': '\n', 'r': '\r', 't': '\t', '\\': '\\', '"': '"'}
 
 var puncts = map[byte]TokenKind{
 	':': Colon, '=': Equals, '+': Plus, '(': LParen,
@@ -177,6 +177,13 @@ func (l *lexer) atInterp() bool {
 	return bytes.HasPrefix(l.src[l.pos:], []byte("{{"))
 }
 
+// interpEscape is how body text writes a literal "{{".
+const interpEscape = "{{{{"
+
+func (l *lexer) atEscape() bool {
+	return bytes.HasPrefix(l.src[l.pos:], []byte(interpEscape))
+}
+
 // bump consumes one rune, or one line break, and returns the source bytes it
 // covers. A line break is returned verbatim ("\n" or "\r\n"), so string
 // values keep the file's line endings as upstream does. Invalid UTF-8 is
@@ -252,15 +259,23 @@ func blankPrefix(b []byte) int {
 }
 
 // lexText lexes one run of body text and what ends it: an interpolation
-// opener or the line break.
+// opener or the line break. "{{{{" is text, and stands for "{{".
 func (l *lexer) lexText() {
 	at := l.mark()
 	start := l.pos
-	for l.pos < len(l.src) && l.newlineWidth() == 0 && !l.atInterp() {
+	for l.pos < len(l.src) && l.newlineWidth() == 0 {
+		if l.atEscape() {
+			l.skip(len(interpEscape))
+			continue
+		}
+		if l.atInterp() {
+			break
+		}
 		l.bump()
 	}
 	if l.pos > start {
-		l.emit(Text, string(l.src[start:l.pos]), at)
+		raw := string(l.src[start:l.pos])
+		l.toks = append(l.toks, Token{Kind: Text, Text: strings.ReplaceAll(raw, interpEscape, "{{"), Raw: raw, Line: at.line, Col: at.col})
 	}
 	switch {
 	case l.atInterp():
@@ -299,10 +314,8 @@ func (l *lexer) lexCode() error {
 		l.lexNewline()
 	case isIdentStart(c):
 		l.lexIdent()
-	case c == '"':
-		return l.lexCooked()
-	case c == '\'':
-		return l.lexRaw()
+	case c == '"' || c == '\'':
+		return l.lexString()
 	case c == '#':
 		l.lexComment()
 	default:
@@ -338,81 +351,38 @@ func (l *lexer) lexComment() {
 	l.emit(Comment, string(l.src[start:l.pos]), at)
 }
 
-// lexRaw lexes a single-quoted string: no escapes, line breaks allowed.
-func (l *lexer) lexRaw() error {
+// lexString lexes a string literal: '...', "...", or an indented string,
+// which opens and closes with three quotes, single or double. As upstream
+// does, the lexer only finds the end: in a double-quoted string a backslash
+// keeps the next character from closing it. The token's Text is the source
+// between the delimiters, and StringValue gives the value. An unterminated
+// string is reported at its start, underlining the opening delimiter.
+func (l *lexer) lexString() error {
 	at, start := l.mark(), l.pos
-	l.skip(1)
-	var text []byte
+	delim := stringDelimiter(l.src[l.pos:])
+	l.skip(len(delim))
+	body := l.pos
+	escape := false
 	for l.pos < len(l.src) {
-		if l.peek() == '\'' {
-			l.skip(1)
-			l.emitString(string(text), start, at)
+		if !escape && bytes.HasPrefix(l.src[l.pos:], delim) {
+			text := string(l.src[body:l.pos])
+			l.skip(len(delim))
+			l.emitString(text, start, at)
 			return nil
 		}
-		text = append(text, l.bump()...)
-	}
-	return l.errAt(at, "unterminated string")
-}
-
-// lexCooked lexes a double-quoted string with backslash escapes.
-func (l *lexer) lexCooked() error {
-	at, start := l.mark(), l.pos
-	l.skip(1)
-	var text []byte
-	for l.pos < len(l.src) {
-		switch l.peek() {
-		case '"':
-			l.skip(1)
-			l.emitString(string(text), start, at)
-			return nil
-		case '\\':
-			out, err := l.lexEscape(at, start)
-			if err != nil {
-				return err
-			}
-			text = append(text, out...)
-		default:
-			text = append(text, l.bump()...)
-		}
-	}
-	return l.errAt(at, "unterminated string")
-}
-
-// lexEscape consumes a backslash escape and returns the bytes it produces. A
-// backslash before a line break produces nothing. str is the start of the
-// enclosing string, reported if the input ends inside the escape, and start
-// is its byte offset.
-func (l *lexer) lexEscape(str mark, start int) ([]byte, error) {
-	l.skip(1)
-	if l.pos >= len(l.src) {
-		return nil, l.errAt(str, "unterminated string")
-	}
-	if l.newlineWidth() > 0 {
+		escape = delim[0] == '"' && !escape && l.peek() == '\\'
 		l.bump()
-		return nil, nil
 	}
-	out, ok := escapes[l.peek()]
-	if !ok {
-		r, _ := utf8.DecodeRune(l.src[l.pos:])
-		return nil, l.errWidth(str, l.stringWidth(start), fmt.Sprintf("`\\%c` is not a valid escape sequence", r))
-	}
-	l.skip(1)
-	return []byte{out}, nil
+	return l.errWidth(at, len(delim), "unterminated string")
 }
 
-// stringWidth is the width in runes of the cooked string that starts at byte
-// offset start: through its closing quote, or to the end of the input. The
-// lexer is inside the string, past an invalid escape. Upstream underlines the
-// whole string for that error. It does not move the lexer.
-func (l *lexer) stringWidth(start int) int {
-	end := l.pos
-	for end < len(l.src) && l.src[end] != '"' {
-		if l.src[end] == '\\' {
-			end++
-		}
-		end++
+// stringDelimiter returns the delimiter of the string literal that starts
+// rest: three quotes for an indented string, otherwise one. Pure.
+func stringDelimiter(rest []byte) []byte {
+	if len(rest) >= 3 && rest[1] == rest[0] && rest[2] == rest[0] {
+		return rest[:3]
 	}
-	return utf8.RuneCount(l.src[start:min(end+1, len(l.src))])
+	return rest[:1]
 }
 
 // lexPunct lexes operators and delimiters, or reports an unknown character.

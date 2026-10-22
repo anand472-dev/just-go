@@ -602,3 +602,62 @@ func TestParseErrorWidths(t *testing.T) {
 		}
 	}
 }
+
+// String literals get their values from lexer.StringValue: indented strings
+// lose their common indentation, and cooked strings process escapes after
+// that (the string::indented_* and string::cooked_string_* corpus cases).
+func TestParseStringLiteralForms(t *testing.T) {
+	jf := mustParse(t, "a := \"\"\"\n  foo\\\n  bar\n\"\"\"\nb := '''\n  x\\n\n  y\n'''\nc := \"\\u{1f916}\\t\"\n"+
+		"set shell := [\"\\u{62}ash\", '\\c']\n")
+	want := []ast.Assignment{
+		{Name: "a", Value: lit("foobar\n"), Line: 1},
+		{Name: "b", Value: lit("x\\n\ny\n"), Line: 5},
+		{Name: "c", Value: lit("\U0001F916\t"), Line: 9},
+	}
+	if !reflect.DeepEqual(jf.Assignments, want) {
+		t.Errorf("Assignments =\n %+v\nwant\n %+v", jf.Assignments, want)
+	}
+	if shell := []string{"bash", "\\c"}; !reflect.DeepEqual(jf.Settings.Shell, shell) {
+		t.Errorf("Shell = %q, want %q", jf.Settings.Shell, shell)
+	}
+}
+
+// Upstream cooks a string when it parses it, after the whole file has lexed,
+// so a lex error later in the file and a parse error earlier in it both come
+// before a bad escape.
+func TestParseStringEscapeErrorsComeFromTheParser(t *testing.T) {
+	wantError(t, "x := \"\\q\"\n", 1, 6, "`\\q` is not a valid escape sequence")
+	wantError(t, "set shell := [\"a\", \"\\u{}\"]\n", 1, 20, "unicode escape sequences must not be empty")
+	wantError(t, "set shell := [\"\\u\"]\n", 1, 15, "unterminated unicode escape sequence")
+	wantError(t, "r:\n  {{ \"\\q\" }}\n", 2, 6, "`\\q` is not a valid escape sequence")
+	wantError(t, "x := \"\\q\"\ny := 'abc\n", 2, 6, "unterminated string")
+	wantError(t, "x := a b\ny := \"\\q\"\n", 1, 8, "Expected end of line, but found identifier")
+	_, err := parser.Parse("justfile", []byte("x := \"a\\q\" + 'b'\n"))
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Width != 5 {
+		t.Errorf("escape error = %+v, want width 5", de)
+	}
+}
+
+// misc::brace_escape and misc::brace_escape_extra: `{{{{` in a body is `{{`.
+func TestParseBodyBraceEscape(t *testing.T) {
+	wantRecipe(t, "foo:\n  echo '{{{{'\n  echo '{{{{{' {{{{{{x}}\n", ast.Recipe{
+		Name: "foo", Line: 1,
+		Lines: []ast.Line{
+			{Parts: []ast.Expr{txt("echo '{{'")}, Line: 2},
+			{Parts: []ast.Expr{txt("echo '{{{' {{"), ref("x")}, Line: 3},
+		},
+	})
+}
+
+// Upstream underlines the source of a line with extra indentation, so an
+// escape there counts all four braces.
+func TestParseExtraIndentWidthCountsTheEscapeSource(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("r:\n  a\n    {{{{ x {{y}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := jf.Recipes[0].Lines[1].ExtraIndent, (ast.Span{Line: 3, Col: 3, Width: 9}); got != want {
+		t.Errorf("ExtraIndent = %+v, want %+v", got, want)
+	}
+}
