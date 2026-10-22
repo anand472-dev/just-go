@@ -159,14 +159,24 @@ func TestWriteFile(t *testing.T) {
 
 func TestMainExitsWithRunStatus(t *testing.T) {
 	t.Setenv("JUST_GO_BIN", "")
-	oldArgs, oldExit := os.Args, exit
-	defer func() { os.Args, exit = oldArgs, oldExit }()
+	stderr, err := os.CreateTemp(t.TempDir(), "stderr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stderr.Close()
+	oldArgs, oldExit, oldStderr := os.Args, exit, os.Stderr
+	defer func() { os.Args, exit, os.Stderr = oldArgs, oldExit, oldStderr }()
 	code := -1
 	exit = func(c int) { code = c }
 	os.Args = []string{"ratchet"}
+	os.Stderr = stderr
 	main()
 	if code != 2 {
 		t.Fatalf("exit code %d, want 2 (JUST_GO_BIN unset)", code)
+	}
+	data, err := os.ReadFile(stderr.Name())
+	if err != nil || !strings.Contains(string(data), "JUST_GO_BIN must name") {
+		t.Fatalf("stderr %q, %v; want the JUST_GO_BIN message", data, err)
 	}
 }
 
