@@ -1,0 +1,1195 @@
+[
+ {
+  "files": {
+   "justfile": "set export\nA := 'g'\nfoo A='p':\n  echo $A\n"
+  },
+  "name": "export shadow"
+ },
+ {
+  "files": {
+   "justfile": "export A := 'g'\nfoo A='p':\n  echo $A\n"
+  },
+  "name": "export kw shadow"
+ },
+ {
+  "args": [
+   "foo",
+   "z"
+  ],
+  "files": {
+   "justfile": "a := 'x'\nfoo $a:\n  echo $a\n"
+  },
+  "name": "export dollar"
+ },
+ {
+  "files": {
+   "justfile": "foo $a='q' b='r':\n  echo $a $b\n"
+  },
+  "name": "export dollar default"
+ },
+ {
+  "args": [
+   "foo",
+   "x"
+  ],
+  "files": {
+   "justfile": "set positional-arguments\nfoo a b='y':\n  echo $0 $1 $2 \"$@\"\n"
+  },
+  "name": "pos defaults"
+ },
+ {
+  "files": {
+   "a/b/x": "",
+   "justfile": "set working-directory := 'a/b'\nfoo:\n  @pwd | sed 's|.*/||'\n"
+  },
+  "name": "wd nested"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := '/tmp'\nfoo:\n  @pwd -P\n"
+  },
+  "name": "wd absolute"
+ },
+ {
+  "cwd": "sub",
+  "files": {
+   "sub/justfile": "set working-directory := '..'\nfoo:\n  @ls\n",
+   "x": "1"
+  },
+  "name": "wd dotdot"
+ },
+ {
+  "cwd": "sub",
+  "files": {
+   "justfile": "set no-cd\nfoo:\n  @pwd | sed 's|.*/||'\n",
+   "sub/x": ""
+  },
+  "name": "nocd cwd sub"
+ },
+ {
+  "cwd": "sub",
+  "files": {
+   "bar/x": "",
+   "justfile": "set working-directory := 'bar'\nfoo:\n  @pwd | sed 's|.*/||'\n",
+   "sub/y": ""
+  },
+  "name": "wd cwd sub"
+ },
+ {
+  "files": {
+   "justfile": "set allow-duplicate-recipes\na:\n  echo a1\nb:\n  echo b\na:\n  echo a2\n"
+  },
+  "name": "dup recipes default"
+ },
+ {
+  "files": {
+   "justfile": "a:\n  echo a1\na:\n  echo a2\n"
+  },
+  "name": "dup recipes no setting"
+ },
+ {
+  "files": {
+   "justfile": "set allow-duplicate-variables\nx := 'a'\ny := x\nx := 'b'\nfoo:\n  echo {{x}} {{y}}\n"
+  },
+  "name": "dup vars dep"
+ },
+ {
+  "files": {
+   "justfile": "set quiet\nset export\nset quiet := false\nfoo:\n  echo\n"
+  },
+  "name": "dup set"
+ },
+ {
+  "files": {
+   "justfile": "\n\nset lazy := true\nset lazy := false\n"
+  },
+  "name": "dup set diff line"
+ },
+ {
+  "files": {
+   "justfile": "set no-cd\nset working-directory := 'x'\n"
+  },
+  "name": "conflict a"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := 'x'\nset no-cd := true\n"
+  },
+  "name": "conflict b"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := 'x'\nset no-cd := false\nfoo:\n  @echo ok\n",
+   "x/y": ""
+  },
+  "name": "conflict none false"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := '1.59.0'\nfoo:\n  @echo ok\n"
+  },
+  "name": "minver eq"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := '1.59.1'\nfoo:\n  @echo ok\n"
+  },
+  "name": "minver above"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := '01.0.0'\n"
+  },
+  "name": "minver lead zero"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := '1.0'\n"
+  },
+  "name": "minver two"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := '1234567890.0.0'\n"
+  },
+  "name": "minver big"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := '999999999.0.0'\n"
+  },
+  "name": "minver nine"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := ('1.0.0')\n"
+  },
+  "name": "minver group"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := \"1.0.0\"\nfoo:\n  @echo ok\n"
+  },
+  "name": "minver dq"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version\n"
+  },
+  "name": "minver bool"
+ },
+ {
+  "files": {
+   "justfile": "set indentation := '\\t'\nfoo:\n  @echo ok\n"
+  },
+  "name": "indent tab"
+ },
+ {
+  "files": {
+   "justfile": "set indentation\n"
+  },
+  "name": "indent bad bool"
+ },
+ {
+  "files": {
+   "justfile": "set shell := [x, '-c']\nx := 'bash'\nfoo:\n  @echo hi\n"
+  },
+  "name": "shell later var"
+ },
+ {
+  "files": {
+   "justfile": "set shell := ['ba' + 'sh', '-c']\nfoo:\n  @echo hi\n"
+  },
+  "name": "shell concat"
+ },
+ {
+  "files": {
+   "justfile": "set shell := [uppercase('x')]\nfoo:\n  @echo hi\n"
+  },
+  "name": "shell call"
+ },
+ {
+  "files": {
+   "justfile": "set windows-shell := [nope]\nfoo:\n  @echo hi\n"
+  },
+  "name": "winshell undefined"
+ },
+ {
+  "files": {
+   "justfile": "set windows-powershell\nfoo:\n  @echo hi\n"
+  },
+  "name": "winpowershell"
+ },
+ {
+  "files": {
+   "justfile": "d := '.'\nset tempdir := d\nfoo:\n  @echo hi\n"
+  },
+  "name": "tempdir expr"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := uppercase('x')\nfoo:\n  @echo hi\n"
+  },
+  "name": "wd call"
+ },
+ {
+  "files": {
+   "justfile": "x := uppercase('x')\nset working-directory := x\nfoo:\n  @echo hi\n"
+  },
+  "name": "wd nonconst var"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := a\nset tempdir := b\n"
+  },
+  "name": "wd order err"
+ },
+ {
+  "files": {
+   "justfile": "set guards\nfoo:\n  ?false\n  echo no\n"
+  },
+  "name": "guards ok"
+ },
+ {
+  "files": {
+   "justfile": "set guards\nfoo:\n  ?true\n  @echo yes\n  ?@true\n  @-?true\n"
+  },
+  "name": "guards pass"
+ },
+ {
+  "files": {
+   "justfile": "set guards\nfoo:\n  ?exit 3\n  echo no\n"
+  },
+  "name": "guards reserved"
+ },
+ {
+  "files": {
+   "justfile": "set guards\nfoo: bar\n  ?false\n  echo no\nbar:\n  @echo bar\n"
+  },
+  "name": "guards halt then dep"
+ },
+ {
+  "files": {
+   "justfile": "foo:\n  ?true\n"
+  },
+  "name": "guards off"
+ },
+ {
+  "files": {
+   "justfile": "foo:\n  ?[[ 1 == 2 ]]\n  @echo no\nset guards\n"
+  },
+  "name": "guards after recipe"
+ },
+ {
+  "files": {
+   "justfile": "foo:\n  # {{bar}}\n  @echo ok\nset ignore-comments\n"
+  },
+  "name": "ignore comments after recipe"
+ },
+ {
+  "files": {
+   "justfile": "set ignore-comments\nfoo:\n  @# x\n  @echo ok\n  # y \\\n  @echo two\n"
+  },
+  "name": "ignore comments sigil"
+ },
+ {
+  "files": {
+   "justfile": "set no-exit-message\nfoo:\n  exit 3\n"
+  },
+  "name": "noexit"
+ },
+ {
+  "files": {
+   "justfile": "set no-exit-message\nfoo:\n  -exit 3\n  @echo ok\n"
+  },
+  "name": "noexit dash"
+ },
+ {
+  "files": {
+   "justfile": "set lazy\nx := uppercase('a')\nfoo:\n  @echo hi\n"
+  },
+  "name": "lazy ok"
+ },
+ {
+  "files": {
+   "justfile": "set lazy\nx := uppercase('a')\nfoo x='q':\n  @echo {{x}}\n"
+  },
+  "name": "lazy shadow"
+ },
+ {
+  "files": {
+   "justfile": "set lazy\nx := uppercase('a')\nfoo:\n  @echo {{x}}\n"
+  },
+  "known": "builtin calls arrive in Task 10 (report concern 6)",
+  "name": "lazy used"
+ },
+ {
+  "files": {
+   "justfile": "set lazy\neager x := uppercase('a')\nfoo:\n  @echo hi\n"
+  },
+  "known": "builtin calls arrive in Task 10 (report concern 6)",
+  "name": "eager"
+ },
+ {
+  "files": {
+   "justfile": "set lazy\nexport x := uppercase('a')\nfoo:\n  @echo hi\n"
+  },
+  "known": "builtin calls arrive in Task 10 (report concern 6)",
+  "name": "export kw lazy"
+ },
+ {
+  "files": {
+   "justfile": "set default-list\nfoo:\n  @echo foo\n"
+  },
+  "name": "default-list"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set default-list\nfoo:\n  @echo foo\n"
+  },
+  "name": "default-list args"
+ },
+ {
+  "files": {
+   "justfile": "set export := 1\n"
+  },
+  "name": "export bad bool"
+ },
+ {
+  "files": {
+   "justfile": "set fallback := true\nfoo:\n  @echo ok\n"
+  },
+  "name": "fallback bool"
+ },
+ {
+  "files": {
+   "justfile": "set default-script := false\nfoo:\n  @echo ok\n"
+  },
+  "name": "default-script"
+ },
+ {
+  "files": {
+   "justfile": "set foo\n"
+  },
+  "name": "unknown set"
+ },
+ {
+  "files": {
+   "justfile": "set quiet := false\nfoo:\n  echo hi\n"
+  },
+  "name": "set dotenv-load unknown here"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "export\n"
+  },
+  "name": "p0"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "export x\n"
+  },
+  "name": "p1"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "export x :=\n"
+  },
+  "name": "p2"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "export x := 'a' b\n"
+  },
+  "name": "p3"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "export := 'x'\nfoo:\n  @echo {{export}}\n"
+  },
+  "name": "p4"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "export foo:\n  @echo hi\n"
+  },
+  "name": "p5"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "export foo bar:\n  @echo hi\n"
+  },
+  "name": "p6"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "eager\n"
+  },
+  "name": "p7"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "eager x := 'a'\nfoo:\n  @echo {{x}}\n"
+  },
+  "name": "p8"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "eager export x := 'a'\n"
+  },
+  "name": "p9"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "export eager x := 'a'\n"
+  },
+  "name": "p10"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "foo $:\n  @echo\n"
+  },
+  "name": "p11"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "foo $ x:\n  @echo\n"
+  },
+  "name": "p12"
+ },
+ {
+  "args": [
+   "foo",
+   "p"
+  ],
+  "files": {
+   "justfile": "foo $x $y='a':\n  @echo $x$y\n"
+  },
+  "name": "p13"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "foo $x=:\n"
+  },
+  "name": "p14"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "foo $x +y:\n"
+  },
+  "known": "variadic parameters have no owner yet (report concern 2)",
+  "name": "p15"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "foo $:\n"
+  },
+  "name": "p16"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := ['a' 'b']\n"
+  },
+  "name": "p17"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := ['a',,]\n"
+  },
+  "name": "p18"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := [\n"
+  },
+  "name": "p19"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := ['a'\n"
+  },
+  "name": "p20"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := ['a'] x\n"
+  },
+  "name": "p21"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := ('a')\n"
+  },
+  "name": "p22"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := [('a'), 'b' + 'c']\n"
+  },
+  "name": "p23"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set shell := ['a', x()]\n"
+  },
+  "name": "p24"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set tempdir\n"
+  },
+  "name": "p25"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set tempdir :=\n"
+  },
+  "name": "p26"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set tempdir := 'a' 'b'\n"
+  },
+  "name": "p27"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set working-directory := ['a']\n"
+  },
+  "known": "list literals need set lists, Task 7 / R15 (report concern 4c)",
+  "name": "p28"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set working-directory = 'a'\n"
+  },
+  "name": "p29"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set working-directory 'a'\n"
+  },
+  "name": "p30"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set script-interpreter := ['sh', '-eu']\nfoo:\n  @echo ok\n"
+  },
+  "name": "p31"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set script-interpreter := []\n"
+  },
+  "name": "p32"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set windows-shell := ['powershell', 'x']\nfoo:\n  @echo ok\n"
+  },
+  "name": "p33"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set indentation := ' ' + ' '\n"
+  },
+  "name": "p34"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set indentation := ''''  '''\n"
+  },
+  "name": "p35"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set indentation := \"\\t\\t\"\nfoo:\n  @echo ok\n"
+  },
+  "name": "p36"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set indentation := '  \\t'\n"
+  },
+  "name": "p37"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set indentation :=\n"
+  },
+  "name": "p38"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set indentation := 1\n"
+  },
+  "name": "p39"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version := 1\n"
+  },
+  "name": "p40"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version :=\n"
+  },
+  "name": "p41"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version := ''\n"
+  },
+  "name": "p42"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version := '1.2.3.4'\n"
+  },
+  "name": "p43"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version := '1.2.x'\n"
+  },
+  "name": "p44"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version := ' 1.0.0'\n"
+  },
+  "name": "p45"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set minimum-version := '1.59.0' # c\n"
+  },
+  "name": "p46"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set lazy := yes\n"
+  },
+  "name": "p47"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set lazy :=\n"
+  },
+  "name": "p48"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set guards := True\n"
+  },
+  "name": "p49"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set quiet quiet\n"
+  },
+  "name": "p50"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set  quiet\n"
+  },
+  "name": "p51"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set quiet # c\nfoo:\n  @echo hi\n"
+  },
+  "name": "p52"
+ },
+ {
+  "args": [
+   "foo",
+   "1"
+  ],
+  "files": {
+   "justfile": "set positional-arguments := false\nfoo a:\n  @echo $1\n"
+  },
+  "name": "p53"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set export := false\nexport X := 'a'\nfoo:\n  @echo $X\n"
+  },
+  "name": "p54"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set export\nX := 'a'\nfoo $X='b':\n  @echo $X\n"
+  },
+  "name": "p55"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set export\nfoo:\n  @env | grep -c '^X='\n"
+  },
+  "name": "p56"
+ },
+ {
+  "args": [
+   "foo",
+   "z"
+  ],
+  "files": {
+   "justfile": "X := 'a'\nfoo X:\n  @echo $X\n"
+  },
+  "name": "p57"
+ },
+ {
+  "args": [
+   "foo",
+   "z"
+  ],
+  "files": {
+   "justfile": "export X := 'a'\nfoo X:\n  @echo $X\n"
+  },
+  "name": "p58"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "export X := 'a'\nfoo:\n  @echo $X\nbar: foo\n  @echo $X\n"
+  },
+  "name": "p59"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "export X := 'a'\nfoo:\n  @echo $X\nbar: (foo)\n"
+  },
+  "name": "p60"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "x := 'a'\nset working-directory := x + 'b'\nfoo:\n  @echo hi\n"
+  },
+  "known": "os-error wording for a missing working directory (report concern 4a)",
+  "name": "p61"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set working-directory := y\ny := x\nx := y\n"
+  },
+  "name": "p62"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set working-directory := x\nx := 'a' + z\nz := y\ny := 'q'\nfoo:\n  @echo ok\n"
+  },
+  "known": "os-error wording for a missing working directory (report concern 4a)",
+  "name": "p63"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set ignore-comments\nfoo:\n  # {{ bar\n  @echo ok\n"
+  },
+  "name": "p64"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set ignore-comments\nfoo:\n  #\n  @echo ok\n  # a \\\n  # b \\\n  @echo c\n"
+  },
+  "name": "p65"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set ignore-comments\nfoo:\n  @echo a \\\n  # b \\\n  @echo c\n"
+  },
+  "name": "p66"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set ignore-comments\nfoo:\n  # b {{x}}\n"
+  },
+  "name": "p67"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set guards\nfoo:\n  ?\n  @echo ok\n"
+  },
+  "name": "p68"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set guards\nfoo:\n  ??true\n  @echo ok\n"
+  },
+  "name": "p69"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set guards\nfoo:\n  ?-true\n  @echo ok\n"
+  },
+  "name": "p70"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set guards\n@foo:\n  ?true\n  ?false\n  @echo no\n"
+  },
+  "name": "p71"
+ },
+ {
+  "args": [
+   "foo"
+  ],
+  "files": {
+   "justfile": "set guards\nfoo:\n  @echo a \\\n  ?x\n"
+  },
+  "name": "p72"
+ },
+ {
+  "args": [],
+  "files": {
+   "justfile": "set guards\nbar:\n  ?false\n  echo no\nfoo: bar\n  @echo foo\n"
+  },
+  "name": "p73"
+ },
+ {
+  "files": {
+   "justfile": "set minimum-version := (\n"
+  },
+  "name": "e0"
+ },
+ {
+  "files": {
+   "justfile": "set indentation := 1\n"
+  },
+  "name": "e1"
+ },
+ {
+  "files": {
+   "justfile": "set windows-shell := ['a', ,]\n"
+  },
+  "name": "e2"
+ },
+ {
+  "files": {
+   "justfile": "foo $ a:\n"
+  },
+  "known": "default-recipe-needs-arguments message (report concern 4b)",
+  "name": "e3"
+ },
+ {
+  "files": {
+   "justfile": "set guards\nr:\n  ?x {{\n"
+  },
+  "name": "e4"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := 'a' 'b'\n"
+  },
+  "name": "e5"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir :=\n"
+  },
+  "name": "e6"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir\n"
+  },
+  "name": "e7"
+ },
+ {
+  "files": {
+   "justfile": "export a :=\n"
+  },
+  "name": "e8"
+ },
+ {
+  "files": {
+   "justfile": "export a := 'x' b\n"
+  },
+  "name": "e9"
+ },
+ {
+  "files": {
+   "justfile": "set script-interpreter := []\n"
+  },
+  "name": "e10"
+ },
+ {
+  "files": {
+   "justfile": "set indentation := (' ')\n"
+  },
+  "name": "e11"
+ },
+ {
+  "files": {
+   "justfile": "set indentation := \"\"\"  \"\"\"\n"
+  },
+  "name": "e12"
+ },
+ {
+  "files": {
+   "justfile": "set working-directory := uppercase()\n"
+  },
+  "name": "a0"
+ },
+ {
+  "files": {
+   "justfile": "x := y\ny := x\nset tempdir := x\n"
+  },
+  "name": "a1"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := foo()\n"
+  },
+  "name": "a2"
+ },
+ {
+  "files": {
+   "justfile": "set lazy\nset export\nset lazy\n"
+  },
+  "name": "a3"
+ },
+ {
+  "files": {
+   "justfile": "a x x:\nset no-cd\nset working-directory := 'w'\n"
+  },
+  "name": "a4"
+ },
+ {
+  "files": {
+   "justfile": "set tempdir := nope\na:\na:\n"
+  },
+  "name": "a5"
+ },
+ {
+  "files": {
+   "justfile": "set ignore-comments\n\nsome_recipe:\n  echo # {{ bar }}\n"
+  },
+  "name": "a6"
+ },
+ {
+  "files": {
+   "justfile": "set allow-duplicate-recipes\nb:\n  echo {{nope}}\nb:\n  echo ok\n"
+  },
+  "name": "a7"
+ },
+ {
+  "files": {
+   "justfile": "set allow-duplicate-recipes\nb:\n  echo ok\nb:\n  echo {{nope}}\n"
+  },
+  "name": "a8"
+ },
+ {
+  "files": {
+   "justfile": "set default-list\n"
+  },
+  "name": "dl empty"
+ },
+ {
+  "files": {
+   "justfile": "set default-list\n_x:\n  @echo\n"
+  },
+  "name": "dl private"
+ },
+ {
+  "files": {
+   "justfile": "set default-list\n# doc\nx a='b':\n  @echo\n"
+  },
+  "name": "dl doc"
+ },
+ {
+  "files": {
+   "justfile": "set default-list\nx a:\n  @echo\n"
+  },
+  "name": "dl with req arg default"
+ },
+ {
+  "files": {
+   "justfile": "set default-list\nset allow-duplicate-recipes\nx:\n  @echo\nx a:\n  @echo\n"
+  },
+  "name": "dl dup"
+ },
+ {
+  "args": [
+   "-q"
+  ],
+  "files": {
+   "justfile": "set default-list\nx:\n  @echo\n"
+  },
+  "name": "dl quiet"
+ },
+ {
+  "args": [
+   "--",
+   "x"
+  ],
+  "files": {
+   "justfile": "set default-list\nx:\n  @echo\n"
+  },
+  "name": "dl -- "
+ },
+ {
+  "cwd": "sub",
+  "files": {
+   "justfile": "set no-cd\nx:\n  @pwd | sed 's|.*/||'\n",
+   "sub/f": ""
+  },
+  "name": "nocd sub"
+ },
+ {
+  "files": {
+   "justfile": "set export\nx a='b':\n  @env | grep -E '^(a|PATH|HOME)=' | sort\n"
+  },
+  "name": "export parameter echo"
+ },
+ {
+  "files": {
+   "justfile": "export A := 'a'\nexport B := A + 'b'\nC := B\nx:\n  @env | grep -E '^[ABC]=' | sort\n"
+  },
+  "name": "export global many"
+ },
+ {
+  "files": {
+   "justfile": "set positional-arguments\nx: (y 'a' 'b')\n  @echo x 0\ny p q='z':\n  @echo y /bin/zsh   0\n"
+  },
+  "name": "positional dependency"
+ },
+ {
+  "args": [
+   "x",
+   "hello world"
+  ],
+  "files": {
+   "justfile": "set positional-arguments\nx a:\n  echo \n"
+  },
+  "name": "positional echo"
+ }
+]
