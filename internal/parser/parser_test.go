@@ -350,7 +350,9 @@ func TestParseRecipeHeaderErrors(t *testing.T) {
 	// `r: a (b)` was an error before dependency arguments existed; it is a
 	// dependency with an argument list now (TestParseDependencyArguments). An
 	// empty argument list is still an error, and `r (x):` begins a function
-	// definition in upstream, which the parser does not read yet.
+	// definition in upstream (oracle: "expected ':=', but found ':'" at 1:6),
+	// which the parser does not read yet; it stops at the '(' (1:3) instead, so
+	// that shape is left out rather than pinning the divergence.
 	wantError(t, "r: a ()\n", 1, 7, "expected identifier, but found ')'")
 	wantError(t, "r: a 'b'\n", 1, 6, "expected "+afterDeps+", but found string")
 	wantError(t, "r: a := b\n", 1, 6, "expected "+afterDeps+", but found ':='")
