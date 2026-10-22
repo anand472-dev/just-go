@@ -14,6 +14,10 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
 | Cases with regex comparisons | 160 |
 | Cases with JSON responses | 3 |
 | Cases with a path-hashed cache file | 45 |
+| Cases with empty directories (`dirs`) | 40 |
+| Cases with symbolic links (`symlinks`) | 8 |
+| Cases with file modes outside the convention (`modes`) | 3 |
+| Lossy cases (an input that is not valid UTF-8 was left out) | 0 |
 
 ## How to read a case
 
@@ -45,10 +49,28 @@ Each line of `cases.jsonl` is one call to `Test::status` in upstream's
   Inside `stdout_regex` and `stderr_regex` the runner inserts the
   regex-quoted path (Go's `regexp.QuoteMeta`). Everywhere else it inserts the
   path as it is.
-- `files` is the content of the temporary directory just before just ran.
-  Upstream makes executables by naming them `*.exe`; a runner should mark
-  files with that suffix executable.
-- `response` is the value upstream compared with stdout, or `null`.
+- `env` overlays the environment the child inherits; it is not the whole
+  environment. Upstream's child inherits the full environment of the test
+  process minus every variable whose name starts with `JUST_` (`just()` in
+  upstream's `tests/lib.rs` removes them), and `env` is applied on top.
+- `files` holds the regular files of the temporary directory just before
+  just ran. By convention a file named `*.exe` has mode 0755 (upstream makes
+  executables only through `Test::write_executable`, which requires the
+  suffix) and every other file has mode 0644.
+- `modes` maps a path in `files` to its permission bits as four octal
+  digits (for example `"0400"`). It lists only the files whose mode differs
+  from the convention, so an `*.exe` file that upstream left
+  non-executable appears here as `"0644"`.
+- `dirs` lists the empty directories in the temporary directory. A
+  directory that holds a file or a link is implied by it and is not listed.
+- `symlinks` maps the path of a symbolic link to its target as upstream
+  created it. `Test::symlink` makes absolute targets, so most targets
+  start with `@@TEMPDIR@@`. A target may dangle, and a link may point at a
+  directory.
+- `response` is the value upstream compared with stdout, or `null`. The
+  key is always present, so in Go a `null` decodes to
+  `json.RawMessage("null")`, not nil; `Case.HasResponse` tells the cases
+  that compare a JSON response.
 
 ## Cases that cannot be reproduced
 
@@ -62,8 +84,20 @@ treat them as path-dependent.
 
 - Tests that run the binary without `Test::status`: the test files `edit`,
   `examples`, `print`, `readme`, and `signals`.
-- Symbolic links and empty directories in the temporary directory.
-- Files whose name or content is not valid UTF-8, and cases whose working
-  directory is not valid UTF-8.
+- Entries in the temporary directory that are not regular files,
+  directories, or symbolic links, such as the FIFO of `dotenv::fifo`.
+- The modes of directories and of symbolic links.
+- Files whose name or content is not valid UTF-8, and empty directories or
+  symbolic links whose name or target is not valid UTF-8. The case is still
+  recorded without that input; the table above counts these lossy cases and
+  they are listed below.
+- Cases whose working directory is not valid UTF-8. They are left out whole.
 - Tests compiled only for other platforms (`windows`, `windows_shell`, and on
   non-Linux systems `non_unicode`).
+
+## Lossy cases
+
+Each of these cases lost at least one input that is not valid UTF-8, so it
+may behave differently under a runner than it did upstream.
+
+None.

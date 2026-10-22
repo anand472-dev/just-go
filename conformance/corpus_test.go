@@ -3,6 +3,8 @@ package conformance
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 
@@ -26,8 +28,9 @@ var notRecorded = map[string]string{
 	"signals":  "runs just directly and delivers signals to the child",
 }
 
-const sampleLine = `{"args":["--list"],"cwd":"","env":{},"expected_files":{},` +
-	`"files":{"justfile":"a:\n"},"id":"alias::a#1","path_extra":[],"response":null,` +
+const sampleLine = `{"args":["--list"],"cwd":"","dirs":[],"env":{},"expected_files":{},` +
+	`"files":{"justfile":"a:\n"},"id":"alias::a#1","modes":{},"path_extra":[],"response":null,` +
+	`"symlinks":{},` +
 	`"status":0,"stderr":"","stderr_regex":null,"stdin":"","stdout":"x\n","stdout_regex":null}`
 
 func lineWith(t *testing.T, mutate func(m map[string]any)) string {
@@ -51,6 +54,30 @@ func TestCorpusSchema(t *testing.T) {
 	}
 	if err := ValidateCorpus(cases); err != nil {
 		t.Fatalf("validate corpus: %v", err)
+	}
+	checkRecordedInputs(t, cases)
+}
+
+// checkRecordedInputs spot-checks that the recorder keeps the inputs that
+// are not regular files: an empty directory, a symbolic link, and a file
+// mode outside the corpus convention, each from a known upstream test.
+func checkRecordedInputs(t *testing.T, cases []Case) {
+	t.Helper()
+	byID := make(map[string]Case, len(cases))
+	for _, c := range cases {
+		byID[c.ID] = c
+	}
+	if c := byID["init::write_error#1"]; !slices.Contains(c.Dirs, "justfile") {
+		t.Errorf("init::write_error#1 dirs = %q, want the empty directory justfile", c.Dirs)
+	}
+	if c := byID["functions::canonicalize#1"]; c.Symlinks["foo"] != TempDirToken+"/justfile" {
+		t.Errorf("functions::canonicalize#1 symlinks = %q, want foo -> %s/justfile", c.Symlinks, TempDirToken)
+	}
+	if c := byID["format::write_error#1"]; c.Modes["justfile"] != "0400" {
+		t.Errorf("format::write_error#1 modes = %q, want justfile 0400", c.Modes)
+	}
+	if c := byID["which_function::ignores_nonexecutable_candidates#1"]; c.Modes["dummy/foo.exe"] != "0644" {
+		t.Errorf("which_function::ignores_nonexecutable_candidates#1 modes = %q, want dummy/foo.exe 0644", c.Modes)
 	}
 }
 
@@ -242,6 +269,23 @@ func TestValidateCorpus(t *testing.T) {
 		"path list entry":     func(m map[string]any) { m["path_extra"] = []string{"a:b"} },
 		"backslash entry":     func(m map[string]any) { m["path_extra"] = []string{`a\b`} },
 		"empty path_extra":    func(m map[string]any) { m["path_extra"] = []string{""} },
+		"empty dir":           func(m map[string]any) { m["dirs"] = []string{""} },
+		"absolute dir":        func(m map[string]any) { m["dirs"] = []string{"/tmp"} },
+		"dotdot dir":          func(m map[string]any) { m["dirs"] = []string{"../x"} },
+		"parent dir":          func(m map[string]any) { m["dirs"] = []string{".."} },
+		"dot dir":             func(m map[string]any) { m["dirs"] = []string{"."} },
+		"unclean dir":         func(m map[string]any) { m["dirs"] = []string{"a//b"} },
+		"backslash dir":       func(m map[string]any) { m["dirs"] = []string{`a\b`} },
+		"dir is a file":       func(m map[string]any) { m["dirs"] = []string{"justfile"} },
+		"duplicate dir":       func(m map[string]any) { m["dirs"] = []string{"a", "a"} },
+		"absolute symlink":    func(m map[string]any) { m["symlinks"] = map[string]any{"/l": "t"} },
+		"symlink is a file":   func(m map[string]any) { m["symlinks"] = map[string]any{"justfile": "t"} },
+		"symlink is a dir":    func(m map[string]any) { m["dirs"] = []string{"l"}; m["symlinks"] = map[string]any{"l": "t"} },
+		"empty link target":   func(m map[string]any) { m["symlinks"] = map[string]any{"l": ""} },
+		"mode for no file":    func(m map[string]any) { m["modes"] = map[string]any{"other": "0400"} },
+		"mode not octal":      func(m map[string]any) { m["modes"] = map[string]any{"justfile": "0489"} },
+		"mode short":          func(m map[string]any) { m["modes"] = map[string]any{"justfile": "644"} },
+		"mode is convention":  func(m map[string]any) { m["modes"] = map[string]any{"justfile": "0644"} },
 	} {
 		cases, err := ParseCases([]byte(lineWith(t, mutate)))
 		if err != nil {
@@ -269,6 +313,53 @@ func TestValidateAcceptsRegexForms(t *testing.T) {
 	}
 	if err := ValidateCorpus(cases); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateAcceptsInputs(t *testing.T) {
+	line := lineWith(t, func(m map[string]any) {
+		m["files"] = map[string]any{"justfile": "a:\n", "bin/x.exe": "", "bin/y.exe": "", "ro": ""}
+		m["dirs"] = []string{"empty", "a/b/.git"}
+		m["symlinks"] = map[string]any{"link": TempDirToken + "/justfile", "a/rel": "../justfile"}
+		m["modes"] = map[string]any{"bin/x.exe": "0644", "bin/y.exe": "0700", "ro": "0400"}
+	})
+	cases, err := ParseCases([]byte(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateCorpus(cases); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFileMode(t *testing.T) {
+	c := Case{Modes: map[string]string{"ro": "0400", "bin/x.exe": "0644"}}
+	for name, want := range map[string]fs.FileMode{
+		"justfile":  0o644,
+		"bin/y.exe": 0o755,
+		"ro":        0o400,
+		"bin/x.exe": 0o644,
+	} {
+		if got := c.FileMode(name); got != want {
+			t.Errorf("FileMode(%q) = %#o, want %#o", name, got, want)
+		}
+	}
+}
+
+func TestHasResponse(t *testing.T) {
+	for raw, want := range map[string]bool{"": false, "null": false, "{}": true, `"x"`: true, "0": true} {
+		if got := (Case{Response: json.RawMessage(raw)}).HasResponse(); got != want {
+			t.Errorf("HasResponse(%q) = %v, want %v", raw, got, want)
+		}
+	}
+}
+
+func TestConventionalMode(t *testing.T) {
+	if got := ConventionalMode("a/b.exe"); got != "0755" {
+		t.Errorf("ConventionalMode(a/b.exe) = %q", got)
+	}
+	if got := ConventionalMode("a/b.exe.txt"); got != "0644" {
+		t.Errorf("ConventionalMode(a/b.exe.txt) = %q", got)
 	}
 }
 

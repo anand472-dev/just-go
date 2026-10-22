@@ -38,6 +38,8 @@ mkdir "$SCRATCH/src"
 # captures a case before the comparison runs, so that is acceptable.
 RAW="$SCRATCH/raw.jsonl"
 : >"$RAW"
+# The recorder lists the ids of cases that lost an input here.
+: >"$RAW.lossy"
 if ! (cd "$SCRATCH/src" && JUST_RECORD_FILE="$RAW" cargo test --release); then
 	echo "record-corpus: cargo test reported failures; continuing with the recorded cases" >&2
 fi
@@ -59,6 +61,17 @@ TOTAL=$(wc -l <"$OUT" | tr -d ' ')
 REGEX=$(jq -s '[.[] | select(.stdout_regex != null or .stderr_regex != null)] | length' "$OUT")
 RESPONSE=$(jq -s '[.[] | select(.response != null)] | length' "$OUT")
 CACHED=$(jq -s '[.[] | select(.files | keys | any(test("^\\.justcache/[0-9a-f]{64}\\.json$")))] | length' "$OUT")
+DIRS=$(jq -s '[.[] | select(.dirs | length > 0)] | length' "$OUT")
+SYMLINKS=$(jq -s '[.[] | select(.symlinks | length > 0)] | length' "$OUT")
+MODES=$(jq -s '[.[] | select(.modes | length > 0)] | length' "$OUT")
+LOSSY_IDS=$(sort -u "$RAW.lossy")
+if [ -n "$LOSSY_IDS" ]; then
+	LOSSY=$(printf '%s\n' "$LOSSY_IDS" | wc -l | tr -d ' ')
+	LOSSY_LIST=$(printf '%s\n' "$LOSSY_IDS" | sed 's/^/- `/; s/$/`/')
+else
+	LOSSY=0
+	LOSSY_LIST="None."
+fi
 VERSION=$(oracle/bin/just --version)
 PIN=$(git -C oracle/src rev-parse HEAD)
 
@@ -79,6 +92,10 @@ Each line of \`cases.jsonl\` is one call to \`Test::status\` in upstream's
 | Cases with regex comparisons | $REGEX |
 | Cases with JSON responses | $RESPONSE |
 | Cases with a path-hashed cache file | $CACHED |
+| Cases with empty directories (\`dirs\`) | $DIRS |
+| Cases with symbolic links (\`symlinks\`) | $SYMLINKS |
+| Cases with file modes outside the convention (\`modes\`) | $MODES |
+| Lossy cases (an input that is not valid UTF-8 was left out) | $LOSSY |
 
 ## How to read a case
 
@@ -110,10 +127,28 @@ Each line of \`cases.jsonl\` is one call to \`Test::status\` in upstream's
   Inside \`stdout_regex\` and \`stderr_regex\` the runner inserts the
   regex-quoted path (Go's \`regexp.QuoteMeta\`). Everywhere else it inserts the
   path as it is.
-- \`files\` is the content of the temporary directory just before just ran.
-  Upstream makes executables by naming them \`*.exe\`; a runner should mark
-  files with that suffix executable.
-- \`response\` is the value upstream compared with stdout, or \`null\`.
+- \`env\` overlays the environment the child inherits; it is not the whole
+  environment. Upstream's child inherits the full environment of the test
+  process minus every variable whose name starts with \`JUST_\` (\`just()\` in
+  upstream's \`tests/lib.rs\` removes them), and \`env\` is applied on top.
+- \`files\` holds the regular files of the temporary directory just before
+  just ran. By convention a file named \`*.exe\` has mode 0755 (upstream makes
+  executables only through \`Test::write_executable\`, which requires the
+  suffix) and every other file has mode 0644.
+- \`modes\` maps a path in \`files\` to its permission bits as four octal
+  digits (for example \`"0400"\`). It lists only the files whose mode differs
+  from the convention, so an \`*.exe\` file that upstream left
+  non-executable appears here as \`"0644"\`.
+- \`dirs\` lists the empty directories in the temporary directory. A
+  directory that holds a file or a link is implied by it and is not listed.
+- \`symlinks\` maps the path of a symbolic link to its target as upstream
+  created it. \`Test::symlink\` makes absolute targets, so most targets
+  start with \`@@TEMPDIR@@\`. A target may dangle, and a link may point at a
+  directory.
+- \`response\` is the value upstream compared with stdout, or \`null\`. The
+  key is always present, so in Go a \`null\` decodes to
+  \`json.RawMessage("null")\`, not nil; \`Case.HasResponse\` tells the cases
+  that compare a JSON response.
 
 ## Cases that cannot be reproduced
 
@@ -127,11 +162,23 @@ treat them as path-dependent.
 
 - Tests that run the binary without \`Test::status\`: the test files \`edit\`,
   \`examples\`, \`print\`, \`readme\`, and \`signals\`.
-- Symbolic links and empty directories in the temporary directory.
-- Files whose name or content is not valid UTF-8, and cases whose working
-  directory is not valid UTF-8.
+- Entries in the temporary directory that are not regular files,
+  directories, or symbolic links, such as the FIFO of \`dotenv::fifo\`.
+- The modes of directories and of symbolic links.
+- Files whose name or content is not valid UTF-8, and empty directories or
+  symbolic links whose name or target is not valid UTF-8. The case is still
+  recorded without that input; the table above counts these lossy cases and
+  they are listed below.
+- Cases whose working directory is not valid UTF-8. They are left out whole.
 - Tests compiled only for other platforms (\`windows\`, \`windows_shell\`, and on
   non-Linux systems \`non_unicode\`).
+
+## Lossy cases
+
+Each of these cases lost at least one input that is not valid UTF-8, so it
+may behave differently under a runner than it did upstream.
+
+$LOSSY_LIST
 README
 
 echo "recorded $TOTAL cases into $OUT"

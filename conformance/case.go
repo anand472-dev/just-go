@@ -9,7 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"path"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 
 	"gitea.com/wimwian/just-go/internal/sys"
@@ -37,12 +41,33 @@ type Case struct {
 	// ID is "<upstream test name>#<n>" and is unique within the corpus.
 	ID string `json:"id"`
 	// Files are written into the case's temporary directory before the run.
-	// Files whose name ends in ".exe" were executable upstream.
+	// Each file gets the mode FileMode returns: Modes when it names the file,
+	// otherwise the corpus convention (ConventionalMode).
 	Files map[string]string `json:"files"`
+	// Dirs lists the empty directories upstream's test created, relative to
+	// the temporary directory. A runner creates them before the run.
+	// Directories that hold a file or a symbolic link are implied by it and
+	// are not listed.
+	Dirs []string `json:"dirs"`
+	// Symlinks maps the path of a symbolic link, relative to the temporary
+	// directory, to its target exactly as upstream created it. Upstream's
+	// Test::symlink makes absolute targets inside the temporary directory, so
+	// most targets start with TempDirToken; a runner substitutes it like any
+	// other placeholder. A target may dangle.
+	Symlinks map[string]string `json:"symlinks"`
+	// Modes maps a path in Files to its permission bits as four octal digits,
+	// such as "0400". It lists only files whose mode differs from
+	// ConventionalMode.
+	Modes map[string]string `json:"modes"`
 	// Args is the full argument list, including a leading "--shell bash"
 	// when the upstream test ran with its default shell.
 	Args []string `json:"args"`
-	// Env is the exact environment of the run, apart from PathExtra.
+	// Env overlays the environment the child inherits. Upstream's child
+	// inherits the full environment of the test process minus every
+	// variable whose name starts with "JUST_" (just() in upstream's
+	// tests/lib.rs removes them), and Env is then applied on top: a key in
+	// Env replaces the inherited value. PATH is handled by PathExtra when
+	// that is set.
 	Env map[string]string `json:"env"`
 	// PathExtra lists directories, relative to the temporary directory ("."
 	// is the directory itself). Upstream's Test::path REPLACES PATH, so when
@@ -69,7 +94,48 @@ type Case struct {
 	// its expected content after the run.
 	ExpectedFiles map[string]string `json:"expected_files"`
 	// Response is the JSON value upstream compared with stdout, or null.
+	// Every recorded line carries the key, so a JSON null decodes to
+	// []byte("null"), not to nil: Response != nil is true for every case.
+	// Use HasResponse to tell the cases that compare a JSON response.
 	Response json.RawMessage `json:"response"`
+}
+
+// Corpus file modes. A file whose name ends in ".exe" is executable, as
+// upstream's Test::write_executable requires; every other file is 0644.
+const (
+	executableMode = "0755"
+	plainMode      = "0644"
+)
+
+// modePattern is the form of a value in Case.Modes: four octal digits.
+var modePattern = regexp.MustCompile(`^[0-7]{4}$`)
+
+// ConventionalMode returns the mode the corpus assumes for a file when
+// Case.Modes does not name it: "0755" for a name ending in ".exe", otherwise
+// "0644". Pure.
+func ConventionalMode(name string) string {
+	if strings.HasSuffix(name, ".exe") {
+		return executableMode
+	}
+	return plainMode
+}
+
+// FileMode returns the permission bits a runner gives the file name of the
+// case: its entry in Modes, or ConventionalMode. It assumes a validated
+// case. Pure.
+func (c Case) FileMode(name string) fs.FileMode {
+	mode, ok := c.Modes[name]
+	if !ok {
+		mode = ConventionalMode(name)
+	}
+	bits, _ := strconv.ParseUint(mode, 8, 32)
+	return fs.FileMode(bits)
+}
+
+// HasResponse reports whether the case compares stdout with a JSON value,
+// that is, whether Response holds something other than JSON null. Pure.
+func (c Case) HasResponse() bool {
+	return len(c.Response) > 0 && string(c.Response) != "null"
 }
 
 // ParseCases decodes JSON Lines into cases. It rejects unknown fields,
@@ -154,6 +220,79 @@ func (c Case) Validate() error {
 		if _, err := base64.StdEncoding.DecodeString(content); err != nil {
 			return fmt.Errorf("expected file %q: %w", path, err)
 		}
+	}
+	return c.checkInputs()
+}
+
+// checkInputs validates Dirs, Symlinks, and Modes: every path is a clean
+// relative path, no path is both a file, a directory, or a link, every link
+// has a target, and every mode names a file and differs from the
+// convention. Pure.
+func (c Case) checkInputs() error {
+	if err := c.checkDirs(); err != nil {
+		return err
+	}
+	if err := c.checkSymlinks(); err != nil {
+		return err
+	}
+	return c.checkModes()
+}
+
+// checkDirs validates Dirs. Pure.
+func (c Case) checkDirs() error {
+	seen := make(map[string]bool, len(c.Dirs))
+	for _, dir := range c.Dirs {
+		if err := checkRelPath("dirs", dir); err != nil {
+			return err
+		}
+		if _, isFile := c.Files[dir]; isFile || seen[dir] {
+			return fmt.Errorf("dirs entry %q is listed twice or is a file", dir)
+		}
+		seen[dir] = true
+	}
+	return nil
+}
+
+// checkSymlinks validates Symlinks. Pure.
+func (c Case) checkSymlinks() error {
+	for link, target := range c.Symlinks {
+		if err := checkRelPath("symlinks", link); err != nil {
+			return err
+		}
+		_, isFile := c.Files[link]
+		if isFile || slices.Contains(c.Dirs, link) {
+			return fmt.Errorf("symlink %q is also a file or a directory", link)
+		}
+		if target == "" {
+			return fmt.Errorf("symlink %q has no target", link)
+		}
+	}
+	return nil
+}
+
+// checkModes validates Modes. Pure.
+func (c Case) checkModes() error {
+	for name, mode := range c.Modes {
+		if _, isFile := c.Files[name]; !isFile {
+			return fmt.Errorf("mode for %q, which is not in files", name)
+		}
+		if !modePattern.MatchString(mode) {
+			return fmt.Errorf("mode %q of %q is not four octal digits", mode, name)
+		}
+		if mode == ConventionalMode(name) {
+			return fmt.Errorf("mode %q of %q is the convention and must be omitted", mode, name)
+		}
+	}
+	return nil
+}
+
+// checkRelPath requires p to be a clean slash-separated path inside the
+// temporary directory: not empty, not absolute, no backslash, and no "."
+// or ".." element. field names the Case field for the error. Pure.
+func checkRelPath(field, p string) error {
+	if path.Clean(p) != p || path.IsAbs(p) || strings.Contains(p, `\`) ||
+		p == "." || strings.HasPrefix(p+"/", "../") {
+		return fmt.Errorf("%s entry %q is not a clean relative path", field, p)
 	}
 	return nil
 }
