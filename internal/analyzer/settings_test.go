@@ -234,11 +234,26 @@ func TestAnalyzeListFeaturesNeedTheListsSetting(t *testing.T) {
 func TestAnalyzeAcceptsListFeaturesUnderTheListsSetting(t *testing.T) {
 	for _, src := range []string{
 		"set lists\nx := ['a', 'b']\nfoo y=['c']:\n  @echo {{ y }} {{ x }}\n",
-		"set lists := true\nx := show(bool('t'))\nset shell := ['bash', ['-c']]\n",
-		"set lists\nset dotenv-filename := ['foo', 'bar']\nfoo:\n",
+		"set lists := true\nx := show(bool('t'))\nset shell := ['bash', '-c']\n",
 		"set unstable\nset lists\nx := which('a') + join_list('b') + split('c', 'd') + num_jobs()\n",
 	} {
 		if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+			t.Errorf("Analyze(%q) = %v", src, err)
+		}
+	}
+}
+
+// A list in a setting is refused even under `set lists`: its behavior is
+// not implemented (R15, unstable). The refusal is the setting's list error,
+// after the faults in its elements.
+func TestAnalyzeRefusesAListInASettingUnderTheListsSetting(t *testing.T) {
+	for _, src := range []string{
+		"set lists\nset dotenv-filename := ['foo', 'bar']\nfoo:\n",
+		"set lists := true\nset shell := ['bash', ['-c']]\n",
+		"set lists\nx := ['a']\nset tempdir := x\n",
+	} {
+		err := analyzer.Analyze(mustParse(t, src))
+		if err == nil || !strings.Contains(err.Error(), "list values are not supported") {
 			t.Errorf("Analyze(%q) = %v", src, err)
 		}
 	}
@@ -250,7 +265,7 @@ func TestAnalyzeListFeatureCheckOrder(t *testing.T) {
 	// Settings and assignments are resolved before the list features.
 	wantError(t, "x := ['a'] + y\n", 1, "variable `y` not defined")
 	wantError(t, "x := bool()\n", 1, "function `bool` called with 0 arguments but takes 1")
-	wantError(t, "set tempdir := ['a', 'b']\nx := ['a']\n", 1, "list value [\"a\", \"b\"] assigned to `tempdir` setting")
+	wantError(t, "set tempdir := ['a', 'b']\nx := ['a']\n", 1, "list literals require `set lists`")
 	wantError(t, "set lists\nx := ['a', nope]\n", 2, "variable `nope` not defined")
 	// Recipes are checked after the list features.
 	wantError(t, "x := ['a']\nfoo:\n  echo {{y}}\n", 1, "list literals require `set lists`")

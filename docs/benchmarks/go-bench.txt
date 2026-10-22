@@ -2,121 +2,121 @@ goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go
 cpu: Apple M1 Pro
-BenchmarkParse-10    	   13592	     87930 ns/op	  192505 B/op	    1034 allocs/op
-BenchmarkRun-10      	  734721	      1630 ns/op	    2577 B/op	      32 allocs/op
+BenchmarkParse-10    	   13536	     88536 ns/op	  192513 B/op	    1035 allocs/op
+BenchmarkRun-10      	  732000	      1629 ns/op	    2577 B/op	      32 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go	3.540s
+ok  	gitea.com/wimwian/just-go	2.678s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/cmd/just-go
 cpu: Apple M1 Pro
-BenchmarkFormatList-10    	   21788	     54592 ns/op	  114656 B/op	     640 allocs/op
-BenchmarkParseArgs-10     	32565885	        36.63 ns/op	      64 B/op	       1 allocs/op
+BenchmarkFormatList-10    	   21754	     54865 ns/op	  114657 B/op	     640 allocs/op
+BenchmarkParseArgs-10     	32692610	        37.01 ns/op	      64 B/op	       1 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/cmd/just-go	3.151s
+ok  	gitea.com/wimwian/just-go/cmd/just-go	2.570s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/conformance
 cpu: Apple M1 Pro
-BenchmarkParseCases-10         	     164	   7284127 ns/op	  71.39 MB/s	 6848872 B/op	   66040 allocs/op
-BenchmarkNewPlaceholders-10    	 1356937	       884.2 ns/op	    1344 B/op	      24 allocs/op
-BenchmarkCompareOutput-10      	   28850	     41675 ns/op	   29369 B/op	      51 allocs/op
+BenchmarkParseCases-10         	     163	   7289241 ns/op	  71.34 MB/s	 6847644 B/op	   66038 allocs/op
+BenchmarkNewPlaceholders-10    	 1343011	       893.6 ns/op	    1344 B/op	      24 allocs/op
+BenchmarkCompareOutput-10      	   28578	     41915 ns/op	   29260 B/op	      51 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/conformance	4.113s
+ok  	gitea.com/wimwian/just-go/conformance	3.831s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/conformance/cmd/ratchet
 cpu: Apple M1 Pro
-BenchmarkPassingIDs-10       	     470	   2477254 ns/op	 185.96 MB/s	  455326 B/op	    8063 allocs/op
-BenchmarkMergeBaseline-10    	    4818	    242368 ns/op	  398658 B/op	      20 allocs/op
+BenchmarkPassingIDs-10       	     465	   2505906 ns/op	 183.83 MB/s	  455382 B/op	    8063 allocs/op
+BenchmarkMergeBaseline-10    	    4772	    243321 ns/op	  398657 B/op	      20 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/conformance/cmd/ratchet	2.769s
+ok  	gitea.com/wimwian/just-go/conformance/cmd/ratchet	2.765s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/analyzer
 cpu: Apple M1 Pro
-BenchmarkAnalyze-10            	   14210	     83608 ns/op	   69536 B/op	    1025 allocs/op
-BenchmarkAnalyzeSettings-10    	   19634	     61166 ns/op	   37779 B/op	     235 allocs/op
+BenchmarkAnalyze-10            	   14223	     84225 ns/op	   69545 B/op	    1026 allocs/op
+BenchmarkAnalyzeSettings-10    	   19477	     61456 ns/op	   37747 B/op	     234 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/analyzer	3.926s
+ok  	gitea.com/wimwian/just-go/internal/analyzer	3.379s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/ast
 cpu: Apple M1 Pro
-BenchmarkVariables-10        	91669648	        12.99 ns/op	       0 B/op	       0 allocs/op
-BenchmarkUniqueRecipes-10    	  678345	      1669 ns/op	    5928 B/op	       4 allocs/op
+BenchmarkVariables-10        	90523525	        13.13 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUniqueRecipes-10    	  691615	      1671 ns/op	    5928 B/op	       4 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/ast	3.662s
+ok  	gitea.com/wimwian/just-go/internal/ast	3.723s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/diag
 cpu: Apple M1 Pro
-BenchmarkColumn-10          	56494303	        21.18 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDisplayWidth-10    	 2624490	       457.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkColumn-10          	56567011	        21.16 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDisplayWidth-10    	 2592669	       462.4 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/diag	2.772s
+ok  	gitea.com/wimwian/just-go/internal/diag	2.804s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/eval
 cpu: Apple M1 Pro
-BenchmarkEvaluate-10       	 3517928	       330.0 ns/op	     328 B/op	       9 allocs/op
-BenchmarkEvaluateAll-10    	18745581	        64.38 ns/op	      64 B/op	       2 allocs/op
+BenchmarkEvaluate-10       	 3488038	       335.6 ns/op	     328 B/op	       9 allocs/op
+BenchmarkEvaluateAll-10    	18480741	        65.22 ns/op	      64 B/op	       2 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/eval	3.126s
+ok  	gitea.com/wimwian/just-go/internal/eval	3.121s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/lexer
 cpu: Apple M1 Pro
-BenchmarkStringValue-10    	 1886162	       622.4 ns/op	     232 B/op	      12 allocs/op
-BenchmarkLex-10            	    5970	    203572 ns/op	 115.85 MB/s	  466483 B/op	    3002 allocs/op
+BenchmarkStringValue-10    	 1873730	       628.7 ns/op	     232 B/op	      12 allocs/op
+BenchmarkLex-10            	    5829	    207936 ns/op	 113.42 MB/s	  466484 B/op	    3002 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/lexer	3.466s
+ok  	gitea.com/wimwian/just-go/internal/lexer	3.439s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/loader
 cpu: Apple M1 Pro
-BenchmarkFindDeep-10    	  741058	      1386 ns/op	     144 B/op	       9 allocs/op
-BenchmarkLoad-10        	  441523	      2710 ns/op	    6416 B/op	      40 allocs/op
+BenchmarkFindDeep-10    	  868659	      1389 ns/op	     144 B/op	       9 allocs/op
+BenchmarkLoad-10        	  418753	      2764 ns/op	    6424 B/op	      41 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/loader	2.966s
+ok  	gitea.com/wimwian/just-go/internal/loader	2.515s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/parser
 cpu: Apple M1 Pro
-BenchmarkParse-10                       	    3561	    338165 ns/op	  42.91 MB/s	  906526 B/op	    6039 allocs/op
-BenchmarkParseDependencyArguments-10    	    1221	    983140 ns/op	  28.15 MB/s	 2565104 B/op	   16017 allocs/op
-BenchmarkParseLists-10                  	    4143	    290921 ns/op	  27.64 MB/s	  831647 B/op	    5845 allocs/op
-BenchmarkParseSettings-10               	    2422	    501008 ns/op	  23.13 MB/s	 1153259 B/op	   10709 allocs/op
+BenchmarkParse-10                       	    3567	    337444 ns/op	  43.00 MB/s	  906526 B/op	    6039 allocs/op
+BenchmarkParseDependencyArguments-10    	    1214	    993056 ns/op	  27.87 MB/s	 2565104 B/op	   16017 allocs/op
+BenchmarkParseLists-10                  	    4068	    293564 ns/op	  27.39 MB/s	  831645 B/op	    5845 allocs/op
+BenchmarkParseSettings-10               	    2396	    506845 ns/op	  22.86 MB/s	 1153257 B/op	   10709 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/parser	6.294s
+ok  	gitea.com/wimwian/just-go/internal/parser	6.239s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/runner
 cpu: Apple M1 Pro
-BenchmarkResolveOrder-10             	   19551	     61160 ns/op	   73233 B/op	     630 allocs/op
-BenchmarkResolveOrderArguments-10    	    3248	    372683 ns/op	  551097 B/op	    7697 allocs/op
-BenchmarkRenderLine-10               	10685540	       112.4 ns/op	      72 B/op	       4 allocs/op
-BenchmarkShellArgv-10                	30986932	        38.74 ns/op	     112 B/op	       2 allocs/op
-BenchmarkMergeEnv-10                 	 1443138	       832.0 ns/op	     768 B/op	       5 allocs/op
-BenchmarkUsedAssignments-10          	   30716	     38999 ns/op	   50456 B/op	     429 allocs/op
-BenchmarkExportedEnv-10              	  903492	      1330 ns/op	    2392 B/op	       4 allocs/op
+BenchmarkResolveOrder-10             	   19556	     61250 ns/op	   73233 B/op	     630 allocs/op
+BenchmarkResolveOrderArguments-10    	    3208	    374275 ns/op	  551096 B/op	    7697 allocs/op
+BenchmarkRenderLine-10               	10642004	       112.7 ns/op	      72 B/op	       4 allocs/op
+BenchmarkShellArgv-10                	30961348	        38.73 ns/op	     112 B/op	       2 allocs/op
+BenchmarkMergeEnv-10                 	 1431080	       837.0 ns/op	     768 B/op	       5 allocs/op
+BenchmarkUsedAssignments-10          	   30292	     39563 ns/op	   50456 B/op	     429 allocs/op
+BenchmarkExportedEnv-10              	  921685	      1309 ns/op	    2392 B/op	       4 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/runner	9.363s
+ok  	gitea.com/wimwian/just-go/internal/runner	8.849s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/settings
 cpu: Apple M1 Pro
-BenchmarkResolve-10    	 6032890	       194.1 ns/op	     136 B/op	       8 allocs/op
+BenchmarkResolve-10    	 6950482	       166.7 ns/op	      80 B/op	       5 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/settings	1.494s
+ok  	gitea.com/wimwian/just-go/internal/settings	1.451s
 goos: darwin
 goarch: arm64
 pkg: gitea.com/wimwian/just-go/internal/sys
 cpu: Apple M1 Pro
-BenchmarkResolveProgram-10    	  240453	      4977 ns/op	     928 B/op	      13 allocs/op
-BenchmarkOSFSReadFile-10      	   45960	     25954 ns/op	    5272 B/op	       5 allocs/op
-BenchmarkFakeFSReadFile-10    	 2451068	       485.3 ns/op	    4096 B/op	       1 allocs/op
-BenchmarkOSProcessRun-10      	      73	  16252850 ns/op	    1400 B/op	      27 allocs/op
+BenchmarkResolveProgram-10    	  203002	      4942 ns/op	     928 B/op	      13 allocs/op
+BenchmarkOSFSReadFile-10      	   46050	     25996 ns/op	    5272 B/op	       5 allocs/op
+BenchmarkFakeFSReadFile-10    	 2455480	       488.6 ns/op	    4096 B/op	       1 allocs/op
+BenchmarkOSProcessRun-10      	      73	  16120793 ns/op	    1400 B/op	      27 allocs/op
 PASS
-ok  	gitea.com/wimwian/just-go/internal/sys	5.998s
+ok  	gitea.com/wimwian/just-go/internal/sys	5.538s
 ?   	gitea.com/wimwian/just-go/internal/sys/sysfake	[no test files]

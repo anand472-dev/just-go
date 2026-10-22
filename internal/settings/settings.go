@@ -8,18 +8,17 @@
 // variable they name must itself be const. Resolve does the same.
 //
 // A list literal is part of `set lists`, which is unstable and not
-// implemented. The settings that take a list (the dotenv settings and the
-// interpreters) flatten one, so that a file that is refused for using it is
-// refused for that; a setting that takes one string takes a list of one
-// element as that element, and refuses any other, as upstream does.
+// implemented (R15). Evaluating one reports its elements' faults, as upstream
+// would, and then a ListError, which the analyzer turns into upstream's
+// refusal of a file that does not set `set lists`.
 //
 // The package is pure: it reads the syntax tree it is given and returns
 // values. It performs no I/O and keeps no package-level state.
 package settings
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
@@ -75,18 +74,15 @@ func Resolve(jf *ast.Justfile) (Resolved, error) {
 	c := newConst(jf)
 	var out Resolved
 	set := jf.Settings
-	steps := []func() *diag.Error{
-		func() (err *diag.Error) { out.DotenvCommand, err = c.many(set.DotenvCommand); return },
-		func() (err *diag.Error) { out.DotenvFilename, err = c.many(set.DotenvFilename); return },
-		func() (err *diag.Error) { out.DotenvPath, err = c.many(set.DotenvPath); return },
-		func() (err *diag.Error) { out.ScriptInterpreter, err = c.list(set.ScriptInterpreter); return },
-		func() (err *diag.Error) { out.Shell, err = c.list(set.Shell); return },
-		func() (err *diag.Error) { out.Tempdir, err = c.one("tempdir", set.Tempdir); return },
-		func() (err *diag.Error) { out.WindowsShell, err = c.list(set.WindowsShell); return },
-		func() (err *diag.Error) {
-			out.WorkingDirectory, err = c.one("working-directory", set.WorkingDirectory)
-			return
-		},
+	steps := []func() error{
+		func() (err error) { out.DotenvCommand, err = c.many(set.DotenvCommand); return },
+		func() (err error) { out.DotenvFilename, err = c.many(set.DotenvFilename); return },
+		func() (err error) { out.DotenvPath, err = c.many(set.DotenvPath); return },
+		func() (err error) { out.ScriptInterpreter, err = c.list(set.ScriptInterpreter); return },
+		func() (err error) { out.Shell, err = c.list(set.Shell); return },
+		func() (err error) { out.Tempdir, err = c.one(set.Tempdir); return },
+		func() (err error) { out.WindowsShell, err = c.list(set.WindowsShell); return },
+		func() (err error) { out.WorkingDirectory, err = c.one(set.WorkingDirectory); return },
 	}
 	for _, step := range steps {
 		if err := step(); err != nil {
@@ -97,8 +93,7 @@ func Resolve(jf *ast.Justfile) (Resolved, error) {
 }
 
 // consts evaluates expressions in a const context. memo holds the assignments
-// evaluated so far, by name. A value is a list of strings: a string is a list
-// of one.
+// evaluated so far, by name.
 type consts struct {
 	jf     *ast.Justfile
 	byName map[string]ast.Assignment
@@ -106,11 +101,21 @@ type consts struct {
 }
 
 // constValue is the result of evaluating an assignment in a const context:
-// its value, or the fact that it is not const.
+// its value, or the fact that it is not const, or that it is a list.
 type constValue struct {
-	value    []string
+	value    string
 	notConst bool
+	listed   bool
 }
+
+// ListError is the error of a list in a setting. Lists belong to the unstable
+// `lists` setting, whose behavior is not implemented (R15); the error is for
+// the caller to tell apart, so that it can refuse the list as upstream does
+// without `set lists` first.
+type ListError struct{ Diag *diag.Error }
+
+// Error returns the message of the diagnostic. It is pure.
+func (e *ListError) Error() string { return e.Diag.Error() }
 
 func newConst(jf *ast.Justfile) *consts {
 	byName := make(map[string]ast.Assignment, len(jf.Assignments))
@@ -120,28 +125,37 @@ func newConst(jf *ast.Justfile) *consts {
 	return &consts{jf: jf, byName: byName, memo: make(map[string]constValue, len(byName))}
 }
 
-// list evaluates the expressions of an interpreter setting and joins their
-// values, a list contributing its elements. A nil list is a setting that is
-// not set. It is pure.
-func (c *consts) list(exprs []ast.Expr) ([]string, *diag.Error) {
+// list evaluates the expressions of an interpreter setting, one string each.
+// A nil list is a setting that is not set. It is pure.
+func (c *consts) list(exprs []ast.Expr) ([]string, error) {
 	if exprs == nil {
 		return nil, nil
 	}
-	out := make([]string, 0, len(exprs))
-	for _, e := range exprs {
+	out := make([]string, len(exprs))
+	for i, e := range exprs {
 		v, err := c.expr(e)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, v...)
+		out[i] = v
 	}
 	return out, nil
 }
 
-// many evaluates a setting made of a single expression, which may be a list.
-// A nil expression is a setting that is not set; an empty list is set, to
-// nothing. It is pure.
-func (c *consts) many(e ast.Expr) ([]string, *diag.Error) {
+// many evaluates a setting made of a single expression and returns its value
+// as a one-element list, which is what the list form of the setting would
+// give. A nil expression is a setting that is not set. It is pure.
+func (c *consts) many(e ast.Expr) ([]string, error) {
+	v, err := c.one(e)
+	if v == nil {
+		return nil, err
+	}
+	return []string{*v}, nil
+}
+
+// one evaluates a setting made of a single expression. A nil expression is a
+// setting that is not set. It is pure.
+func (c *consts) one(e ast.Expr) (*string, error) {
 	if e == nil {
 		return nil, nil
 	}
@@ -149,58 +163,14 @@ func (c *consts) many(e ast.Expr) ([]string, *diag.Error) {
 	if err != nil {
 		return nil, err
 	}
-	return append([]string{}, v...), nil
+	return &v, nil
 }
-
-// one evaluates the setting called name, which is made of a single
-// expression that must be a string. A nil expression is a setting that is not
-// set. Any list but one of a single element is an error at the setting's
-// name. It is pure.
-func (c *consts) one(name string, e ast.Expr) (*string, *diag.Error) {
-	if e == nil {
-		return nil, nil
-	}
-	v, err := c.expr(e)
-	if err != nil {
-		return nil, err
-	}
-	if len(v) != 1 {
-		site := c.site(name)
-		return nil, c.fail(site.Line, site.Col, name, "list value %s assigned to `%s` setting", debugList(v), name)
-	}
-	return &v[0], nil
-}
-
-// site returns where the setting called name is set. It is pure.
-func (c *consts) site(name string) ast.SettingSite {
-	for _, s := range c.jf.Settings.Sites {
-		if s.Name == name {
-			return s
-		}
-	}
-	return ast.SettingSite{}
-}
-
-// debugList formats values as upstream words a list in an error:
-// `["a", "b"]`, each element in double quotes with the backslash, the double
-// quote, the line feed, the carriage return and the tab escaped, and any
-// other character as it is. Pure.
-func debugList(values []string) string {
-	quoted := make([]string, len(values))
-	for i, v := range values {
-		quoted[i] = `"` + escapes.Replace(v) + `"`
-	}
-	return "[" + strings.Join(quoted, ", ") + "]"
-}
-
-// escapes writes the characters of oracle/src/src/element.rs as escapes.
-var escapes = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\r", `\r`, "\t", `\t`)
 
 // expr evaluates e in a const context. It is pure.
-func (c *consts) expr(e ast.Expr) ([]string, *diag.Error) {
+func (c *consts) expr(e ast.Expr) (string, error) {
 	switch e := e.(type) {
 	case ast.StringLit:
-		return []string{e.Value}, nil
+		return e.Value, nil
 	case ast.Var:
 		return c.variable(e)
 	case ast.Concat:
@@ -208,79 +178,47 @@ func (c *consts) expr(e ast.Expr) ([]string, *diag.Error) {
 	case ast.List:
 		return c.elements(e)
 	case ast.Call:
-		return nil, c.fail(e.Line, e.Col, e.Name, "cannot call functions in const context")
+		return "", c.fail(e.Line, e.Col, e.Name, "cannot call functions in const context")
 	}
-	return nil, c.fail(0, 0, "", "cannot evaluate expression of type %T in a setting", e)
+	return "", c.fail(0, 0, "", "cannot evaluate expression of type %T in a setting", e)
 }
 
-// elements evaluates the elements of l and joins their values. It is pure.
-func (c *consts) elements(l ast.List) ([]string, *diag.Error) {
-	out := []string{}
+// elements evaluates the elements of l, so that the first fault in them is
+// reported as upstream reports it, and then refuses the list: its behavior is
+// not implemented. It is pure.
+func (c *consts) elements(l ast.List) (string, error) {
 	for _, element := range l.Elements {
-		v, err := c.expr(element)
-		if err != nil {
-			return nil, err
+		if _, err := c.expr(element); err != nil {
+			return "", err
 		}
-		out = append(out, v...)
 	}
-	return out, nil
+	return "", c.listed()
 }
 
-// concat evaluates both sides of cat and joins them, as upstream's `+` does
-// for lists: a single string is joined to each element of a list, and two
-// lists of one length are joined element by element. Any other pair is
-// refused. It is pure.
-func (c *consts) concat(cat ast.Concat) ([]string, *diag.Error) {
+// listed is the error of a list. It is pure.
+func (c *consts) listed() error {
+	return &ListError{Diag: c.fail(0, 0, "", "list values are not supported")}
+}
+
+// concat evaluates both sides of cat and joins them. It is pure.
+func (c *consts) concat(cat ast.Concat) (string, error) {
 	left, err := c.expr(cat.Left)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	right, err := c.expr(cat.Right)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	joined, ok := broadcast(left, right)
-	if !ok {
-		return nil, c.fail(0, 0, "", "cannot concatenate list values")
-	}
-	return joined, nil
-}
-
-// broadcast joins a and b as upstream's Value::apply does with the operator
-// `+`: a single element is joined to every element of the other, and lists of
-// equal length are joined pairwise. It reports false for any other pair,
-// which includes an empty list beside a non-empty one. Pure.
-func broadcast(a, b []string) ([]string, bool) {
-	switch {
-	case len(a) == 1 && len(b) >= 1:
-		return mapEach(b, func(x string) string { return a[0] + x }), true
-	case len(a) >= 1 && len(b) == 1:
-		return mapEach(a, func(x string) string { return x + b[0] }), true
-	case len(a) == len(b):
-		out := make([]string, len(a))
-		for i := range a {
-			out[i] = a[i] + b[i]
-		}
-		return out, true
-	}
-	return nil, false
-}
-
-// mapEach returns f of each of values. Pure.
-func mapEach(values []string, f func(string) string) []string {
-	out := make([]string, len(values))
-	for i, v := range values {
-		out[i] = f(v)
-	}
-	return out
+	return left + right, nil
 }
 
 // variable evaluates a reference to an assignment. An assignment that is not
 // const makes the reference an error at the reference. It is pure.
-func (c *consts) variable(v ast.Var) ([]string, *diag.Error) {
+func (c *consts) variable(v ast.Var) (string, error) {
 	a, ok := c.byName[v.Name]
 	if !ok {
-		return nil, c.fail(v.Line, v.Col, v.Name, "variable `%s` not defined", v.Name)
+		return "", c.fail(v.Line, v.Col, v.Name, "variable `%s` not defined", v.Name)
 	}
 	got, ok := c.memo[v.Name]
 	if !ok {
@@ -290,17 +228,24 @@ func (c *consts) variable(v ast.Var) ([]string, *diag.Error) {
 		got = c.assignment(a)
 		c.memo[v.Name] = got
 	}
+	if got.listed {
+		return "", c.listed()
+	}
 	if got.notConst {
-		return nil, c.fail(v.Line, v.Col, v.Name, "cannot access non-const variable `%s` in const context", v.Name)
+		return "", c.fail(v.Line, v.Col, v.Name, "cannot access non-const variable `%s` in const context", v.Name)
 	}
 	return got.value, nil
 }
 
 // assignment evaluates the value of a. Whatever stops it makes the assignment
 // non-const: the analyzer has already ruled out undefined variables, so what
-// is left is a call. It is pure.
+// is left is a call, or a list. It is pure.
 func (c *consts) assignment(a ast.Assignment) constValue {
 	v, err := c.expr(a.Value)
+	var le *ListError
+	if errors.As(err, &le) {
+		return constValue{listed: true}
+	}
 	if err != nil {
 		return constValue{notConst: true}
 	}

@@ -762,6 +762,7 @@
   "files": {
    "justfile": "set lists\nset shell := ['bash', ['-c']]\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal in shell lists on"
  },
  {
@@ -777,12 +778,14 @@
   "files": {
    "justfile": "set lists\nset tempdir := ['a']\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal in tempdir one lists on"
  },
  {
   "files": {
    "justfile": "set tempdir := ['a', 'b']\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal in tempdir two"
  },
  {
@@ -799,6 +802,7 @@
   "files": {
    "justfile": "set tempdir := []\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal in tempdir empty"
  },
  {
@@ -815,6 +819,7 @@
   "files": {
    "justfile": "set working-directory := ['a', 'b']\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal in working-directory two"
  },
  {
@@ -831,6 +836,7 @@
   "files": {
    "justfile": "x := ['a', 'b']\nset tempdir := x\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal via variable"
  },
  {
@@ -847,6 +853,7 @@
   "files": {
    "justfile": "set tempdir := ['a\"\\\\\n\t', 'b']\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal escapes"
  },
  {
@@ -863,6 +870,7 @@
   "files": {
    "justfile": "set tempdir := ['é✓', 'b\u0001']\nfoo:\n  @echo hi\n"
   },
+  "known": "list values in a setting are not implemented (R15, unstable lists)",
   "name": "gate literal unicode"
  },
  {

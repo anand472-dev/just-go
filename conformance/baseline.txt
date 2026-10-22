@@ -22,9 +22,7 @@ dotenv::command_conflicts_with_dotenv_required_setting#1
 dotenv::command_does_not_override_environment#1
 dotenv::directory_is_ignored#1
 dotenv::dotenv_env_var_default_no_override#1
-dotenv::empty_filename_list_is_unset#1
 dotenv::filename_list_requires_lists_setting#1
-dotenv::list_does_not_override_environment#1
 dotenv::no_warning#1
 dotenv::set_false#1
 equals::alias_recipe#1
@@ -81,8 +79,6 @@ line_prefixes::quiet_after_infallible#1
 list::doc_above_wide_signature#1
 list::empty_doc_comments_are_ignored#1
 list_literals::list_literals_requires_lists_setting#1
-lists::interpreter_settings_flatten_lists#1
-lists::list_in_setting_value_points_at_setting_name#1
 lists::lists_setting_is_unstable#1
 markdown::no_code_blocks#1
 minimum_version::minimum_version_invalid#1

@@ -1,6 +1,8 @@
 package analyzer
 
 import (
+	"errors"
+
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/settings"
@@ -74,10 +76,20 @@ func resolveSettings(jf *ast.Justfile) *diag.Error {
 			return err
 		}
 	}
-	if _, err := settings.Resolve(jf); err != nil {
-		return err.(*diag.Error)
+	_, err := settings.Resolve(jf)
+	var listed *settings.ListError
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &listed):
+		// Without `set lists` the file is refused for its first list feature,
+		// as upstream does; with it, the list is not implemented.
+		if refusal := checkListFeatures(jf); refusal != nil {
+			return refusal
+		}
+		return listed.Diag
 	}
-	return nil
+	return err.(*diag.Error)
 }
 
 // checkListFeatures reports the first use of a feature of `set lists` unless

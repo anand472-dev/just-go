@@ -47,13 +47,13 @@ func TestResolveEvaluatesExpressionSettings(t *testing.T) {
 	}
 }
 
-// The dotenv settings take a value, which may be a list; a list is flattened,
-// as upstream's value is. They are not set when absent.
+// The dotenv settings take a value, held as a list of one element until lists
+// are implemented. They are not set when absent.
 func TestResolveEvaluatesDotenvSettings(t *testing.T) {
 	src := "d := '.env'\n" +
 		"set dotenv-command := 'echo ' + d\n" +
 		"set dotenv-filename := d\n" +
-		"set dotenv-path := ['a', d, ['b', []], ]\n"
+		"set dotenv-path := 'a'\n"
 	got, err := Resolve(parse(t, src))
 	if err != nil {
 		t.Fatal(err)
@@ -61,113 +61,40 @@ func TestResolveEvaluatesDotenvSettings(t *testing.T) {
 	want := Resolved{
 		DotenvCommand:  []string{"echo .env"},
 		DotenvFilename: []string{".env"},
-		DotenvPath:     []string{"a", ".env", "b"},
+		DotenvPath:     []string{"a"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Resolve = %+v, want %+v", got, want)
 	}
-}
-
-// An empty list is a value: set, with nothing in it
-// (dotenv::empty_filename_list_is_unset#1 relies on telling it from unset).
-func TestResolveKeepsAnEmptyListApartFromUnset(t *testing.T) {
-	got, err := Resolve(parse(t, "set dotenv-filename := []\n"))
-	if err != nil || got.DotenvFilename == nil || len(got.DotenvFilename) != 0 {
-		t.Errorf("DotenvFilename = %#v, %v; want an empty, non-nil list", got.DotenvFilename, err)
-	}
-	if got.DotenvPath != nil || got.DotenvCommand != nil {
-		t.Errorf("unset settings are not nil: %+v", got)
+	got, err = Resolve(parse(t, "set dotenv-path := 'a'\n"))
+	if err != nil || got.DotenvFilename != nil || got.DotenvCommand != nil {
+		t.Errorf("unset settings are not nil: %+v, %v", got, err)
 	}
 }
 
-// A setting that holds one string takes a list of one element as that string
-// and refuses any other list, in upstream's words.
-func TestResolveAStringSettingTakesAListOfOne(t *testing.T) {
-	got, err := Resolve(parse(t, "x := ['t']\nset tempdir := x\nset working-directory := ['w']\n"))
-	if err != nil || *got.Tempdir != "t" || *got.WorkingDirectory != "w" {
-		t.Errorf("Resolve = %+v, %v", got, err)
-	}
-}
-
-func TestResolveRefusesAListInAStringSetting(t *testing.T) {
-	for _, tc := range []struct {
-		src, msg         string
-		line, col, width int
-	}{
-		{"set tempdir := ['a', 'b']\n", `list value ["a", "b"] assigned to ` + "`tempdir`" + ` setting`, 1, 5, 7},
-		{"set tempdir := []\n", "list value [] assigned to `tempdir` setting", 1, 5, 7},
-		{"x := ['a', 'b']\nset tempdir := x\n", `list value ["a", "b"] assigned to ` + "`tempdir`" + ` setting`, 2, 5, 7},
-		{"\n\nset working-directory := ['a\"\\\n\t', 'b']\n", `list value ["a\"\\\n\t", "b"] assigned to ` + "`working-directory`" + ` setting`, 3, 5, 17},
-	} {
-		_, err := Resolve(parse(t, tc.src))
-		var de *diag.Error
-		if !errors.As(err, &de) {
-			t.Fatalf("Resolve(%q) = %v, want a *diag.Error", tc.src, err)
-		}
-		if de.Msg != tc.msg || de.Line != tc.line || de.Col != tc.col || de.Width != tc.width || de.Kind != diag.KindAnalysis {
-			t.Errorf("Resolve(%q) = %+v, want %q at %d:%d width %d", tc.src, de, tc.msg, tc.line, tc.col, tc.width)
-		}
-	}
-}
-
-// Upstream's element display escapes five characters and writes the rest as
-// they are (oracle/src/src/element.rs; checked against the oracle).
-func TestDebugListEscapesAsUpstreamDoes(t *testing.T) {
-	for _, tc := range []struct {
-		values []string
-		want   string
-	}{
-		{nil, "[]"},
-		{[]string{""}, `[""]`},
-		{[]string{"a\x00b", "\x01", "\x7f"}, "[\"a\x00b\", \"\x01\", \"\x7f\"]"},
-		{[]string{"é✓ 日本", "it's"}, `["é✓ 日本", "it's"]`},
-		{[]string{"\t\r\n\"\\"}, `["\t\r\n\"\\"]`},
-	} {
-		if got := debugList(tc.values); got != tc.want {
-			t.Errorf("debugList(%q) = %s, want %s", tc.values, got, tc.want)
-		}
-	}
-}
-
-// A hand-built tree may hold a list in a setting that no `set` statement
-// records; the error is then without a location.
-func TestResolveRefusesAListInATreeWithoutSettingSites(t *testing.T) {
-	jf := &ast.Justfile{File: "justfile", Settings: ast.Settings{Tempdir: ast.List{}}}
-	_, err := Resolve(jf)
-	var de *diag.Error
-	if !errors.As(err, &de) || de.Msg != "list value [] assigned to `tempdir` setting" || de.Line != 0 {
-		t.Errorf("Resolve = %v", err)
-	}
-}
-
-// `+` joins a string to every element of a list, and lists of one length
-// pairwise, as upstream's Value::apply does; any other pair is refused.
-func TestResolveAddsListsAsUpstreamDoes(t *testing.T) {
-	for _, tc := range []struct {
-		src  string
-		want []string
-	}{
-		{"set dotenv-path := 'a' + 'b'\n", []string{"ab"}},
-		{"set dotenv-path := ['a', 'b'] + 'c'\n", []string{"ac", "bc"}},
-		{"set dotenv-path := 'c' + ['a', 'b']\n", []string{"ca", "cb"}},
-		{"set dotenv-path := ['a', 'b'] + ['c', 'd']\n", []string{"ac", "bd"}},
-		{"set dotenv-path := ['a'] + ['c', 'd']\n", []string{"ac", "ad"}},
-		{"set dotenv-path := [] + []\n", []string{}},
-	} {
-		got, err := Resolve(parse(t, tc.src))
-		if err != nil || !reflect.DeepEqual(got.DotenvPath, tc.want) {
-			t.Errorf("Resolve(%q) = %#v, %v; want %#v", tc.src, got.DotenvPath, err, tc.want)
-		}
-	}
+// A list is not implemented (R15): it is a ListError, after the faults in its
+// elements, which are reported as upstream reports them. A variable that holds
+// a list is a ListError at its use, not a non-const variable.
+func TestResolveRefusesAList(t *testing.T) {
 	for _, src := range []string{
-		"set dotenv-path := 'c' + []\n",
-		"set dotenv-path := [] + 'c'\n",
-		"set dotenv-path := ['a', 'b'] + ['c', 'd', 'e']\n",
-		"set dotenv-path := ['a', 'b'] + []\n",
+		"set tempdir := ['a', 'b']\n",
+		"set tempdir := []\n",
+		"set working-directory := ['a']\n",
+		"set dotenv-path := ['a', ['b']]\n",
+		"set shell := ['echo', ['foo', 'bar']]\n",
+		"x := ['a']\nset tempdir := x\n",
+		"x := ['a']\nset dotenv-filename := 'f' + x\n",
 	} {
 		_, err := Resolve(parse(t, src))
-		if err == nil || !strings.Contains(err.Error(), "cannot concatenate list values") {
-			t.Errorf("Resolve(%q) = %v", src, err)
+		var le *ListError
+		if !errors.As(err, &le) {
+			t.Fatalf("Resolve(%q) = %v, want a *ListError", src, err)
+		}
+		if !strings.Contains(le.Error(), "list values are not supported") {
+			t.Errorf("Resolve(%q) = %q", src, le.Error())
+		}
+		if le.Diag.Kind != diag.KindAnalysis || le.Diag.File != "justfile" {
+			t.Errorf("Resolve(%q) diag = %+v", src, le.Diag)
 		}
 	}
 }
