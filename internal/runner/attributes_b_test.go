@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -230,17 +231,77 @@ func TestRunContinueDoesNotForgiveFailure(t *testing.T) {
 }
 
 // timedProcess is a sys.Process that records when each command starts and
-// ends, how many run at once at most, and keeps each command for as long as
-// its delay says.
+// ends and how many run at once at most. It holds commands with channels and
+// not with sleeps, so that what it proves does not depend on the speed of the
+// machine: together makes the commands it names wait until all of them are
+// running, and after makes a command wait until another has ended. A wait
+// that is not met within guard gives up and sets timedOut, so that a hang
+// fails a test (see checkNoHang) and does not stall it.
 type timedProcess struct {
-	mu      sync.Mutex
-	events  []string
-	running int
-	most    int
-	delay   map[string]time.Duration
-	codes   map[string]int
-	errs    map[string]error
-	output  string
+	mu       sync.Mutex
+	events   []string
+	running  int
+	most     int
+	together []string
+	after    map[string]string
+	guard    time.Duration
+	timedOut bool
+	latches  map[string]chan struct{}
+	arrived  int
+	codes    map[string]int
+	errs     map[string]error
+	output   string
+}
+
+// defaultGuard is how long a held command waits for what it waits for.
+const defaultGuard = 5 * time.Second
+
+// latch returns the channel called name, made on first use. The caller holds
+// p.mu.
+func (p *timedProcess) latch(name string) chan struct{} {
+	if p.latches == nil {
+		p.latches = map[string]chan struct{}{}
+	}
+	if p.latches[name] == nil {
+		p.latches[name] = make(chan struct{})
+	}
+	return p.latches[name]
+}
+
+// open closes the channel called name, once. The caller holds p.mu.
+func (p *timedProcess) open(name string) {
+	ch := p.latch(name)
+	select {
+	case <-ch:
+	default:
+		close(ch)
+	}
+}
+
+// wait blocks until ch is closed, or until the guard runs out, which it
+// records. The caller does not hold p.mu.
+func (p *timedProcess) wait(ch chan struct{}) {
+	guard := p.guard
+	if guard == 0 {
+		guard = defaultGuard
+	}
+	select {
+	case <-ch:
+	case <-time.After(guard):
+		p.mu.Lock()
+		p.timedOut = true
+		p.mu.Unlock()
+	}
+}
+
+// checkNoHang fails t if a held command gave up waiting.
+func (p *timedProcess) checkNoHang(t *testing.T) {
+	t.Helper()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.timedOut {
+		t.Errorf("a command waited in vain: %v", p.events)
+	}
 }
 
 func (p *timedProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error) {
@@ -249,8 +310,24 @@ func (p *timedProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error)
 	p.events = append(p.events, "start "+command)
 	p.running++
 	p.most = max(p.most, p.running)
+	meet, together := p.latch("meet"), slices.Contains(p.together, command)
+	if together {
+		if p.arrived++; p.arrived == len(p.together) {
+			p.open("meet")
+		}
+	}
+	other, waits := p.after[command]
+	var ended chan struct{}
+	if waits {
+		ended = p.latch("end " + other)
+	}
 	p.mu.Unlock()
-	time.Sleep(p.delay[command])
+	if together {
+		p.wait(meet)
+	}
+	if waits {
+		p.wait(ended)
+	}
 	if p.output != "" {
 		for range 50 {
 			io.WriteString(spec.Stdout, p.output)
@@ -260,6 +337,7 @@ func (p *timedProcess) Run(_ context.Context, spec sys.ProcessSpec) (int, error)
 	defer p.mu.Unlock()
 	p.running--
 	p.events = append(p.events, "end "+command)
+	p.open("end " + command)
 	return p.codes[command], p.errs[command]
 }
 
@@ -283,12 +361,11 @@ func (p *timedProcess) count(event string) int {
 	return n
 }
 
-const slow = 40 * time.Millisecond
-
 func TestRunParallelRunsDependenciesAtOnce(t *testing.T) {
-	proc := &timedProcess{delay: map[string]time.Duration{"echo a": slow, "echo b": slow, "echo c": slow}}
+	proc := &timedProcess{together: []string{"echo a", "echo b", "echo c"}}
 	plan, _, _ := newPlan(t, "[parallel]\nall: a b c\n  @echo all\na:\n  @echo a\nb:\n  @echo b\nc:\n  @echo c\n", proc)
 	mustRun(t, plan)
+	proc.checkNoHang(t)
 	if proc.most != 3 {
 		t.Errorf("%d commands ran at once, want 3: %v", proc.most, proc.events)
 	}
@@ -301,18 +378,21 @@ func TestRunParallelRunsDependenciesAtOnce(t *testing.T) {
 }
 
 func TestRunWithoutParallelRunsDependenciesOneAfterTheOther(t *testing.T) {
-	proc := &timedProcess{delay: map[string]time.Duration{"echo a": slow, "echo b": slow}}
+	// Run one after the other, a waits in vain for b to start, so it gives up
+	// at once at the short guard; run at once, they would both be running.
+	proc := &timedProcess{together: []string{"echo a", "echo b"}, guard: 20 * time.Millisecond}
 	plan, _, _ := newPlan(t, "all: a b\n  @echo all\na:\n  @echo a\nb:\n  @echo b\n", proc)
 	mustRun(t, plan)
-	if proc.most != 1 {
-		t.Errorf("%d commands ran at once, want 1: %v", proc.most, proc.events)
+	if !proc.timedOut || proc.most != 1 {
+		t.Errorf("%d commands ran at once, timed out %v; want 1 and a wait in vain: %v", proc.most, proc.timedOut, proc.events)
 	}
 }
 
 func TestRunParallelSubsequents(t *testing.T) {
-	proc := &timedProcess{delay: map[string]time.Duration{"echo a": slow, "echo b": slow}}
+	proc := &timedProcess{together: []string{"echo a", "echo b"}}
 	plan, _, _ := newPlan(t, "[parallel]\nall: && a b\n  @echo all\na:\n  @echo a\nb:\n  @echo b\n", proc)
 	mustRun(t, plan)
+	proc.checkNoHang(t)
 	if proc.most != 2 || proc.index("end echo all") > proc.index("start echo a") {
 		t.Errorf("subsequents: %d at once, events %v; want 2 at once after the recipe", proc.most, proc.events)
 	}
@@ -336,7 +416,7 @@ func TestForksNeedsTwoDependenciesAndTheAttribute(t *testing.T) {
 // A recipe two branches both depend on runs once, and the branch that did not
 // run it waits for it.
 func TestRunParallelBranchesShareADependency(t *testing.T) {
-	proc := &timedProcess{delay: map[string]time.Duration{"echo c": slow}}
+	proc := &timedProcess{}
 	plan, _, _ := newPlan(t, "[parallel]\nall: a b\n  @echo all\na: c\n  @echo a\nb: c\n  @echo b\nc:\n  @echo c\n", proc)
 	mustRun(t, plan)
 	if n := proc.count("start echo c"); n != 1 {
@@ -366,12 +446,17 @@ func TestRunParallelDependencyAlreadyRun(t *testing.T) {
 // Only the failure of the first branch that failed is reported, as upstream
 // returns only that error; the other branches still run to the end.
 func TestRunParallelReportsTheFirstFailure(t *testing.T) {
+	// a ends after b, so that it is first in order and not in time.
 	proc := &timedProcess{
-		delay: map[string]time.Duration{"exit 1": slow},
+		after: map[string]string{"exit 1": "exit 2"},
 		codes: map[string]int{"exit 1": 1, "exit 2": 2},
 	}
 	plan, _, stderr := newPlan(t, "[parallel]\nall: a b\na:\n  @exit 1\nb:\n  @exit 2\n", proc)
 	res := mustRun(t, plan)
+	proc.checkNoHang(t)
+	if proc.index("end exit 2") > proc.index("end exit 1") {
+		t.Errorf("b did not end before a: %v", proc.events)
+	}
 	if res.ExitCode != 1 {
 		t.Errorf("exit code = %d, want that of the first branch, 1", res.ExitCode)
 	}
@@ -405,7 +490,7 @@ func TestRunParallelReturnsTheErrorOfTheFirstBranchThatHasOne(t *testing.T) {
 // A branch that waits for a recipe another branch fails to run does not wait
 // for ever, and does not go on.
 func TestRunParallelWaiterOfAFailedRecipe(t *testing.T) {
-	proc := &timedProcess{codes: map[string]int{"exit 1": 1}, delay: map[string]time.Duration{"exit 1": slow}}
+	proc := &timedProcess{codes: map[string]int{"exit 1": 1}}
 	plan, _, stderr := newPlan(t, "[parallel]\nall: a b\na: c\n  @echo a\nb: c\n  @echo b\nc:\n  @exit 1\n", proc)
 	res := mustRun(t, plan)
 	if res.ExitCode != 1 || proc.count("start echo a") != 0 || proc.count("start echo b") != 0 {
@@ -459,7 +544,7 @@ func TestRunParallelPlanErrors(t *testing.T) {
 // A recipe named twice in a list that runs at once is run by the first branch,
 // and the second waits for it and does not run it again.
 func TestRunParallelRecipeNamedTwiceRunsOnce(t *testing.T) {
-	proc := &timedProcess{delay: map[string]time.Duration{"echo a": slow}}
+	proc := &timedProcess{}
 	plan, _, _ := newPlan(t, "[parallel]\nall: a a\n  @echo all\na:\n  @echo a\n", proc)
 	mustRun(t, plan)
 	if n := proc.count("start echo a"); n != 1 || proc.index("start echo all") < proc.index("end echo a") {
