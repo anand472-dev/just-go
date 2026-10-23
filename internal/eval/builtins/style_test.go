@@ -112,3 +112,11 @@ func TestStyleOfAStreamNeedsColourSettingsNotYetSupported(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkStyle(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		if _, err := style([]string{"#ff8800", "foo"}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

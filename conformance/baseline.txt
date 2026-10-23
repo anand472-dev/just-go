@@ -77,6 +77,8 @@ confirm::do_not_confirm_recipe#1
 confirm::do_not_confirm_recipe_with_confirm_recipe_dependency#1
 confirm::recipe_with_confirm_recipe_dependency#1
 confirm::recipe_with_confirm_recipe_dependency_arg#1
+constants::constants_are_defined_in_recipe_bodies#1
+constants::constants_are_defined_in_recipe_parameters#1
 default::default_attribute_may_only_appear_once_per_justfile#1
 default::default_attribute_overrides_first_recipe#1
 default::default_list_allows_default_recipe_with_arguments#1
@@ -153,6 +155,7 @@ functions::recipe_name_in_dependency_argument#1
 functions::recipe_name_in_parameter_default#1
 functions::replace#1
 functions::replace_regex#1
+functions::semver_matches#1
 functions::shoutykebabcase#1
 functions::shoutysnakecase#1
 functions::snakecase#1
@@ -434,6 +437,7 @@ search::test_justfile_search#1
 settings::assert#1
 settings::backtick#1
 settings::bad_regex#1
+settings::built_in_constant#1
 settings::expression#1
 settings::function_call#1
 settings::invalid_attribute#1
@@ -497,6 +501,10 @@ string::unterminated_indented_raw_string#1
 string::unterminated_indented_string#1
 string::unterminated_raw_string#1
 string::unterminated_string#1
+style::style_command_default#1
+style::style_error#1
+style::style_unknown#1
+style::style_warning#1
 subsequents::argument#1
 subsequents::circular_dependency#1
 subsequents::duplicate_subsequents_dont_run#1

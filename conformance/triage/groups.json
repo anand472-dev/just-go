@@ -1,15 +1,12 @@
 {
   "counts": {
-    "pass": 533,
-    "fail": 1459,
+    "pass": 541,
+    "fail": 1451,
     "skip": 19,
     "total": 2011
   },
   "group_sizes": {
     "attribute": 112,
-    "builtin:constants": 3,
-    "builtin:semver": 1,
-    "builtin:style": 4,
     "cli:alias-style": 3,
     "cli:allow-missing": 5,
     "cli:ceiling": 8,
@@ -184,20 +181,6 @@
       "options::value_uses_forwarded_dependency_argument#1": "uses the [arg] attribute",
       "options::value_with_undefined_variable_is_an_error#1": "uses the [arg] attribute",
       "options::variadics_can_follow_options#1": "uses the [arg] attribute"
-    },
-    "builtin:constants": {
-      "constants::constants_are_defined_in_recipe_bodies#1": "uses the constant HEX",
-      "constants::constants_are_defined_in_recipe_parameters#1": "uses the constant HEX",
-      "settings::built_in_constant#1": "uses the constant HEX"
-    },
-    "builtin:semver": {
-      "functions::semver_matches#1": "calls semver_matches()"
-    },
-    "builtin:style": {
-      "style::style_command_default#1": "calls style()",
-      "style::style_error#1": "calls style()",
-      "style::style_unknown#1": "calls style()",
-      "style::style_warning#1": "calls style()"
     },
     "cli:alias-style": {
       "alias_style::left#1": "passes --alias-style",

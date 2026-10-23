@@ -108,3 +108,11 @@ func TestUUIDFailsWhenTheRandomSourceFails(t *testing.T) {
 		t.Error("uuid() with an empty random source: want an error")
 	}
 }
+
+func BenchmarkBLAKE3(b *testing.B) {
+	data := []byte(hashPattern(4096))
+	b.SetBytes(int64(len(data)))
+	for i := 0; i < b.N; i++ {
+		blake3Sum(data)
+	}
+}

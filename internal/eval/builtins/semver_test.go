@@ -213,3 +213,11 @@ func TestSemverMatchesAcceptsThirtyTwoComparatorsAndRefusesThirtyThree(t *testin
 		t.Errorf("33 comparators: error = %v", err)
 	}
 }
+
+func BenchmarkSemverMatches(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		if _, err := semverMatches([]string{"1.2.9", ">=1.2.0, <2.0.0"}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
