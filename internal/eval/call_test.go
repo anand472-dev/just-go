@@ -75,18 +75,19 @@ func TestEvaluateWithRunsTheBackticksOfTheArguments(t *testing.T) {
 }
 
 func TestEvaluateReadsDirAsDirectory(t *testing.T) {
+	// cache_dir is cache_directory, which needs the Host of a justfile to run in.
 	_, err := Evaluate(call("cache_dir"), nil)
-	requireRuntime(t, err, "function cache_dir is not implemented yet")
+	requireRuntime(t, err, "function `cache_dir` cannot be called without a justfile")
 }
 
 // A function that has a name and no implementation yet says so, located at
 // its name.
 func TestEvaluateRefusesAFunctionThatIsNotImplementedYet(t *testing.T) {
-	_, err := Evaluate(call("cache_directory"), nil)
-	requireRuntime(t, err, "function cache_directory is not implemented yet")
+	_, err := Evaluate(call("split", lit("a b")), nil)
+	requireRuntime(t, err, "function split is not implemented yet")
 	var de *diag.Error
-	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("cache_directory") {
-		t.Errorf("location = %+v; want line 2, column 7, width 15", de)
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("split") {
+		t.Errorf("location = %+v; want line 2, column 7, width 5", de)
 	}
 }
 
