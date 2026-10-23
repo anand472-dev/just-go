@@ -142,7 +142,7 @@ kebabcase len lowercamelcase lowercase module_directory module_file
 module_path num_cpus num_jobs os os_family parent_directory path_exists
 prepend quote read recipe_name replace replace_regex require
 semver_matches sha256 sha256_file shell shoutykebabcase shoutysnakecase
-snakecase source_directory source_file titlecase trim trim_end
+snakecase source_directory source_file style titlecase trim trim_end
 trim_end_match trim_end_matches trim_start trim_start_match
 trim_start_matches uppercamelcase uppercase uuid which without_extension
 """.split())

@@ -136,7 +136,7 @@ var table = map[string]Builtin{
 	"source_directory":            {0, 0, nil, sourceDirectory},
 	"source_file":                 {0, 0, nil, sourceFile},
 	"split":                       {1, 2, nil, nil},
-	"style":                       {1, 2, nil, nil},
+	"style":                       {1, 2, style, nil},
 	"titlecase":                   {1, 1, unary(titlecase), nil},
 	"trim":                        {1, 1, unary(strings.TrimSpace), nil},
 	"trim_end":                    {1, 1, unary(trimEnd), nil},

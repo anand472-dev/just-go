@@ -125,9 +125,9 @@ class ExpressionTextTest(unittest.TestCase):
     recipe header line, which these tests pin instead."""
 
     def test_dependency_arguments_are_expression_text(self):
-        text = triage.expression_text("a: (b style('x'))\n  echo\n")
-        self.assertIn("style(", text)
-        self.assertEqual(triage.builtin_group(text)[0], "builtin:style")
+        text = triage.expression_text("a: (b cache_directory())\n  echo\n")
+        self.assertIn("cache_directory(", text)
+        self.assertEqual(triage.builtin_group(text)[0], "builtin:directories")
 
     def test_body_text_is_not_expression_text(self):
         self.assertNotIn("sha256(", triage.expression_text("a:\n  sha256('x')\n"))
@@ -226,15 +226,15 @@ class ClassifyPrecedenceTest(unittest.TestCase):
         self.assertEqual(group("[script]\na:\n  x\n"), "shebang")
 
     def test_builtin_family(self):
-        self.assertEqual(group("x := style('red')\n"), "builtin:style")
+        self.assertEqual(group("x := cache_directory()\n"), "builtin:directories")
 
     def test_implemented_builtin_is_not_a_builtin_group(self):
         self.assertEqual(group("x := uppercase('a')\n", actual="status: got 1"),
                          "other")
 
     def test_unimplemented_builtin_after_an_implemented_one(self):
-        self.assertEqual(group("x := uppercase(style('red'))\n"),
-                         "builtin:style")
+        self.assertEqual(group("x := uppercase(cache_directory())\n"),
+                         "builtin:directories")
 
     def test_dir_alias_maps_to_directory(self):
         self.assertEqual(group("x := home_dir()\n"),
