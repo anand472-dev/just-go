@@ -87,6 +87,11 @@ type Plan struct {
 	// are stamped, in TimestampFormat, or the default format when it is empty.
 	DryRun, Explain, Time, Timestamp bool
 	TimestampFormat                  string
+	// Color is --color on: errors, echoed lines and the announcement are styled.
+	// NoHighlight is --no-highlight, which leaves echoed lines plain. CommandColor
+	// is the SGR foreground code of --command-color, or "" for none.
+	Color, NoHighlight bool
+	CommandColor       string
 	// Dotenv holds the dotenv choices of the command line, which replace the
 	// justfile's settings; see DotenvFlags.
 	Dotenv DotenvFlags
@@ -1057,7 +1062,7 @@ func (inv *invocation) say(msg string) {
 		*inv.held = append(*inv.held, msg)
 		return
 	}
-	fmt.Fprint(inv.stderr, msg)
+	fmt.Fprint(inv.stderr, styleError(inv.plan.Color, msg))
 }
 
 // startFailure turns an error from the process runner into the result of a

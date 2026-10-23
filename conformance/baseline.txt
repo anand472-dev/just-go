@@ -79,6 +79,7 @@ choose::skip_private_recipes#1
 choose::skip_recipes_in_private_modules#1
 choose::skip_recipes_that_require_arguments#1
 choose::visit_modules_in_alphabetical_order#1
+command::command_color#1
 command::command_exit_code_is_propagated#1
 command::command_not_found#1
 command::dont_evaluate_unnecessary_variables#1
@@ -527,10 +528,12 @@ lazy::unused_assignments_are_evaluated_without_lazy#1
 lazy::used_assignment_evaluated#1
 line_prefixes::infallible_after_quiet#1
 line_prefixes::quiet_after_infallible#1
+list::backticks_highlighted#1
 list::doc_above_wide_signature#1
 list::empty_doc_attributes_are_ignored#1
 list::empty_doc_comments_are_ignored#1
 list::list_recipes_in_search_directory#1
+list::unclosed_backticks#1
 list::unsorted_list_order#1
 list::unsorted_list_order#2
 list::unsorted_list_order#3
@@ -593,6 +596,10 @@ misc::bad_setting_with_keyword_name#1
 misc::brace_escape#1
 misc::brace_escape_extra#1
 misc::circular_recipe_dependency_entered_from_outside#1
+misc::color_always#1
+misc::color_auto#1
+misc::color_never#1
+misc::colors_no_context#1
 misc::command_backtick_failure#1
 misc::comment_before_variable#1
 misc::complex_dependencies#1
@@ -635,6 +642,7 @@ misc::line_error_spacing#1
 misc::list#1
 misc::list_alignment#1
 misc::list_alignment_long#1
+misc::list_colors#1
 misc::list_empty_prefix_and_heading#1
 misc::list_heading#1
 misc::list_prefix#1
@@ -643,6 +651,8 @@ misc::missing_second_dependency#1
 misc::mixed_whitespace#1
 misc::mixed_whitespace_in_recipe_body#1
 misc::multi_line_string_in_interpolation#1
+misc::no_highlight#1
+misc::no_highlight_is_respected_for_script_echoing#1
 misc::old_equals_assignment_syntax_produces_error#1
 misc::order#1
 misc::plus_then_star_variadic#1
@@ -658,6 +668,7 @@ misc::quiet_shebang_recipe#1
 misc::required_after_default#1
 misc::required_after_plus_variadic#1
 misc::required_after_star_variadic#1
+misc::run_colors#1
 misc::run_suggestion#1
 misc::select#1
 misc::self_dependency#1
@@ -947,6 +958,7 @@ shadowing_parameters::exporting_shadowing_parameters_does_change_environment#1
 shadowing_parameters::parameter_may_shadow_variable#1
 shadowing_parameters::shadowing_parameters_do_not_change_environment#1
 shebang::echo#1
+shebang::echo_with_command_color#1
 shebang::invalid_shebang_error#1
 shebang::powershell_shebang_on_unix_has_no_bom#1
 shebang::run_shebang#1

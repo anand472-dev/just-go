@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1129,
-    "fail": 858,
+    "pass": 1141,
+    "fail": 846,
     "skip": 24,
     "total": 2011
   },
@@ -12,7 +12,6 @@
     "cli:check": 2,
     "cli:choose": 2,
     "cli:clean": 1,
-    "cli:color": 12,
     "cli:command-color": 1,
     "cli:dotenv-command": 1,
     "cli:dump": 103,
@@ -181,20 +180,6 @@
     },
     "cli:clean": {
       "cache::clean_succeeds_without_cache_directory#1": "passes --clean"
-    },
-    "cli:color": {
-      "command::command_color#1": "passes --color",
-      "list::backticks_highlighted#1": "passes --color",
-      "list::unclosed_backticks#1": "passes --color",
-      "misc::color_always#1": "passes --color",
-      "misc::color_auto#1": "passes --color",
-      "misc::color_never#1": "passes --color",
-      "misc::colors_no_context#1": "passes --color",
-      "misc::list_colors#1": "passes --color",
-      "misc::no_highlight#1": "passes --color",
-      "misc::no_highlight_is_respected_for_script_echoing#1": "passes --color",
-      "misc::run_colors#1": "passes --color",
-      "shebang::echo_with_command_color#1": "passes --color"
     },
     "cli:command-color": {
       "style::style_command_non_default#1": "passes --command-color"

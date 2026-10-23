@@ -215,7 +215,7 @@ func continuesOn(r *ast.Recipe, caught int) bool {
 func (inv *invocation) echo(s step, line ast.Line, command string) error {
 	if s.timestamp == nil {
 		if echoes(line.Prefix, inv.plan.Quiet, settingQuiet(inv.plan.Justfile.Settings, s.recipe), inv.plan.Verbose) {
-			fmt.Fprintln(inv.stderr, command)
+			fmt.Fprintln(inv.stderr, inv.styleCommand(command))
 		}
 		return nil
 	}

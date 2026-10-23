@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"gitea.com/wimwian/just-go/internal/ansi"
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/eval"
@@ -132,7 +133,7 @@ func (inv *invocation) execute(r *ast.Recipe, args []string, shared *ran, chain 
 // is given. Impure: it writes to the invocation's stderr.
 func (inv *invocation) announce(r *ast.Recipe) {
 	if inv.plan.Verbose && !inv.plan.Quiet {
-		fmt.Fprintf(inv.stderr, "===> running recipe `%s`...\n", r.Name)
+		fmt.Fprintln(inv.stderr, ansi.Paint(inv.plan.Color, "1;36", fmt.Sprintf("===> running recipe `%s`...", r.Name)))
 	}
 }
 

@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	just "gitea.com/wimwian/just-go"
+	"gitea.com/wimwian/just-go/internal/ansi"
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/output"
@@ -61,7 +62,7 @@ func workingDir(getwd func() (string, error)) string {
 func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.Writer, fsys sys.FS, exec sys.Process) int {
 	cfg, err := parseArgs(args)
 	if err != nil {
-		report(stderr, err)
+		report(stderr, cfg, err)
 		_, _ = io.WriteString(stderr, "\nFor more information, try '--help'.\n")
 		return exitUsage
 	}
@@ -69,17 +70,17 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	workDir = startDir(cfg, workDir)
 	workDir, err = searchDirectory(&cfg, workDir, fsys)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	if status, done := early(cfg, env, workDir, fsys, exec, stdin, stdout, stderr); done {
 		return status
 	}
 	if err := overridesOf(&cfg); err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	src, err := stdinSource(cfg, stdin)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	childOut, childErr := childStreams(cfg.quiet, stdout, stderr)
 	opts := just.Options{
@@ -99,6 +100,9 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Time:              cfg.time,
 		Timestamp:         cfg.timestamp,
 		TimestampFormat:   cfg.timestampFormat,
+		Color:             colorOf(cfg, stderr),
+		NoHighlight:       cfg.noHighlight,
+		CommandColor:      commandCodes[cfg.commandColor],
 		Jobs:              cfg.jobs,
 		WorkDir:           runDir(cfg, workDir),
 		Env:               env,
@@ -117,7 +121,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	}
 	jf, err := just.Load(opts)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	if status, done := inspect(cfg, env, jf, opts, stdout, stderr); done {
 		return status
@@ -131,7 +135,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 func runChosen(cfg config, jf *just.Justfile, opts just.Options, stderr io.Writer) int {
 	calls, err := chooseCalls(cfg, jf)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	if len(calls) == 0 && len(cfg.words) > 0 {
 		return 0
@@ -139,7 +143,7 @@ func runChosen(cfg config, jf *just.Justfile, opts just.Options, stderr io.Write
 	opts.Calls = calls
 	res, err := jf.Run(context.Background(), opts)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	return res.ExitCode
 }
@@ -173,14 +177,14 @@ func describeInfo(cfg config, env []string, jf *just.Justfile, stdout, stderr io
 	case cfg.show != "":
 		text, err := jf.Show(cfg.show, indentation(cfg, env))
 		if err != nil {
-			return fail(stderr, cfg.quiet, err), true
+			return fail(stderr, cfg, err), true
 		}
 		_, _ = io.WriteString(stdout, text)
 		return 0, true
 	case cfg.usage != "":
 		text, err := jf.Usage(cfg.usage)
 		if err != nil {
-			return fail(stderr, cfg.quiet, err), true
+			return fail(stderr, cfg, err), true
 		}
 		_, _ = io.WriteString(stdout, text)
 		return 0, true
@@ -254,9 +258,11 @@ func formatGroups(infos []just.RecipeInfo, unsorted bool, prefix string) string 
 func listRecipes(cfg config, jf *just.Justfile, stdout, stderr io.Writer) int {
 	infos := jf.Recipes()
 	if missing, ok := missingGroup(infos, cfg.group); ok {
-		return fail(stderr, cfg.quiet, usage("justfile does not contain group `%s`", missing))
+		return fail(stderr, cfg, usage("justfile does not contain group `%s`", missing))
 	}
-	_, _ = io.WriteString(stdout, formatListWith(infos, listOptionsOf(cfg)))
+	opts := listOptionsOf(cfg)
+	opts.color = colorOf(cfg, stdout)
+	_, _ = io.WriteString(stdout, formatListWith(infos, opts))
 	return 0
 }
 
@@ -279,7 +285,7 @@ func indentation(cfg config, env []string) string {
 // runs the justfile's backticks through opts.Exec.
 func evaluate(cfg config, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) int {
 	if len(cfg.words) > 0 {
-		return fail(stderr, cfg.quiet, usage("`--evaluate` used with unexpected argument: `%s`", cfg.words[0]))
+		return fail(stderr, cfg, usage("`--evaluate` used with unexpected argument: `%s`", cfg.words[0]))
 	}
 	var names []string
 	if cfg.evaluateName != "" {
@@ -287,7 +293,7 @@ func evaluate(cfg config, jf *just.Justfile, opts just.Options, stdout, stderr i
 	}
 	bindings, err := jf.Evaluate(context.Background(), opts, names)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	_, _ = io.WriteString(stdout, output.Evaluate(bindings, cfg.evaluateName))
 	return 0
@@ -380,9 +386,9 @@ const (
 // fail reports err on stderr, unless quiet, and returns the status the run
 // ends with: the one the error carries, such as the exit status of a backtick
 // that failed, else exitFailure. Impure: it writes to stderr.
-func fail(stderr io.Writer, quiet bool, err error) int {
-	if !quiet {
-		report(stderr, err)
+func fail(stderr io.Writer, cfg config, err error) int {
+	if !cfg.quiet {
+		report(stderr, cfg, err)
 	}
 	return statusOf(err)
 }
@@ -399,8 +405,9 @@ func statusOf(err error) int {
 
 // report writes "error: <message>" for err to stderr. Impure: it writes to
 // stderr.
-func report(stderr io.Writer, err error) {
-	_, _ = fmt.Fprintf(stderr, "error: %s\n", describe(err))
+func report(stderr io.Writer, cfg config, err error) {
+	on := colorOf(cfg, stderr)
+	_, _ = fmt.Fprintf(stderr, "%s\n", ansi.ErrorLine(on, describe(err, on)))
 }
 
 // describe is the message of err. A diagnostic without a location, such as a
@@ -410,7 +417,7 @@ func report(stderr io.Writer, err error) {
 // file name and position and by the source line with the diagnostic
 // underlined (see snippet). A located diagnostic on an empty line still
 // quotes it, as upstream does. Pure.
-func describe(err error) string {
+func describe(err error, on bool) string {
 	var de *diag.Error
 	if !errors.As(err, &de) {
 		return err.Error()
@@ -418,7 +425,7 @@ func describe(err error) string {
 	if de.Line == 0 || de.Col == 0 {
 		return de.Msg
 	}
-	return de.Msg + "\n" + snippet(de)
+	return de.Msg + "\n" + snippet(de, on)
 }
 
 // snippet renders the location of de as upstream's Token display does:
@@ -432,13 +439,16 @@ func describe(err error) string {
 // justfile (a path relative to its directory). The column is upstream's (see
 // diag.Error.Column). A tab shows as four spaces, and the carets cover the
 // display width of de.Width runes from de.Col, at least one. Pure.
-func snippet(de *diag.Error) string {
+func snippet(de *diag.Error, on bool) string {
 	number := strconv.Itoa(de.Line)
 	pad := strings.Repeat(" ", len(number))
 	text, column, width := underline(de.Source, de.Col-1, max(de.Width, 1))
-	return fmt.Sprintf("%s——▶ %s:%d:%d\n%s │\n%s │ %s\n%s │ %s%s",
-		pad, filepath.Base(de.File), de.Line, de.Column(), pad, number, text, pad,
-		strings.Repeat(" ", column), strings.Repeat("^", max(width, 1)))
+	bar := ansi.Paint(on, "1;34", "│")
+	return fmt.Sprintf("%s%s %s:%d:%d\n%s %s\n%s %s\n%s %s %s%s",
+		pad, ansi.Paint(on, "1;34", "——▶"), filepath.Base(de.File), de.Line, de.Column(),
+		pad, bar,
+		ansi.Paint(on, "1;34", number+" │"), text,
+		pad, bar, strings.Repeat(" ", column), ansi.Paint(on, "1;31", strings.Repeat("^", max(width, 1))))
 }
 
 // underline returns line with each tab shown as four spaces, and the display
@@ -553,8 +563,12 @@ type config struct {
 	// timestampFormat is --timestamp-format.
 	dryRun, explain, time, timestamp bool
 	timestampFormat                  string
-	request                          string
-	requestGiven                     bool
+	// color is --color's value, or "" for auto. noHighlight is --no-highlight, and
+	// commandColor the --command-color name, or "" for none.
+	color, commandColor string
+	noHighlight         bool
+	request             string
+	requestGiven        bool
 
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
@@ -831,7 +845,11 @@ type flagSpec struct {
 // completions offer its names, so a flag added here is parsed and completed.
 var flags = []flagSpec{
 	{"allow-missing", switchFlag},
+	{"color", valueFlag},
+	{"command-color", valueFlag},
 	{"dry-run", switchFlag},
+	{"highlight", switchFlag},
+	{"no-highlight", switchFlag},
 	{"explain", switchFlag},
 	{"time", switchFlag},
 	{"timestamp", switchFlag},
@@ -938,6 +956,8 @@ var switches = map[string]func(*config){
 	"no-deps":                     func(c *config) { c.noDeps = true },
 	"allow-missing":               func(c *config) { c.allowMissing = true },
 	"dry-run":                     func(c *config) { c.dryRun = true },
+	"highlight":                   func(c *config) {}, // the default; it does not undo --no-highlight
+	"no-highlight":                func(c *config) { c.noHighlight = true },
 	"explain":                     func(c *config) { c.explain = true },
 	"time":                        func(c *config) { c.time = true },
 	"timestamp":                   func(c *config) { c.timestamp = true },
@@ -994,7 +1014,22 @@ var setters = map[string]func(*config, string) error{
 	"show":             func(c *config, v string) error { c.show = v; return nil },
 	"request":          func(c *config, v string) error { c.request, c.requestGiven = v, true; return nil },
 	"timestamp-format": func(c *config, v string) error { c.timestampFormat = v; return nil },
-	"usage":            func(c *config, v string) error { c.usage = v; return nil },
+	"color": func(c *config, v string) error {
+		switch v {
+		case "always", "auto", "never":
+			c.color = v
+			return nil
+		}
+		return usage("invalid value '%s' for '--color <COLOR>'", v)
+	},
+	"command-color": func(c *config, v string) error {
+		if _, ok := commandCodes[v]; !ok {
+			return usage("invalid value '%s' for '--command-color <COMMAND_COLOR>'", v)
+		}
+		c.commandColor = v
+		return nil
+	},
+	"usage": func(c *config, v string) error { c.usage = v; return nil },
 }
 
 // setJobs records --jobs, which takes a positive number: zero is refused with
@@ -1167,6 +1202,7 @@ type listEntry struct {
 	width     int    // display width of signature
 	doc       string
 	groups    []string
+	info      just.RecipeInfo // the recipe, for the colors of its listing
 }
 
 // listSection is the recipes of --list output under one heading: those in a
@@ -1207,6 +1243,7 @@ type listOptions struct {
 	heading  string
 	prefix   string
 	groups   []string
+	color    bool // color is on: the parameters, defaults and docs are styled
 }
 
 // listOptionsOf are the listing options the command line asks for. Pure.
@@ -1232,7 +1269,7 @@ func formatListWith(infos []just.RecipeInfo, opts listOptions) string {
 			b.WriteString(opts.prefix + "[" + section.group + "]\n")
 		}
 		for _, e := range section.entries {
-			writeEntry(&b, e, column, opts.prefix)
+			writeEntry(&b, e, column, opts.prefix, opts.color)
 		}
 	}
 	return b.String()
@@ -1271,7 +1308,7 @@ func listEntries(infos []just.RecipeInfo, unsorted bool) []listEntry {
 			continue
 		}
 		sig := signature(info)
-		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc, groups: info.Groups})
+		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc, groups: info.Groups, info: info})
 	}
 	return entries
 }
@@ -1355,16 +1392,16 @@ func alignWidth(entries []listEntry) int {
 // writeEntry writes one recipe of --list output, indented by prefix, with its
 // "#" in the column that follows a signature of width column. Pure apart from
 // writing to b.
-func writeEntry(b *strings.Builder, e listEntry, column int, prefix string) {
+func writeEntry(b *strings.Builder, e listEntry, column int, prefix string, on bool) {
 	inline := e.width <= maxSignatureWidth && !strings.Contains(e.doc, "\n")
 	if e.doc != "" && !inline {
 		for _, line := range strings.Split(e.doc, "\n") {
-			b.WriteString(prefix + "# " + line + "\n")
+			b.WriteString(prefix + ansi.Paint(on, "34", "#") + " " + styledDoc(line, on) + "\n")
 		}
 	}
-	b.WriteString(prefix + e.signature)
+	b.WriteString(prefix + styledSignature(e.info, on))
 	if e.doc != "" && inline {
-		b.WriteString(strings.Repeat(" ", column-e.width+1) + "# " + e.doc)
+		b.WriteString(strings.Repeat(" ", column-e.width+1) + ansi.Paint(on, "34", "#") + " " + styledDoc(e.doc, on))
 	}
 	b.WriteByte('\n')
 }

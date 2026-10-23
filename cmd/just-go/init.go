@@ -72,7 +72,7 @@ func editJustfile(cfg config, env []string, workDir string, fsys sys.FS, exec sy
 	}
 	path, err := loader.Find(fsys, workDir)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	code, err := exec.Run(context.Background(), sys.ProcessSpec{Argv: []string{editor, path}, Dir: workDir, Env: env})
 	if err != nil {

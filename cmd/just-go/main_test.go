@@ -551,7 +551,7 @@ func TestDescribe(t *testing.T) {
 		{located("justfile", 1, 6, 4, `x := "日本"`, "wide"),
 			"wide\n ——▶ justfile:1:6\n  │\n1 │ x := \"日本\"\n  │      ^^^^^^"},
 	} {
-		if got := describe(tc.err); got != tc.want {
+		if got := describe(tc.err, false); got != tc.want {
 			t.Errorf("describe(%v) = %q, want %q", tc.err, got, tc.want)
 		}
 	}
@@ -704,7 +704,7 @@ func TestErrorColumnCountsRunesThroughRun(t *testing.T) {
 // cannot be found (shell::recipe_shell_not_found_error_message).
 func TestDescribeSkipsSnippetWithoutSource(t *testing.T) {
 	de := &diag.Error{Kind: diag.KindRuntime, File: "/w/justfile", Line: 2, Msg: "recipe `a` could not be run"}
-	if got := describe(de); got != de.Msg {
+	if got := describe(de, false); got != de.Msg {
 		t.Errorf("describe = %q, want %q", got, de.Msg)
 	}
 	missing := fmt.Errorf("exec: %q: %w", "nosuchshell", fs.ErrNotExist)

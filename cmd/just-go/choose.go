@@ -22,7 +22,7 @@ import (
 func chooseRecipes(cfg config, env []string, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) int {
 	candidates := choosable(jf.Recipes(), cfg.group)
 	if len(candidates) == 0 {
-		return fail(stderr, cfg.quiet, usage("justfile contains no choosable recipes"))
+		return fail(stderr, cfg, usage("justfile contains no choosable recipes"))
 	}
 	chooser := chooserOf(cfg, env)
 	var selected bytes.Buffer
@@ -40,7 +40,7 @@ func chooseRecipes(cfg config, env []string, jf *just.Justfile, opts just.Option
 	opts.Calls = callsOf(selected.String(), candidates)
 	res, err := jf.Run(context.Background(), opts)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	return res.ExitCode
 }

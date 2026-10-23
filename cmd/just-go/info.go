@@ -25,7 +25,7 @@ func answer(cfg config, env []string, stdout, stderr io.Writer) (status int, don
 	case cfg.requestGiven:
 		out, err := request.Answer(cfg.request, func(name string) (string, bool) { return envValue(env, name) })
 		if err != nil {
-			return fail(stderr, cfg.quiet, err), true
+			return fail(stderr, cfg, err), true
 		}
 		_, _ = io.WriteString(stdout, out)
 	default:

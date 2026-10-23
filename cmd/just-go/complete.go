@@ -69,11 +69,11 @@ func completeWords(words []string, workDir string, fsys sys.FS, stdout io.Writer
 // error. Impure: it writes to stdout, or to stderr for an error.
 func writeCompletions(cfg config, stdout, stderr io.Writer) int {
 	if len(cfg.words) > 0 {
-		return fail(stderr, cfg.quiet, usage("`--completions` used with unexpected argument: `%s`", cfg.words[0]))
+		return fail(stderr, cfg, usage("`--completions` used with unexpected argument: `%s`", cfg.words[0]))
 	}
 	script, ok := completion.Script(cfg.completions)
 	if !ok {
-		return fail(stderr, cfg.quiet, usage("completions for `%s` are not generated; the shells are bash, zsh and powershell", cfg.completions))
+		return fail(stderr, cfg, usage("completions for `%s` are not generated; the shells are bash, zsh and powershell", cfg.completions))
 	}
 	_, _ = io.WriteString(stdout, script)
 	return 0
@@ -100,13 +100,13 @@ func runCommandLine(cfg config, env []string, workDir string, fsys sys.FS, exec 
 	if err != nil {
 		code, err := runner.RunPlainCommand(ctx, exec, sys.ProcessSpec{Argv: cfg.command, Dir: workDir, Env: env, Stdin: stdin, Stdout: stdout, Stderr: stderr})
 		if err != nil {
-			return fail(stderr, cfg.quiet, err)
+			return fail(stderr, cfg, err)
 		}
 		return code
 	}
 	code, err := jf.RunCommand(ctx, opts, cfg.command)
 	if err != nil {
-		return fail(stderr, cfg.quiet, err)
+		return fail(stderr, cfg, err)
 	}
 	return code
 }

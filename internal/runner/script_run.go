@@ -89,7 +89,7 @@ func (inv *invocation) echoScript(s step, lines []string) {
 		return
 	}
 	for _, line := range lines {
-		fmt.Fprintln(inv.stderr, line)
+		fmt.Fprintln(inv.stderr, inv.styleCommand(line))
 	}
 }
 
