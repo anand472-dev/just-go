@@ -173,6 +173,16 @@ func Run(ctx context.Context, plan Plan) (Result, error) {
 	if err != nil {
 		return Result{}, withSource(plan.Justfile, err)
 	}
+	fsys, exec := plan.FS, plan.Exec
+	if fsys == nil {
+		fsys = sys.OSFS{}
+	}
+	if exec == nil {
+		exec = sys.OSProcess{}
+	}
+	if plan.Env, err = loadDotenv(ctx, plan, fsys, exec, pre.set); err != nil {
+		return Result{}, err
+	}
 	goos := plan.OS
 	if goos == "" {
 		goos = runtime.GOOS
