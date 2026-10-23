@@ -121,6 +121,7 @@ func host(files sysfake.FakeFS) Host {
 		FS: files, WorkDir: "/w", Justfile: "/w/justfile", SourceFile: "/w/inc/a.just",
 		ModuleFile: "/w/mod/justfile", ModulePath: "mod::sub", InvocationDir: "/w/here",
 		Env: sysfake.FakeEnv{}, Platform: sysfake.FakePlatform{}, Random: &sysfake.FakeRandom{},
+		Clock: sysfake.FakeClock{},
 		Shell: func(string, []string) (string, error) { return "", nil },
 	}
 }

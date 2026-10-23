@@ -82,11 +82,11 @@ func TestEvaluateReadsDirAsDirectory(t *testing.T) {
 // A function that has a name and no implementation yet says so, located at
 // its name.
 func TestEvaluateRefusesAFunctionThatIsNotImplementedYet(t *testing.T) {
-	_, err := Evaluate(call("uuid"), nil)
-	requireRuntime(t, err, "function uuid is not implemented yet")
+	_, err := Evaluate(call("style", lit("red")), nil)
+	requireRuntime(t, err, "function style is not implemented yet")
 	var de *diag.Error
-	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("uuid") {
-		t.Errorf("location = %+v; want line 2, column 7, width 4", de)
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("style") {
+		t.Errorf("location = %+v; want line 2, column 7, width 5", de)
 	}
 }
 

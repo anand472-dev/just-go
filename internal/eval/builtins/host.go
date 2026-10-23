@@ -34,7 +34,9 @@ type Host struct {
 	// Platform answers for the machine: os, arch, num_cpus, just_pid,
 	// just_executable, and whether a file found on PATH can be run.
 	Platform sys.Platform
-	// Random is where choose draws its characters from.
+	// Clock tells the time that datetime and datetime_utc format.
+	Clock sys.Clock
+	// Random is where choose and uuid draw their bytes from.
 	Random sys.Random
 	// Recipe is the name of the recipe the expression is part of, as it is
 	// written, which is not the name an alias gave. It is empty outside a

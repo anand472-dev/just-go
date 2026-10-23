@@ -31,7 +31,7 @@ func (inv *invocation) host() builtins.Host {
 	h := builtins.Host{
 		FS: inv.fs, WorkDir: inv.base, Justfile: file, SourceFile: file, ModuleFile: file,
 		InvocationDir: inv.here, Env: sys.EnvList(inv.plan.Env), Platform: inv.platform,
-		Random: inv.random, Version: parser.UpstreamVersion, Jobs: inv.plan.Jobs,
+		Clock: inv.clock, Random: inv.random, Version: parser.UpstreamVersion, Jobs: inv.plan.Jobs,
 	}
 	if inv.goos == "windows" {
 		h.Unix = inv.unixPath
