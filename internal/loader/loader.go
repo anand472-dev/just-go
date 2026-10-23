@@ -71,8 +71,14 @@ func andTicked(names []string) string {
 // names returns the file names Find looks for in each directory. Names are
 // matched ignoring ASCII case. Pure: it returns a fresh slice, so callers
 // cannot disturb later calls.
-func names() []string {
+func defaultNames() []string {
 	return []string{"justfile", ".justfile"}
+}
+
+// names are the justfile names a module's directory may hold, which are the
+// default names. Pure.
+func names() []string {
+	return defaultNames()
 }
 
 // parent returns the directory above dir, and false when dir is already the
@@ -105,12 +111,12 @@ func lowerASCII(c byte) byte {
 	return c
 }
 
-// matching returns the entries whose name equals a justfile name ignoring
+// matching returns the entries whose name equals one of the names ignoring
 // ASCII case, in the order given. Pure: it returns a fresh slice.
-func matching(entries []string) []string {
+func matching(entries, names []string) []string {
 	var found []string
 	for _, entry := range entries {
-		for _, name := range names() {
+		for _, name := range names {
 			if equalFoldASCII(entry, name) {
 				found = append(found, entry)
 				break
@@ -128,10 +134,24 @@ func matching(entries []string) []string {
 // than choosing. A filesystem failure is returned wrapped, and is not
 // ErrNoJustfile. Impure: it reads fsys.
 func Find(fsys sys.FS, startDir string) (string, error) {
+	return FindNamed(fsys, startDir, "", nil)
+}
+
+// FindNamed is Find with the names a justfile may have given: names, or the
+// default names when it is nil. A ceiling, when not "", is the directory the search
+// does not go above (see FindWithin). Impure: it reads fsys.
+func FindNamed(fsys sys.FS, startDir, ceiling string, names []string) (string, error) {
+	if names == nil {
+		names = defaultNames()
+	}
 	dir := filepath.Clean(startDir)
+	limit := filepath.Clean(ceiling)
 	for {
-		if path, err := findIn(fsys, dir); err != nil || path != "" {
+		if path, err := findIn(fsys, dir, names); err != nil || path != "" {
 			return path, err
+		}
+		if ceiling != "" && dir == limit {
+			return "", ErrNoJustfile
 		}
 		up, ok := parent(dir)
 		if !ok {
@@ -145,33 +165,19 @@ func Find(fsys sys.FS, startDir string) (string, error) {
 // ceiling has been examined. A ceiling that is not above startDir is no limit
 // beyond the filesystem root. Impure: it reads fsys.
 func FindWithin(fsys sys.FS, startDir, ceiling string) (string, error) {
-	dir := filepath.Clean(startDir)
-	limit := filepath.Clean(ceiling)
-	for {
-		if path, err := findIn(fsys, dir); err != nil || path != "" {
-			return path, err
-		}
-		if dir == limit {
-			return "", ErrNoJustfile
-		}
-		up, ok := parent(dir)
-		if !ok {
-			return "", ErrNoJustfile
-		}
-		dir = up
-	}
+	return FindNamed(fsys, startDir, ceiling, nil)
 }
 
 // findIn returns the path of the justfile in dir, or "" when there is none,
 // or a *MultipleCandidatesError when there are several. Impure: it reads
 // fsys.
-func findIn(fsys sys.FS, dir string) (string, error) {
+func findIn(fsys sys.FS, dir string, names []string) (string, error) {
 	entries, err := fsys.ReadDir(dir)
 	if err != nil {
 		return "", fmt.Errorf("search for justfile: %w", err)
 	}
 	var files []string
-	for _, entry := range matching(entries) {
+	for _, entry := range matching(entries, names) {
 		ok, err := fsys.IsFile(filepath.Join(dir, entry))
 		if err != nil {
 			return "", fmt.Errorf("search for justfile: %w", err)

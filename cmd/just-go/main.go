@@ -66,6 +66,10 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		return exitUsage
 	}
 	workDir = startDir(cfg, workDir)
+	workDir, err = searchDirectory(&cfg, workDir, fsys)
+	if err != nil {
+		return fail(stderr, cfg.quiet, err)
+	}
 	if status, done := early(cfg, env, workDir, fsys, exec, stdin, stdout, stderr); done {
 		return status
 	}
@@ -79,6 +83,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Justfile:          resolve(workDir, cfg.justfile),
 		SearchFrom:        workDir,
 		Ceiling:           resolve(workDir, cfg.ceiling),
+		JustfileNames:     cfg.justfileNames,
 		WorkDir:           runDir(cfg, workDir),
 		Env:               env,
 		InvocationDir:     workDir,
@@ -457,6 +462,8 @@ type config struct {
 	// init is --init, and justfileName the --justfile-name for it, if given.
 	init         bool
 	justfileName string
+	// justfileNames are the names a justfile may have, from every --justfile-name.
+	justfileNames []string
 	// edit is --edit, which opens the justfile in the editor.
 	edit bool
 	// choose is --choose; chooser is the --chooser command, if given.
@@ -846,13 +853,17 @@ var setters = map[string]func(*config, string) error{
 	"chooser":           func(c *config, v string) error { c.chooser = v; return nil },
 	"working-directory": func(c *config, v string) error { c.workingDirectory = v; return nil },
 	"group":             func(c *config, v string) error { c.group = append(c.group, v); return nil },
-	"justfile-name":     func(c *config, v string) error { c.justfileName = v; return nil },
-	"list-heading":      func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
-	"list-prefix":       func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
-	"shell":             setShell,
-	"shell-arg":         func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
-	"show":              func(c *config, v string) error { c.show = v; return nil },
-	"usage":             func(c *config, v string) error { c.usage = v; return nil },
+	"justfile-name": func(c *config, v string) error {
+		c.justfileName = v
+		c.justfileNames = append(c.justfileNames, strings.Split(v, ",")...)
+		return nil
+	},
+	"list-heading": func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
+	"list-prefix":  func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
+	"shell":        setShell,
+	"shell-arg":    func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
+	"show":         func(c *config, v string) error { c.show = v; return nil },
+	"usage":        func(c *config, v string) error { c.usage = v; return nil },
 }
 
 // setShell records --shell, which may not be given twice, as upstream's.

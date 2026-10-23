@@ -42,6 +42,9 @@ type Options struct {
 	// Ceiling, when set, is the directory the search does not go above: it is
 	// examined, and no directory beyond it is.
 	Ceiling string
+	// JustfileNames are the names a justfile may have, in place of "justfile" and
+	// ".justfile"; nil means those.
+	JustfileNames []string
 	WorkDir string // working directory for recipes; empty means the justfile's directory
 	// InvocationDir is the directory the command was run from, where recipes
 	// run under set no-cd. Empty means WorkDir.
@@ -179,10 +182,7 @@ func locate(fsys sys.FS, opts Options) (string, error) {
 	if opts.SearchFrom == "" {
 		return "", usage("no justfile given: set Options.Justfile or Options.SearchFrom")
 	}
-	if opts.Ceiling != "" {
-		return loader.FindWithin(fsys, opts.SearchFrom, opts.Ceiling)
-	}
-	return loader.Find(fsys, opts.SearchFrom)
+	return loader.FindNamed(fsys, opts.SearchFrom, opts.Ceiling, opts.JustfileNames)
 }
 
 // Parse parses and analyzes src as a justfile; name is used as the file name

@@ -313,13 +313,13 @@ func TestFindOnRealFilesystem(t *testing.T) {
 }
 
 func TestMatching(t *testing.T) {
-	got := matching([]string{"Justfile", "a", ".JUSTFILE", "justfile.bak", "justfile"})
+	got := matching([]string{"Justfile", "a", ".JUSTFILE", "justfile.bak", "justfile"}, defaultNames())
 	want := []string{"Justfile", ".JUSTFILE", "justfile"}
 	if !slices.Equal(got, want) {
 		t.Errorf("matching = %v, want %v", got, want)
 	}
-	if got := matching(nil); len(got) != 0 {
-		t.Errorf("matching(nil) = %v, want empty", got)
+	if got := matching(nil, defaultNames()); len(got) != 0 {
+		t.Errorf("matching(nil, defaultNames()) = %v, want empty", got)
 	}
 }
 

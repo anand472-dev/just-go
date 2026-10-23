@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1037,
-    "fail": 951,
+    "pass": 1069,
+    "fail": 919,
     "skip": 23,
     "total": 2011
   },
@@ -26,12 +26,12 @@
     "cli:fmt": 24,
     "cli:global-justfile": 4,
     "cli:groups": 1,
-    "cli:init": 3,
+    "cli:init": 2,
     "cli:jobs": 1,
     "cli:json": 1,
     "cli:justfile": 2,
-    "cli:justfile-name": 5,
-    "cli:list": 8,
+    "cli:justfile-name": 1,
+    "cli:list": 7,
     "cli:list-submodules": 8,
     "cli:man": 1,
     "cli:no-aliases": 1,
@@ -39,16 +39,16 @@
     "cli:no-dotenv": 1,
     "cli:one": 2,
     "cli:request": 3,
-    "cli:search-directory": 25,
+    "cli:search-directory": 2,
     "cli:set": 7,
     "cli:shell-command": 1,
-    "cli:show": 11,
+    "cli:show": 9,
     "cli:summary": 1,
     "cli:tempdir": 1,
     "cli:time": 1,
     "cli:timestamp": 5,
     "cli:unsorted": 3,
-    "cli:usage": 11,
+    "cli:usage": 10,
     "cli:verbose": 3,
     "cli:working-directory": 3,
     "completions": 12,
@@ -429,7 +429,6 @@
       "groups::reject_extra_arguments#1": "passes --groups"
     },
     "cli:init": {
-      "init::justfile_name_from_search_directory#1": "passes --init",
       "justfile_from_stdin::init_error#1": "passes --init",
       "markdown::init_error#1": "passes --init"
     },
@@ -444,18 +443,13 @@
       "justfile_from_stdin::parse_error#1": "reads the justfile from standard input"
     },
     "cli:justfile-name": {
-      "markdown::justfile_found_by_name_is_tangled#1": "passes --justfile-name",
-      "search::justfile_name_accepts_comma_separated_values#1": "passes --justfile-name",
-      "search::justfile_name_may_be_repeated#1": "passes --justfile-name",
-      "search::justfile_name_not_found#1": "passes --justfile-name",
-      "search::justfile_name_skips_default_justfile#1": "passes --justfile-name"
+      "markdown::justfile_found_by_name_is_tangled#1": "passes --justfile-name"
     },
     "cli:list": {
       "alias::module_alias_resolves_in_list#1": "lists a submodule",
       "list::list_invalid_path#1": "lists a submodule",
       "list::list_nested_submodule#1": "lists a submodule",
       "list::list_nested_submodule#2": "lists a submodule",
-      "list::list_recipes_in_search_directory#1": "lists a submodule",
       "list::list_submodule#1": "lists a submodule",
       "list::list_unknown_submodule#1": "lists a submodule",
       "modules::list_absent_optional_module_is_error#1": "lists a submodule"
@@ -494,31 +488,8 @@
       "request::environment_variable_set#1": "runs just with --request"
     },
     "cli:search-directory": {
-      "dotenv::dotenv#1": "names a recipe by a directory path",
-      "fallback::fallback_from_subdir_bugfix#1": "names a recipe by a directory path",
       "fallback::fallback_from_subdir_message#1": "names a recipe by a directory path",
-      "fallback::works_with_provided_search_directory#1": "names a recipe by a directory path",
-      "search::double_upwards#1": "names a recipe by a directory path",
-      "search::single_downwards#1": "names a recipe by a directory path",
-      "search::single_upwards#1": "names a recipe by a directory path",
-      "search::test_downwards_multiple_path_argument#1": "names a recipe by a directory path",
-      "search::test_downwards_multiple_path_argument#2": "names a recipe by a directory path",
-      "search::test_downwards_multiple_path_argument#3": "names a recipe by a directory path",
-      "search::test_downwards_multiple_path_argument#4": "names a recipe by a directory path",
-      "search::test_downwards_multiple_path_argument#5": "names a recipe by a directory path",
-      "search::test_downwards_multiple_path_argument#6": "names a recipe by a directory path",
-      "search::test_downwards_path_argument#1": "names a recipe by a directory path",
-      "search::test_downwards_path_argument#2": "names a recipe by a directory path",
-      "search::test_downwards_path_argument#3": "names a recipe by a directory path",
-      "search::test_downwards_path_argument#4": "names a recipe by a directory path",
-      "search::test_downwards_path_argument#5": "names a recipe by a directory path",
-      "search::test_downwards_path_argument#6": "names a recipe by a directory path",
-      "search::test_upwards_multiple_path_argument#1": "names a recipe by a directory path",
-      "search::test_upwards_multiple_path_argument#2": "names a recipe by a directory path",
-      "search::test_upwards_path_argument#1": "names a recipe by a directory path",
-      "search::test_upwards_path_argument#2": "names a recipe by a directory path",
-      "search_arguments::argument_with_different_path_prefix_is_allowed#1": "names a recipe by a directory path",
-      "search_arguments::passing_dot_as_argument_is_allowed#1": "runs just with a recipe named by a directory path"
+      "fallback::works_with_provided_search_directory#1": "names a recipe by a directory path"
     },
     "cli:set": {
       "lazy::overridden_assignment_dependencies_are_not_evaluated#1": "passes --set",
@@ -536,14 +507,12 @@
       "alias::module_alias_resolves_in_show#1": "passes --show",
       "show::alias_show#1": "passes --show",
       "show::alias_show_missing_target#1": "passes --show",
-      "show::search_directory_without_recipe#1": "passes --show",
       "show::show_alias_disabled_by_absent_module#1": "passes --show",
       "show::show_alias_suggestion#1": "passes --show",
       "show::show_invalid_path#1": "passes --show",
       "show::show_no_alias_suggestion#1": "passes --show",
       "show::show_prints_full_recipe_path_for_cross_module_alias#1": "passes --show",
-      "show::show_recipe_disabled_by_absent_module#1": "passes --show",
-      "show::show_recipe_in_search_directory#1": "passes --show"
+      "show::show_recipe_disabled_by_absent_module#1": "passes --show"
     },
     "cli:summary": {
       "modules::disabled_recipes_are_hidden_from_summary#1": "passes --summary"
@@ -576,8 +545,7 @@
       "usage::multi_line_doc#1": "passes --usage",
       "usage::options_only#1": "passes --usage",
       "usage::root_module#1": "passes --usage",
-      "usage::submodule#1": "passes --usage",
-      "usage::usage_recipe_in_search_directory#1": "passes --usage"
+      "usage::submodule#1": "passes --usage"
     },
     "cli:verbose": {
       "fallback::fallback_from_subdir_verbose_message#1": "passes --verbose",
