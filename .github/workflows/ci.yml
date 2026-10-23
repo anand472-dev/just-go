@@ -1,0 +1,54 @@
+# Continuous integration. The platform matrix is in docs/platforms.md.
+#
+# Linux and macOS run the full gate: vet, tests, the conformance baseline,
+# coverage, and complexity. Windows is required by the spec; its job runs vet and
+# the tests, and it stays red until the Windows shell work (Phase 5, Task 32) is
+# done, because the tests that hardcode /bin/sh fail there. The BSDs are
+# best-effort: they are compiled and vetted, not run.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unix:
+    name: gate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install gocyclo
+        run: make tools
+      - name: Vet, test, baseline, coverage, complexity
+        run: make check cover cyclo
+
+  windows:
+    name: gate (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Vet and test
+        run: |
+          go vet ./...
+          go test ./...
+
+  cross:
+    name: build and vet for the best-effort platforms
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Cross-compile and vet
+        run: make cross
