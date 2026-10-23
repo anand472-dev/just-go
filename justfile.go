@@ -115,6 +115,9 @@ type RecipeInfo struct {
 	// Empty when absent.
 	Doc    string
 	Params []string // parameter names in declaration order; never nil
+	// Kinds is parallel to Params: "+" for a `+name` parameter, "*" for a `*name`
+	// one, and "" for one that takes a single argument. Never nil.
+	Kinds []string
 	// Defaults is parallel to Params: each default as written in the justfile,
 	// quotes included ("'x'", `"x"`, "(a + 'b')"), or "" for a parameter with
 	// none. Never nil.
@@ -196,15 +199,28 @@ func (j *Justfile) Recipes() []RecipeInfo {
 	for i, r := range recipes {
 		params := make([]string, len(r.Params))
 		defaults := make([]string, len(r.Params))
+		kinds := make([]string, len(r.Params))
 		for k, p := range r.Params {
-			params[k], defaults[k] = p.Name, p.DefaultText
+			params[k], defaults[k], kinds[k] = p.Name, p.DefaultText, kindMark(p.Kind)
 		}
 		infos[i] = RecipeInfo{
-			Name: r.Name, Doc: j.doc(&recipes[i]), Params: params, Defaults: defaults,
+			Name: r.Name, Doc: j.doc(&recipes[i]), Params: params, Defaults: defaults, Kinds: kinds,
 			Private: r.Private(), Groups: r.Groups(),
 		}
 	}
 	return infos
+}
+
+// kindMark is the mark a parameter of kind k is written with: "+", "*", or "".
+// Pure.
+func kindMark(k ast.ParamKind) string {
+	switch k {
+	case ast.ParamPlus:
+		return "+"
+	case ast.ParamStar:
+		return "*"
+	}
+	return ""
 }
 
 // doc is the doc of r: its `[doc]` attribute, evaluated and trimmed, nothing

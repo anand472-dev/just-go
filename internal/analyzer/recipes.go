@@ -87,10 +87,11 @@ func (r *recipeResolver) argumentCounts(rec *ast.Recipe) *diag.Error {
 				// A dependency on an absent module has no recipe to count against.
 				continue
 			}
-			found, lo, hi := len(dep.Args), required(callee), len(callee.Params)
-			if found < lo || found > hi {
+			found := len(dep.Args)
+			lo, hi, unbounded := callee.Arity()
+			if found < lo || !unbounded && found > hi {
 				return fail(r.jf, name(dep.Line, dep.Col, dep.Name), "dependency `%s` got %s but takes %s",
-					dep.Name, count(found, "argument"), takes(found, lo, hi))
+					dep.Name, count(found, "argument"), takes(found, lo, hi, unbounded))
 			}
 		}
 	}
@@ -105,27 +106,19 @@ func dependencyLists(rec *ast.Recipe) [2][]ast.Dependency {
 }
 
 // takes words the number of arguments a recipe accepts, as upstream's
-// DependencyArgumentCountMismatch does: exactly lo when lo is hi, else at
-// least lo when found is below it, else at most hi. It is pure.
-func takes(found, lo, hi int) string {
+// DependencyArgumentCountMismatch does: at least lo when the recipe is variadic,
+// exactly lo when lo is hi, else at least lo when found is below it, else at
+// most hi. It is pure.
+func takes(found, lo, hi int, unbounded bool) string {
 	switch {
+	case unbounded:
+		return "at least " + count(lo, "argument")
 	case lo == hi:
 		return count(lo, "argument")
 	case found < lo:
 		return "at least " + count(lo, "argument")
 	}
 	return "at most " + count(hi, "argument")
-}
-
-// required counts the parameters of rec that have no default. It is pure.
-func required(rec *ast.Recipe) int {
-	n := 0
-	for _, p := range rec.Params {
-		if p.Default == nil {
-			n++
-		}
-	}
-	return n
 }
 
 // count formats n and noun, adding "s" unless n is 1, as upstream's

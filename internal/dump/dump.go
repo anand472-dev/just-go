@@ -189,6 +189,12 @@ func param(p ast.Param) string {
 	if p.Exported {
 		s = "$" + s
 	}
+	switch p.Kind {
+	case ast.ParamPlus:
+		s = "+" + s
+	case ast.ParamStar:
+		s = "*" + s
+	}
 	if p.Default != nil {
 		s += "=" + expr(p.Default)
 	}

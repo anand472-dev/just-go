@@ -271,8 +271,8 @@ func TestParseErrorsNameTheFile(t *testing.T) {
 func TestRecipesReportsNameDocAndParams(t *testing.T) {
 	j := mustParse(t, "# builds it\nbuild target mode='fast':\n\techo hi\n\ntest:\n\techo t\n")
 	want := []RecipeInfo{
-		{Name: "build", Doc: "builds it", Params: []string{"target", "mode"}, Defaults: []string{"", "'fast'"}},
-		{Name: "test", Params: []string{}, Defaults: []string{}},
+		{Name: "build", Doc: "builds it", Params: []string{"target", "mode"}, Kinds: []string{"", ""}, Defaults: []string{"", "'fast'"}},
+		{Name: "test", Params: []string{}, Kinds: []string{}, Defaults: []string{}},
 	}
 	if got := j.Recipes(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Recipes = %+v, want %+v", got, want)

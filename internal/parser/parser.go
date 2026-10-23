@@ -825,18 +825,16 @@ func (p *parser) docFor(start lexer.Token, attrs attributeSet) string {
 }
 
 // header parses parameters, the colon, and dependencies, through the line
-// break. Upstream also looks for variadic (`+`, `*`) parameters,
-// which the subset does not have.
+// break. A variadic parameter is the last one: nothing that starts a parameter
+// may follow it.
 func (p *parser) header(r *ast.Recipe) error {
-	for p.isParam() {
+	for p.paramFollows(r) {
 		param, err := p.param()
 		if err != nil {
 			return err
 		}
 		r.Params = append(r.Params, param)
 	}
-	p.is(lexer.Plus)
-	p.is(lexer.Asterisk)
 	if _, err := p.expect(lexer.Colon); err != nil {
 		return err
 	}
@@ -931,21 +929,40 @@ func (p *parser) modulePath(name string) (string, error) {
 	return name, nil
 }
 
-// isParam reports whether a parameter starts at the current token.
-func (p *parser) isParam() bool {
-	param := p.is(lexer.Ident)
-	return p.is(lexer.Dollar) || param
+// paramFollows reports whether another parameter of r starts at the current
+// token. After a variadic parameter the grammar looks for no `+` or `*`, which
+// upstream does not list as expected; a name may still follow, and the analyzer
+// refuses it.
+func (p *parser) paramFollows(r *ast.Recipe) bool {
+	if r.Variadic() {
+		k := p.peek().Kind
+		return k == lexer.Ident || k == lexer.Dollar
+	}
+	return p.isParam()
 }
 
-// param parses a parameter and its default: `name`, `$name` for one that is
-// exported, and `=` followed by a value.
+// isParam reports whether a parameter starts at the current token.
+func (p *parser) isParam() bool {
+	return p.is(lexer.Ident) || p.is(lexer.Dollar) || p.is(lexer.Plus) || p.is(lexer.Asterisk)
+}
+
+// param parses a parameter and its default: `name`, with a `+` or `*` before
+// it for a variadic one, `$name` for one that is exported, and `=` followed by
+// a value.
 func (p *parser) param() (ast.Param, error) {
+	kind := ast.ParamSingle
+	switch {
+	case p.accept(lexer.Plus):
+		kind = ast.ParamPlus
+	case p.accept(lexer.Asterisk):
+		kind = ast.ParamStar
+	}
 	exported := p.accept(lexer.Dollar)
 	name, err := p.expect(lexer.Ident)
 	if err != nil {
 		return ast.Param{}, err
 	}
-	param := ast.Param{Name: name.Text, Exported: exported, Line: name.Line, Col: name.Col}
+	param := ast.Param{Name: name.Text, Kind: kind, Exported: exported, Line: name.Line, Col: name.Col}
 	if !p.accept(lexer.Equals) {
 		return param, nil
 	}

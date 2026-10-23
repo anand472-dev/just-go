@@ -119,18 +119,22 @@ func checkItems(jf *ast.Justfile) *diag.Error {
 // parameters checks the parameters of r for checkItems. It is pure.
 func parameters(jf *ast.Justfile, r ast.Recipe) *diag.Error {
 	seen := make(map[string]struct{}, len(r.Params))
-	passedDefault := false
+	passedDefault, passedVariadic := false, false
 	for _, p := range r.Params {
 		at := name(p.Line, p.Col, p.Name)
 		if _, ok := seen[p.Name]; ok {
 			return fail(jf, at, "recipe `%s` has duplicate parameter `%s`", r.Name, p.Name)
 		}
 		seen[p.Name] = struct{}{}
+		if passedVariadic {
+			return fail(jf, at, "parameter `%s` follows variadic parameter", p.Name)
+		}
 		if p.Default != nil {
 			passedDefault = true
-		} else if passedDefault {
+		} else if passedDefault && p.Kind == ast.ParamSingle {
 			return fail(jf, at, "non-default parameter `%s` follows default parameter", p.Name)
 		}
+		passedVariadic = p.Kind != ast.ParamSingle
 	}
 	return nil
 }

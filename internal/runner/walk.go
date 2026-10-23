@@ -151,21 +151,65 @@ func (inv *invocation) begin(r *ast.Recipe, args []string, at site) (frame, erro
 	for k, v := range inv.globals {
 		scope[k] = v
 	}
-	positional := make([]string, len(r.Params))
 	var cmd eval.Commander
 	if len(args) < len(r.Params) {
 		cmd = inv.commander(base, attr, at)
 	}
-	for i, p := range r.Params {
-		v := ""
-		if i < len(args) {
-			v = args[i]
-		} else if v, err = eval.EvaluateWith(p.Default, scope, cmd); err != nil {
-			return frame{}, locate(err, jf.File, r.Line)
+	def := func(p ast.Param) (string, error) {
+		v, err := eval.EvaluateWith(p.Default, scope, cmd)
+		if err != nil {
+			return "", locate(err, jf.File, r.Line)
 		}
-		scope[p.Name], positional[i] = v, v
+		return v, nil
+	}
+	positional, err := bindArgs(r, args, scope, def)
+	if err != nil {
+		return frame{}, err
 	}
 	return frame{at: at, scope: scope, positional: positional, exported: paramEnv(jf, r, scope, base), attr: attr}, nil
+}
+
+// bindArgs sets each parameter of r in scope from args, and returns the
+// positional values in order: one for each argument a single parameter takes,
+// and each argument a variadic parameter takes. A variadic parameter takes the
+// rest of the arguments, and in scope it is them joined with spaces. A parameter
+// with no argument left takes its default, through def, if it has one; a
+// variadic parameter with no default and no argument is empty. The arguments
+// have already been counted (see checkArgCount). Pure apart from def.
+func bindArgs(r *ast.Recipe, args []string, scope eval.Scope, def func(ast.Param) (string, error)) ([]string, error) {
+	var positional []string
+	for i, p := range r.Params {
+		if p.Kind == ast.ParamSingle {
+			v := ""
+			if i < len(args) {
+				v = args[i]
+			} else if p.Default != nil {
+				var err error
+				if v, err = def(p); err != nil {
+					return nil, err
+				}
+			}
+			scope[p.Name] = v
+			positional = append(positional, v)
+			continue
+		}
+		if i >= len(args) {
+			v := ""
+			if p.Default != nil {
+				var err error
+				if v, err = def(p); err != nil {
+					return nil, err
+				}
+				positional = append(positional, v)
+			}
+			scope[p.Name] = v
+			continue
+		}
+		rest := args[i:]
+		scope[p.Name] = strings.Join(rest, " ")
+		positional = append(positional, rest...)
+	}
+	return positional, nil
 }
 
 // stepOf makes the step that runs the commands of r: it evaluates the

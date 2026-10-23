@@ -586,7 +586,7 @@ func setFlag(cfg *config, long, value string) error {
 func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error) {
 	params := make(map[string]int, len(infos))
 	for _, info := range infos {
-		params[info.Name] = len(info.Params)
+		params[info.Name] = argCount(info)
 	}
 	var calls []just.Call
 	for i := 0; i < len(words); {
@@ -597,11 +597,23 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 			}
 			return nil, missingRecipe(words[i], infos)
 		}
-		take := min(n, len(words)-i-1)
+		take := len(words) - i - 1
+		if n >= 0 {
+			take = min(n, take)
+		}
 		calls = append(calls, just.Call{Recipe: words[i], Args: append([]string(nil), words[i+1:i+1+take]...)})
 		i += 1 + take
 	}
 	return calls, nil
+}
+
+// argCount is how many words a recipe takes after its name: its parameters, or
+// -1 when its last parameter is variadic, since that takes every word left. Pure.
+func argCount(info just.RecipeInfo) int {
+	if n := len(info.Kinds); n > 0 && info.Kinds[n-1] != "" {
+		return -1
+	}
+	return len(info.Params)
 }
 
 // wordParams is the number of parameters of the recipe a word runs. A word
@@ -615,7 +627,7 @@ func wordParams(word string, params map[string]int, infos []just.RecipeInfo) (in
 	module := strings.TrimSuffix(word, "::")
 	for _, info := range infos {
 		if rest, ok := strings.CutPrefix(info.Name, module+"::"); ok && !strings.Contains(rest, "::") {
-			return len(info.Params), true
+			return argCount(info), true
 		}
 	}
 	return 0, false
@@ -778,6 +790,9 @@ func signature(info just.RecipeInfo) string {
 	words := make([]string, 0, 1+len(info.Params))
 	words = append(words, info.Name)
 	for i, name := range info.Params {
+		if i < len(info.Kinds) {
+			name = info.Kinds[i] + name
+		}
 		if i < len(info.Defaults) && info.Defaults[i] != "" {
 			name += "=" + info.Defaults[i]
 		}

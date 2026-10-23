@@ -481,28 +481,25 @@ func callKey(name string, args []string) string {
 	return fmt.Sprintf("%s\x00%d\x00%s", name, len(args), strings.Join(args, "\x00"))
 }
 
-// requiredParams counts the parameters of r that have no default. It is pure.
+// requiredParams is the fewest arguments r takes. It is pure.
 func requiredParams(r *ast.Recipe) int {
-	n := 0
-	for _, p := range r.Params {
-		if p.Default == nil {
-			n++
-		}
-	}
-	return n
+	lo, _, _ := r.Arity()
+	return lo
 }
 
 // checkArgCount reports a usage error, worded as upstream's
 // PositionalArgumentCountMismatch, when found arguments do not fit r's
 // parameters. It is pure.
 func checkArgCount(r *ast.Recipe, found int) error {
-	lo, hi := requiredParams(r), len(r.Params)
-	if found >= lo && found <= hi {
+	lo, hi, unbounded := r.Arity()
+	if found >= lo && (unbounded || found <= hi) {
 		return nil
 	}
 	got := fmt.Sprintf("recipe `%s` got %s but", r.Name, count(found, "positional argument"))
 	var takes string
 	switch {
+	case unbounded:
+		takes = fmt.Sprintf("takes at least %d", lo)
 	case lo == hi && found > hi:
 		takes = fmt.Sprintf("only takes %d", hi)
 	case lo == hi:
@@ -520,11 +517,15 @@ func checkArgCount(r *ast.Recipe, found int) error {
 func usageLine(r *ast.Recipe) string {
 	words := []string{"just", r.Name}
 	for _, p := range r.Params {
+		name := p.Name
+		if p.Kind != ast.ParamSingle {
+			name += "..."
+		}
 		if p.Default != nil {
-			words = append(words, "["+p.Name+"]")
+			words = append(words, "["+name+"]")
 			continue
 		}
-		words = append(words, p.Name)
+		words = append(words, name)
 	}
 	return strings.Join(words, " ")
 }

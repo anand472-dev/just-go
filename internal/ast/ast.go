@@ -477,9 +477,23 @@ type Dependency struct {
 	Col  int
 }
 
+// ParamKind is how a parameter takes its arguments.
+type ParamKind int
+
+// The kinds of parameter: one argument; one or more (`+`); or zero or more
+// (`*`). Only the last parameter of a recipe may be variadic.
+const (
+	ParamSingle ParamKind = iota
+	ParamPlus
+	ParamStar
+)
+
 // Param is a recipe parameter. Line and Col locate the name.
 type Param struct {
 	Name string
+	// Kind is ParamPlus for `+name` and ParamStar for `*name`; a parameter
+	// that takes one argument is ParamSingle.
+	Kind ParamKind
 	// Exported is true for `$name`, which puts the parameter in the
 	// environment of the recipe's commands.
 	Exported bool
@@ -490,6 +504,28 @@ type Param struct {
 	DefaultText string
 	Line        int
 	Col         int
+}
+
+// Arity is the number of arguments r takes: at least lo, and at most hi unless
+// unbounded is true, which it is when the last parameter is variadic. A
+// parameter with no default needs an argument, except a `*` parameter, which
+// may have none. It is pure.
+func (r *Recipe) Arity() (lo, hi int, unbounded bool) {
+	for _, p := range r.Params {
+		if p.Default == nil && p.Kind != ParamStar {
+			lo++
+		}
+		if p.Kind != ParamSingle {
+			unbounded = true
+		}
+	}
+	return lo, len(r.Params), unbounded
+}
+
+// Variadic reports whether the last parameter of r takes the rest of the
+// arguments, `+name` or `*name`. It is pure.
+func (r *Recipe) Variadic() bool {
+	return len(r.Params) > 0 && r.Params[len(r.Params)-1].Kind != ParamSingle
 }
 
 // Prefix is the set of marks that may precede a recipe line.
