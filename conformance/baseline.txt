@@ -179,6 +179,8 @@ dotenv::command_conflicts_with_dotenv_path_setting#1
 dotenv::command_conflicts_with_dotenv_required_setting#1
 dotenv::command_does_not_override_environment#1
 dotenv::command_failure#1
+dotenv::command_option#1
+dotenv::command_option_multiple#1
 dotenv::command_setting#1
 dotenv::command_with_override#1
 dotenv::directory_is_ignored#1
@@ -195,8 +197,16 @@ dotenv::dotenv_variable_in_function_in_backtick#1
 dotenv::dotenv_variable_in_function_in_recipe#1
 dotenv::dotenv_variable_in_recipe#1
 dotenv::error_message#1
+dotenv::filename_flag_overwrites_no_load#1
 dotenv::filename_list_requires_lists_setting#1
+dotenv::filename_resolves#1
+dotenv::multiple_arguments_require_lists_setting#1
+dotenv::no_dotenv#1
 dotenv::no_warning#1
+dotenv::path_flag_overwrites_no_load#1
+dotenv::path_resolves#1
+dotenv::program_argument_has_priority_for_dotenv_filename#1
+dotenv::program_argument_has_priority_for_dotenv_path#1
 dotenv::set_false#1
 dotenv::set_implicit#1
 dotenv::set_true#1

@@ -77,6 +77,9 @@ type Plan struct {
 	// their names (a module's variable is `module::name`). An overridden
 	// variable takes its value, and its expression is not evaluated.
 	Overrides map[string]string
+	// Dotenv holds the dotenv choices of the command line, which replace the
+	// justfile's settings; see DotenvFlags.
+	Dotenv DotenvFlags
 	Exec              sys.Process // nil uses the OS implementation from internal/sys
 	// FS is where script recipes write their scripts, in a directory it makes
 	// and removes again. Nil uses the OS implementation from internal/sys.

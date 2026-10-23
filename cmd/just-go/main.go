@@ -84,6 +84,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		SearchFrom:        workDir,
 		Ceiling:           resolve(workDir, cfg.ceiling),
 		JustfileNames:     cfg.justfileNames,
+		Dotenv:            dotenvOf(cfg),
 		WorkDir:           runDir(cfg, workDir),
 		Env:               env,
 		InvocationDir:     workDir,
@@ -286,6 +287,21 @@ func startDir(cfg config, workDir string) string {
 	return resolve(workDir, cfg.workingDirectory)
 }
 
+// dotenvOf are the dotenv choices the command line makes. Nil lists mean the flag
+// was not given, so the justfile's setting stands. Pure.
+func dotenvOf(cfg config) just.DotenvFlags {
+	return just.DotenvFlags{Filename: cfg.dotenvFilename, Path: cfg.dotenvPath, Command: cfg.dotenvCommand, NoDotenv: cfg.noDotenv}
+}
+
+// dotenvError is the error for a command line that gives --dotenv-filename or
+// --dotenv-path more than once, which needs `set lists`. It is nil for one each. Pure.
+func dotenvError(cfg config) error {
+	if len(cfg.dotenvFilename) > 1 || len(cfg.dotenvPath) > 1 {
+		return usage("multiple `--dotenv-filename` or `--dotenv-path` arguments require `set lists`")
+	}
+	return nil
+}
+
 // childStreams are the streams the recipes write to: the command's own, or
 // nothing when quiet, as upstream's --quiet discards the recipes' output too.
 // Pure.
@@ -469,6 +485,10 @@ type config struct {
 	// choose is --choose; chooser is the --chooser command, if given.
 	choose  bool
 	chooser string
+	// dotenvFilename, dotenvPath and dotenvCommand are the repeatable dotenv
+	// flags; noDotenv is --no-dotenv.
+	dotenvFilename, dotenvPath, dotenvCommand []string
+	noDotenv                                  bool
 	// workingDirectory is --working-directory, and ceiling --ceiling: where the
 	// command runs and starts its search, and the directory it does not search above.
 	workingDirectory string
@@ -643,7 +663,7 @@ func overridesOf(cfg *config) error {
 			return usage("invalid override path `%s`", name)
 		}
 	}
-	return nil
+	return dotenvError(*cfg)
 }
 
 // chooseCalls is the recipes the command line names, each with its arguments.
@@ -739,6 +759,9 @@ type flagSpec struct {
 var flags = []flagSpec{
 	{"allow-outside-project-paths", switchFlag},
 	{"ceiling", valueFlag},
+	{"dotenv-command", valueFlag},
+	{"dotenv-filename", valueFlag},
+	{"dotenv-path", valueFlag},
 	{"choose", switchFlag},
 	{"chooser", valueFlag},
 	{"completions", valueFlag},
@@ -754,6 +777,7 @@ var flags = []flagSpec{
 	{"justfile-name", valueFlag},
 	{"groups", switchFlag},
 	{"list-heading", valueFlag},
+	{"no-dotenv", switchFlag},
 	{"list-prefix", valueFlag},
 	{"list-submodules", switchFlag},
 	{"shell", valueFlag},
@@ -822,6 +846,7 @@ var switches = map[string]func(*config){
 	"allow-outside-project-paths": func(c *config) { c.allowOutside = true },
 	"choose":                      func(c *config) { c.choose = true },
 	"dump":                        func(c *config) { c.dump = true },
+	"no-dotenv":                   func(c *config) { c.noDotenv = true },
 	"edit":                        func(c *config) { c.edit = true },
 	"init":                        func(c *config) { c.init = true },
 	"groups":                      func(c *config) { c.groups = true },
@@ -850,6 +875,9 @@ var setters = map[string]func(*config, string) error{
 	"indentation":       func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
 	"justfile":          func(c *config, v string) error { c.justfile = v; return nil },
 	"ceiling":           func(c *config, v string) error { c.ceiling = v; return nil },
+	"dotenv-command":    func(c *config, v string) error { c.dotenvCommand = append(c.dotenvCommand, v); return nil },
+	"dotenv-filename":   func(c *config, v string) error { c.dotenvFilename = append(c.dotenvFilename, v); return nil },
+	"dotenv-path":       func(c *config, v string) error { c.dotenvPath = append(c.dotenvPath, v); return nil },
 	"chooser":           func(c *config, v string) error { c.chooser = v; return nil },
 	"working-directory": func(c *config, v string) error { c.workingDirectory = v; return nil },
 	"group":             func(c *config, v string) error { c.group = append(c.group, v); return nil },

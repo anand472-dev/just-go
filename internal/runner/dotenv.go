@@ -30,6 +30,10 @@ const defaultDotenvFilename = ".env"
 func loadDotenv(ctx context.Context, plan Plan, fsys sys.FS, exec sys.Process, set settings.Resolved) ([]string, error) {
 	jf := plan.Justfile
 	dir := filepath.Dir(jf.File)
+	if plan.Dotenv.NoDotenv {
+		return plan.Env, nil
+	}
+	set = plan.Dotenv.apply(set)
 	if set.DotenvCommand != nil {
 		return loadDotenvCommand(ctx, plan, exec, dir, set)
 	}
@@ -73,19 +77,48 @@ func loadDotenvFile(fsys sys.FS, plan Plan, path string) ([]string, error) {
 // loadDotenvCommand runs the dotenv-command through the justfile's shell and
 // reads its output as a dotenv file.
 func loadDotenvCommand(ctx context.Context, plan Plan, exec sys.Process, dir string, set settings.Resolved) ([]string, error) {
-	command := set.DotenvCommand[len(set.DotenvCommand)-1]
-	argv := append(append([]string(nil), shellOf(set)...), command)
-	out, err := sys.Capture(ctx, exec, sys.ProcessSpec{Argv: argv, Dir: dir, Env: plan.Env})
-	if err != nil {
-		return nil, fmt.Errorf("dotenv command `%s` failed: %s", command, sys.ErrorText(err))
-	}
-	if out.ExitCode != 0 {
-		return nil, &diag.Error{
-			Kind: diag.KindRuntime, ExitCode: out.ExitCode,
-			Msg: fmt.Sprintf("dotenv command `%s` failed: process exited with status code %d", command, out.ExitCode),
+	env := plan.Env
+	for _, command := range set.DotenvCommand {
+		argv := append(append([]string(nil), shellOf(set)...), command)
+		plan.Env = env
+		out, err := sys.Capture(ctx, exec, sys.ProcessSpec{Argv: argv, Dir: dir, Env: env})
+		if err != nil {
+			return nil, fmt.Errorf("dotenv command `%s` failed: %s", command, sys.ErrorText(err))
+		}
+		if out.ExitCode != 0 {
+			return nil, &diag.Error{
+				Kind: diag.KindRuntime, ExitCode: out.ExitCode,
+				Msg: fmt.Sprintf("dotenv command `%s` failed: process exited with status code %d", command, out.ExitCode),
+			}
+		}
+		if env, err = mergeDotenv(plan, out.Stdout, command); err != nil {
+			return nil, err
 		}
 	}
-	return mergeDotenv(plan, out.Stdout, command)
+	return env, nil
+}
+
+// DotenvFlags are the dotenv choices the command line makes, which replace the
+// justfile's settings for the run: a filename, a path, or commands, each given
+// once; and NoDotenv, which loads no file or command at all.
+type DotenvFlags struct {
+	Filename, Path, Command []string
+	NoDotenv                bool
+}
+
+// apply is set with the flags' values in place of the justfile's, for each the
+// flags give. It is pure.
+func (f DotenvFlags) apply(set settings.Resolved) settings.Resolved {
+	if f.Filename != nil {
+		set.DotenvFilename = f.Filename
+	}
+	if f.Path != nil {
+		set.DotenvPath = f.Path
+	}
+	if f.Command != nil {
+		set.DotenvCommand = f.Command
+	}
+	return set
 }
 
 // shellOf is the shell the justfile names, or the default one.

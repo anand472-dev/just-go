@@ -45,7 +45,7 @@ type Options struct {
 	// JustfileNames are the names a justfile may have, in place of "justfile" and
 	// ".justfile"; nil means those.
 	JustfileNames []string
-	WorkDir string // working directory for recipes; empty means the justfile's directory
+	WorkDir       string // working directory for recipes; empty means the justfile's directory
 	// InvocationDir is the directory the command was run from, where recipes
 	// run under set no-cd. Empty means WorkDir.
 	InvocationDir string
@@ -56,13 +56,16 @@ type Options struct {
 	// Overrides are the values given on the command line for variables, by name
 	// (a module's variable is `module::name`); see runner.Plan.Overrides.
 	Overrides map[string]string
-	Stdin     io.Reader // nil means no input; commands, and the commands of backticks, read it
-	Stdout    io.Writer // nil discards
-	Stderr    io.Writer // nil discards; receives echoed commands and failure messages
-	Recipes   []string  // recipes to run; empty means the first recipe in the file
-	Args      []string  // positional arguments for the single requested recipe
-	Calls     []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
-	Quiet     bool      // suppress command echo, as if `set quiet` held
+	// Dotenv are the dotenv choices of the command line, which replace the
+	// justfile's settings for the run; see runner.DotenvFlags.
+	Dotenv  DotenvFlags
+	Stdin   io.Reader // nil means no input; commands, and the commands of backticks, read it
+	Stdout  io.Writer // nil discards
+	Stderr  io.Writer // nil discards; receives echoed commands and failure messages
+	Recipes []string  // recipes to run; empty means the first recipe in the file
+	Args    []string  // positional arguments for the single requested recipe
+	Calls   []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
+	Quiet   bool      // suppress command echo, as if `set quiet` held
 	// Yes answers yes to every `[confirm]` prompt without asking, as
 	// upstream's --yes does. Without it a prompt is written to Prompt and the
 	// answer is read, one line, from Stdin; no Stdin means no.
@@ -456,6 +459,9 @@ func (j *Justfile) Variables() []string {
 	return names
 }
 
+// DotenvFlags are the dotenv choices of the command line; see runner.DotenvFlags.
+type DotenvFlags = runner.DotenvFlags
+
 // RunCommand runs argv as a child of the justfile, with the environment its
 // recipes see at the top level: its exported variables, and its dotenv values.
 // It returns the child's exit code; a child that fails or cannot start is an
@@ -507,6 +513,7 @@ func (j *Justfile) plan(opts Options) (runner.Plan, error) {
 		Recipes:           opts.Recipes,
 		AllowOutsidePaths: opts.AllowOutsidePaths,
 		Overrides:         opts.Overrides,
+		Dotenv:            opts.Dotenv,
 		Args:              opts.Args,
 		Calls:             runnerCalls(opts.Calls),
 		Env:               opts.Env,

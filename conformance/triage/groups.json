@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1069,
-    "fail": 919,
+    "pass": 1079,
+    "fail": 909,
     "skip": 23,
     "total": 2011
   },
@@ -16,9 +16,7 @@
     "cli:color": 12,
     "cli:command-color": 1,
     "cli:default-list": 2,
-    "cli:dotenv-command": 3,
-    "cli:dotenv-filename": 3,
-    "cli:dotenv-path": 3,
+    "cli:dotenv-command": 1,
     "cli:dry-run": 4,
     "cli:dump": 104,
     "cli:evaluate": 31,
@@ -36,7 +34,6 @@
     "cli:man": 1,
     "cli:no-aliases": 1,
     "cli:no-deps": 3,
-    "cli:no-dotenv": 1,
     "cli:one": 2,
     "cli:request": 3,
     "cli:search-directory": 2,
@@ -58,7 +55,7 @@
     "setting:fallback": 6,
     "shebang": 1,
     "unstable:cached-recipes": 85,
-    "unstable:lists": 241,
+    "unstable:lists": 240,
     "unstable:user-defined-functions": 32
   },
   "groups": {
@@ -231,19 +228,7 @@
       "default::default_list_flag_lists_recipes#1": "passes --default-list"
     },
     "cli:dotenv-command": {
-      "dotenv::command_only_runs_in_root_module#1": "passes --dotenv-command",
-      "dotenv::command_option#1": "passes --dotenv-command",
-      "dotenv::command_option_multiple#1": "passes --dotenv-command"
-    },
-    "cli:dotenv-filename": {
-      "dotenv::filename_flag_overwrites_no_load#1": "passes --dotenv-filename",
-      "dotenv::filename_resolves#1": "passes --dotenv-filename",
-      "dotenv::program_argument_has_priority_for_dotenv_filename#1": "passes --dotenv-filename"
-    },
-    "cli:dotenv-path": {
-      "dotenv::path_flag_overwrites_no_load#1": "passes --dotenv-path",
-      "dotenv::path_resolves#1": "passes --dotenv-path",
-      "dotenv::program_argument_has_priority_for_dotenv_path#1": "passes --dotenv-path"
+      "dotenv::command_only_runs_in_root_module#1": "passes --dotenv-command"
     },
     "cli:dry-run": {
       "dotenv::command_is_not_executed_in_dry_run#1": "passes --dry-run",
@@ -474,9 +459,6 @@
       "no_dependencies::skip_dependency_multi#1": "passes --no-deps",
       "no_dependencies::skip_normal_dependency#1": "passes --no-deps",
       "no_dependencies::skip_prior_dependency#1": "passes --no-deps"
-    },
-    "cli:no-dotenv": {
-      "dotenv::no_dotenv#1": "passes --no-dotenv"
     },
     "cli:one": {
       "run::one_flag_only_allows_one_invocation#1": "passes --one",
@@ -903,7 +885,6 @@
       "dotenv::filename_list_stops_at_first_directory#1": "uses `set lists`",
       "dotenv::list_does_not_override_environment#1": "uses `set lists`",
       "dotenv::list_override#1": "uses `set lists`",
-      "dotenv::multiple_arguments_require_lists_setting#1": "expects the unstable gate: require `set lists`",
       "dotenv::path_argument_list#1": "uses `set lists`",
       "dotenv::path_list_falls_through_to_filename_search#1": "uses `set lists`",
       "dotenv::path_list_last_wins#1": "uses `set lists`",
