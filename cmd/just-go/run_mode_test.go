@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
 
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/sys/sysfake"
 )
 
 // --jobs takes a positive number, and each refusal has upstream's wording.
@@ -73,5 +75,96 @@ func TestRunDryRunWritesLinesAndRunsNothing(t *testing.T) {
 	got := runFake(t, map[string]string{"/w/justfile": "foo:\n  echo {{ `date` }}\n"}, nil, "--dry-run", "foo")
 	if got.code != 0 || got.stderr != "echo `date`\n" || len(got.proc.Specs) != 0 {
 		t.Errorf("run = %d, stderr %q, ran %d", got.code, got.stderr, len(got.proc.Specs))
+	}
+}
+
+// --justfile - reads the justfile from standard input, and the recipes run in
+// the --working-directory given.
+func TestRunReadsTheJustfileFromStdin(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	proc := &sysfake.FakeProcess{}
+	fsys := sysfake.FakeFS{"/w/bar/baz": "qux"}
+	code := run([]string{"--justfile", "-", "--working-directory", "bar"}, nil, "/w", strings.NewReader("@foo:\n  cat baz\n"), &stdout, &stderr, fsys, proc)
+	if code != 0 || len(proc.Specs) != 1 || proc.Specs[0].Dir != "/w/bar" {
+		t.Errorf("run = %d, stderr %q, specs %+v", code, stderr.String(), proc.Specs)
+	}
+}
+
+// A justfile path with no parent is an error, as upstream reports it.
+func TestRunRefusesAJustfilePathWithNoParent(t *testing.T) {
+	got := runFake(t, nil, nil, "--justfile", "/", "--list")
+	if got.code != 1 || got.stderr != "error: justfile path had no parent: /\n" {
+		t.Errorf("run = %d, stderr %q", got.code, got.stderr)
+	}
+}
+
+// A relative --justfile is found from where the command was run, and the recipes
+// run in the --working-directory.
+func TestRunJustfileResolvesFromTheInvocationDirectory(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/foo.md": "```just\n@foo:\n  cat baz\n```\n", "/w/bar/baz": "qux"}, nil,
+		"--justfile", "foo.md", "--working-directory", "bar")
+	if got.code != 0 || len(got.proc.Specs) != 1 || got.proc.Specs[0].Dir != "/w/bar" {
+		t.Errorf("run = %d, stderr %q, specs %+v", got.code, got.stderr, got.proc.Specs)
+	}
+}
+
+// --init cannot write a justfile that is read from standard input.
+func TestInitRefusesAJustfileFromStandardInput(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--justfile", "-", "--init"}, nil, "/w", strings.NewReader(""), &stdout, &stderr, sysfake.FakeFS{}, &sysfake.FakeProcess{})
+	if code != 1 || stderr.String() != "error: cannot use justfile from standard input with `--init`\n" {
+		t.Errorf("run = %d, stderr %q", code, stderr.String())
+	}
+}
+
+// errReader is a standard input that cannot be read.
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("broken stdin") }
+
+// stdinSource reads the justfile from stdin only when --justfile is `-`; with no
+// stdin it is empty, and a read that fails is an error.
+func TestStdinSourceReadsOnlyForAStdinJustfile(t *testing.T) {
+	if got, err := stdinSource(config{justfile: "x"}, strings.NewReader("ignored")); got != nil || err != nil {
+		t.Errorf("stdinSource of a named file = %q, %v", got, err)
+	}
+	if got, err := stdinSource(config{justfile: "-"}, nil); got == nil || len(got) != 0 || err != nil {
+		t.Errorf("stdinSource with no stdin = %q, %v", got, err)
+	}
+	if _, err := stdinSource(config{justfile: "-"}, errReader{}); err == nil {
+		t.Errorf("stdinSource of a broken stdin gave no error")
+	}
+}
+
+// A broken stdin is reported as the run's error.
+func TestRunReportsABrokenStdin(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--justfile", "-"}, nil, "/w", errReader{}, &stdout, &stderr, sysfake.FakeFS{}, &sysfake.FakeProcess{})
+	if code != 1 || !strings.Contains(stderr.String(), "broken stdin") {
+		t.Errorf("run = %d, stderr %q", code, stderr.String())
+	}
+}
+
+// --init --quiet refuses a stdin justfile silently.
+func TestInitRefusesStdinQuietly(t *testing.T) {
+	var stderr bytes.Buffer
+	if code := writeInit(config{justfile: "-", quiet: true}, "/w", sysfake.FakeFS{}, &stderr); code != 1 || stderr.Len() != 0 {
+		t.Errorf("writeInit = %d, stderr %q", code, stderr.String())
+	}
+}
+
+// --init writes the --justfile if given, else the --justfile-name, else justfile.
+func TestInitNameFollowsTheFlagsGiven(t *testing.T) {
+	for _, c := range []struct {
+		cfg  config
+		want string
+	}{
+		{config{justfile: "a.md", justfileName: "b"}, "a.md"},
+		{config{justfileName: "b"}, "b"},
+		{config{}, "justfile"},
+	} {
+		if got := initName(c.cfg); got != c.want {
+			t.Errorf("initName(%+v) = %q; want %q", c.cfg, got, c.want)
+		}
 	}
 }

@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1113,
-    "fail": 874,
+    "pass": 1129,
+    "fail": 858,
     "skip": 24,
     "total": 2011
   },
@@ -10,20 +10,17 @@
     "cli:alias-style": 3,
     "cli:ceiling": 6,
     "cli:check": 2,
-    "cli:choose": 3,
+    "cli:choose": 2,
     "cli:clean": 1,
     "cli:color": 12,
     "cli:command-color": 1,
     "cli:dotenv-command": 1,
-    "cli:dump": 104,
+    "cli:dump": 103,
     "cli:evaluate": 31,
     "cli:fmt": 24,
     "cli:global-justfile": 4,
     "cli:groups": 1,
-    "cli:init": 2,
     "cli:json": 1,
-    "cli:justfile": 2,
-    "cli:justfile-name": 1,
     "cli:list": 7,
     "cli:list-submodules": 8,
     "cli:no-aliases": 1,
@@ -36,11 +33,10 @@
     "cli:unsorted": 3,
     "cli:usage": 10,
     "cli:verbose": 1,
-    "cli:working-directory": 3,
     "completions": 12,
     "dotenv": 1,
-    "grammar": 51,
-    "module": 83,
+    "grammar": 46,
+    "module": 82,
     "setting:fallback": 6,
     "shebang": 1,
     "unstable:cached-recipes": 85,
@@ -181,7 +177,6 @@
     },
     "cli:choose": {
       "choose::invoke_error_function#1": "passes --choose",
-      "choose::skip_recipes_in_private_modules#1": "passes --choose",
       "quiet::choose_invocation#1": "passes --choose"
     },
     "cli:clean": {
@@ -306,7 +301,6 @@
       "json::simple#1": "passes --dump",
       "json::single_metadata_attribute#1": "passes --dump",
       "lazy::eager_assignment_dump#1": "passes --dump",
-      "markdown::dump#1": "passes --dump",
       "modules::modules_are_dumped_correctly#1": "passes --dump",
       "modules::modules_with_paths_are_dumped_correctly#1": "passes --dump",
       "modules::optional_modules_are_dumped_correctly#1": "passes --dump",
@@ -381,19 +375,8 @@
     "cli:groups": {
       "groups::reject_extra_arguments#1": "passes --groups"
     },
-    "cli:init": {
-      "justfile_from_stdin::init_error#1": "passes --init",
-      "markdown::init_error#1": "passes --init"
-    },
     "cli:json": {
       "dump::json#1": "passes --json"
-    },
-    "cli:justfile": {
-      "justfile_from_stdin::no_working_directory#1": "reads the justfile from standard input",
-      "justfile_from_stdin::parse_error#1": "reads the justfile from standard input"
-    },
-    "cli:justfile-name": {
-      "markdown::justfile_found_by_name_is_tangled#1": "passes --justfile-name"
     },
     "cli:list": {
       "alias::module_alias_resolves_in_list#1": "lists a submodule",
@@ -470,11 +453,6 @@
     "cli:verbose": {
       "fallback::fallback_from_subdir_verbose_message#1": "passes --verbose"
     },
-    "cli:working-directory": {
-      "justfile_from_stdin::with_working_directory#1": "passes --working-directory",
-      "markdown::with_working_directory#1": "passes --working-directory",
-      "search::justfile_with_no_parent_returns_correct_error#1": "passes --working-directory"
-    },
     "completions": {
       "completions::aliases_completed_with_environment_variable#1": "generates or runs completions",
       "completions::aliases_completed_with_flag#1": "generates or runs completions",
@@ -514,11 +492,6 @@
       "format_string::unmatched_close_is_ignored#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unterminated_format_string_error#1": "just-go reports a parse error: unterminated string",
       "functions::recipe_name_ignores_alias#1": "uses `alias`",
-      "markdown::code_blocks_are_concatenated#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
-      "markdown::extension_is_case_insensitive#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
-      "markdown::line_numbers_are_preserved#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
-      "markdown::non_just_code_blocks_are_ignored#1": "just-go reports a parse error: unterminated backtick",
-      "markdown::working_directory_is_markdown_file_directory#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
       "misc::alias#1": "uses `alias`",
       "misc::alias_listing#1": "uses `alias`",
       "misc::alias_listing_multiple_aliases#1": "uses `alias`",
@@ -620,7 +593,6 @@
       "os_attributes::disabled_module_file_not_required#1": "uses mod or import",
       "os_attributes::import#1": "uses mod or import",
       "os_attributes::module#1": "uses mod or import",
-      "private::private_attribute_for_module#1": "uses mod or import",
       "scope::aliases_in_submodules_run_with_submodule_scope#1": "uses mod or import",
       "scope::dependencies_in_nested_submodules_run_with_submodule_scope#1": "uses mod or import",
       "settings::submodule_expression#1": "uses mod or import",

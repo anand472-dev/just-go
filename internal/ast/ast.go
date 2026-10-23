@@ -71,10 +71,13 @@ type Module struct {
 	Name     string
 	Path     string
 	Optional bool
-	Doc      string
-	Line     int
-	Col      int
-	Width    int
+	// Private is true for a module with the [private] attribute: its recipes are
+	// private too, so listings and the chooser leave them out.
+	Private bool
+	Doc     string
+	Line    int
+	Col     int
+	Width   int
 }
 
 // Import is an `import` or `import?` statement. Path is the string as written,

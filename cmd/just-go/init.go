@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 
 	"gitea.com/wimwian/just-go/internal/loader"
 	"gitea.com/wimwian/just-go/internal/sys"
@@ -14,31 +13,46 @@ import (
 const starterJustfile = "# https://just.systems\n\ndefault:\n    echo 'Hello, world!'\n"
 
 // writeInit writes the starter justfile to the directory the command runs in,
-// under the --justfile-name, else "justfile". An existing justfile is an error,
+// at the --justfile, else under the --justfile-name, else as "justfile". A
+// justfile from standard input cannot be written. An existing justfile is an error,
 // and so is a file that cannot be written. Impure: it writes the file system and
 // reports on stderr unless quiet.
 func writeInit(cfg config, workDir string, fsys sys.FS, stderr io.Writer) int {
-	name := "justfile"
-	if cfg.justfileName != "" {
-		name = cfg.justfileName
+	if cfg.justfile == "-" {
+		return initFailed(cfg, stderr, "cannot use justfile from standard input with `--init`")
 	}
-	path := filepath.Join(workDir, name)
+	path := resolve(workDir, initName(cfg))
 	if exists, err := fsys.IsFile(path); err != nil || exists {
-		if !cfg.quiet {
-			_, _ = fmt.Fprintf(stderr, "error: justfile `%s` already exists\n", path)
-		}
-		return exitFailure
+		return initFailed(cfg, stderr, fmt.Sprintf("justfile `%s` already exists", path))
 	}
 	if err := fsys.WriteFile(path, []byte(starterJustfile), 0o644); err != nil {
-		if !cfg.quiet {
-			_, _ = fmt.Fprintf(stderr, "error: failed to write justfile to `%s`: %s\n", path, sys.ErrorText(err))
-		}
-		return exitFailure
+		return initFailed(cfg, stderr, fmt.Sprintf("failed to write justfile to `%s`: %s", path, sys.ErrorText(err)))
 	}
 	if !cfg.quiet {
 		_, _ = fmt.Fprintf(stderr, "wrote justfile to `%s`\n", path)
 	}
 	return 0
+}
+
+// initName is the name --init writes: the --justfile if given, else the
+// --justfile-name, else "justfile". Pure.
+func initName(cfg config) string {
+	switch {
+	case cfg.justfile != "":
+		return cfg.justfile
+	case cfg.justfileName != "":
+		return cfg.justfileName
+	}
+	return "justfile"
+}
+
+// initFailed reports why --init did not write, unless quiet, and returns the
+// failure status. Impure: it writes to stderr.
+func initFailed(cfg config, stderr io.Writer, msg string) int {
+	if !cfg.quiet {
+		_, _ = fmt.Fprintf(stderr, "error: %s\n", msg)
+	}
+	return exitFailure
 }
 
 // editJustfile runs the editor, VISUAL or else EDITOR, on the justfile the

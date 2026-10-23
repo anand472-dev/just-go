@@ -61,6 +61,10 @@ type Options struct {
 	Dotenv DotenvFlags
 	// NoDeps and Verbose are --no-deps and --verbose; see runner.Plan.
 	NoDeps, Verbose bool
+	// Source, when not nil, is the justfile's text, read in place of a file;
+	// SourceName is its name in errors, such as <stdin>.
+	Source     []byte
+	SourceName string
 	// DryRun, Explain, Time and Timestamp are --dry-run, --explain, --time and
 	// --timestamp; TimestampFormat is --timestamp-format. See runner.Plan.
 	DryRun, Explain, Time, Timestamp bool
@@ -167,15 +171,35 @@ func Load(opts Options) (*Justfile, error) {
 	if fsys == nil {
 		fsys = sys.OSFS{}
 	}
+	if opts.Source != nil {
+		return loadSource(opts)
+	}
 	path, err := locate(fsys, opts)
 	if err != nil {
 		return nil, err
+	}
+	if filepath.Dir(path) == path {
+		return nil, fmt.Errorf("justfile path had no parent: %s", path)
 	}
 	tree, err := loader.LoadWith(fsys, path, loader.Options{Home: homeOf(opts.Env), AllowOutsidePaths: opts.AllowOutsidePaths})
 	if err != nil {
 		return nil, err
 	}
 	j := &Justfile{tree: tree, dir: filepath.Dir(path)}
+	if err := j.checkUnstable(opts.Unstable); err != nil {
+		return nil, err
+	}
+	return j, nil
+}
+
+// loadSource parses and analyzes the justfile text of opts.Source. It has no
+// directory on disk, so its imports and modules are not resolved, and Run needs
+// Options.WorkDir for it. Impure: it reads nothing.
+func loadSource(opts Options) (*Justfile, error) {
+	j, err := Parse(opts.SourceName, opts.Source)
+	if err != nil {
+		return nil, err
+	}
 	if err := j.checkUnstable(opts.Unstable); err != nil {
 		return nil, err
 	}

@@ -357,7 +357,7 @@ func (p *parser) moduleItem(jf *ast.Justfile, attrs attributeSet) error {
 	}
 	m := ast.Module{
 		Name: name.Text, Optional: optional, Line: name.Line, Col: name.Col, Width: tokenWidth(name),
-		Doc: p.docFor(start, attrs),
+		Doc: p.docFor(start, attrs), Private: attrs.find(ast.AttrPrivate) != nil,
 	}
 	if p.is(lexer.String) {
 		if m.Path, err = p.stringValue(); err != nil {

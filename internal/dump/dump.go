@@ -42,7 +42,11 @@ func Justfile(jf *ast.Justfile, indent string) string {
 	sort.SliceStable(items, func(i, j int) bool { return items[i].line < items[j].line })
 	var b strings.Builder
 	for i, it := range items {
-		if i > 0 && blankBefore(lines, it.line) {
+		switch {
+		case i == 0:
+			// Up to two blank lines before the first item are kept, as upstream keeps them.
+			b.WriteString(strings.Repeat("\n", min(blankRun(lines, it.line), 2)))
+		case blankBefore(lines, it.line):
 			b.WriteString("\n")
 		}
 		b.WriteString(it.text)
@@ -54,14 +58,22 @@ func Justfile(jf *ast.Justfile, indent string) string {
 // preceded by a blank line, once the comment and attribute lines that belong to
 // the item are passed over. It is pure.
 func blankBefore(lines []string, line int) bool {
-	if len(lines) == 0 {
-		return false
-	}
+	return blankRun(lines, line) > 0
+}
+
+// blankRun is how many blank lines come just before the item that starts on line
+// (counted from 1), once the comment and attribute lines of the item are passed
+// over. It is pure.
+func blankRun(lines []string, line int) int {
 	i := min(line-2, len(lines)-1)
 	for i >= 0 && isItemLine(lines[i]) {
 		i--
 	}
-	return i >= 0 && strings.TrimSpace(lines[i]) == ""
+	n := 0
+	for ; i >= 0 && strings.TrimSpace(lines[i]) == ""; i-- {
+		n++
+	}
+	return n
 }
 
 // blankAfter is how many blank lines follow line n of the source, counted from

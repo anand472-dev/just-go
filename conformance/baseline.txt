@@ -76,6 +76,7 @@ choose::no_choosable_recipes#1
 choose::override_variable#1
 choose::recipes_in_submodules_can_be_chosen#1
 choose::skip_private_recipes#1
+choose::skip_recipes_in_private_modules#1
 choose::skip_recipes_that_require_arguments#1
 choose::visit_modules_in_alphabetical_order#1
 command::command_exit_code_is_propagated#1
@@ -503,6 +504,10 @@ interpolation::indent_and_dedent_are_ignored_in_interpolation#1
 interpolation::linewise_error_line_numbers_are_correct_with_multi_line_interpolations#1
 interpolation::shebang_line_numbers_are_correct_with_multi_line_interpolations#1
 invocation_directory::invocation_directory_native#1
+justfile_from_stdin::init_error#1
+justfile_from_stdin::no_working_directory#1
+justfile_from_stdin::parse_error#1
+justfile_from_stdin::with_working_directory#1
 lazy::assignment_in_body_interpolation_evaluated#1
 lazy::assignment_used_in_dependency_argument_evaluated#1
 lazy::assignment_used_in_dependency_evaluated#1
@@ -542,7 +547,16 @@ lists::quote_of_empty_variadic_is_empty_string_without_lists_setting#1
 lists::recipe_interpolations_space_join_lists#1
 lists::singular_parameters_contribute_one_positional_argument#1
 lists::split_requires_lists_setting#1
+markdown::code_blocks_are_concatenated#1
+markdown::dump#1
+markdown::extension_is_case_insensitive#1
+markdown::init_error#1
+markdown::justfile_found_by_name_is_tangled#1
+markdown::line_numbers_are_preserved#1
 markdown::no_code_blocks#1
+markdown::non_just_code_blocks_are_ignored#1
+markdown::with_working_directory#1
+markdown::working_directory_is_markdown_file_directory#1
 minimum_version::minimum_version_invalid#1
 minimum_version::minimum_version_may_not_be_expression#1
 minimum_version::minimum_version_may_not_be_indented_string#1
@@ -810,6 +824,7 @@ positional_arguments::shell_with_attribute#1
 positional_arguments::variadic_arguments_are_separate#1
 positional_arguments::variadic_shebang#1
 positional_arguments::variadic_shell#1
+private::private_attribute_for_module#1
 private::private_attribute_for_recipe#1
 private::private_variables_are_not_listed#1
 quiet::assignment_backtick_stderr#1
@@ -880,6 +895,7 @@ search::justfile_name_may_be_repeated#1
 search::justfile_name_not_found#1
 search::justfile_name_skips_default_justfile#1
 search::justfile_symlink_parent#1
+search::justfile_with_no_parent_returns_correct_error#1
 search::not_found#1
 search::search_stops_at_closest_justfile#1
 search::single_downwards#1

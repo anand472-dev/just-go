@@ -61,8 +61,26 @@ func expandModule(e *loadEnv, jf *ast.Justfile, src []byte, chain []string, m as
 	if err := expandModules(e, sub.jf, sub.src, next); err != nil {
 		return err
 	}
-	flattenModule(jf, m.Name+"::", sub.jf)
+	mergeModule(jf, m, sub.jf)
 	return nil
+}
+
+// mergeModule merges the module mod, which m declares, into jf under its name, with
+// the module's own privacy applied to its recipes. It is pure apart from updating jf.
+func mergeModule(jf *ast.Justfile, m ast.Module, mod *ast.Justfile) {
+	if m.Private {
+		hidePrivate(mod, m)
+	}
+	flattenModule(jf, m.Name+"::", mod)
+}
+
+// hidePrivate gives each recipe of mod the [private] attribute, as the module's
+// own attribute makes them: a private module's recipes are not listed or chosen.
+// It is pure apart from updating mod.
+func hidePrivate(mod *ast.Justfile, m ast.Module) {
+	for i := range mod.Recipes {
+		mod.Recipes[i].Attributes = append(mod.Recipes[i].Attributes, ast.Attribute{Name: ast.AttrPrivate, Line: m.Line, Col: m.Col})
+	}
 }
 
 // findModule is the file a module names, as upstream searches for it. With a

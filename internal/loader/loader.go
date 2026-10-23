@@ -215,13 +215,25 @@ type Options struct {
 	AllowOutsidePaths bool
 }
 
-// LoadWith is Load with the options given.
+// LoadWith is Load with the options given. A Markdown justfile's errors name it
+// `justfile`.
 func LoadWith(fsys sys.FS, path string, opts Options) (*ast.Justfile, error) {
+	jf, err := loadRoot(fsys, path, opts)
+	if err != nil && isMarkdown(path) {
+		err = renameFile(err, path, "justfile")
+	}
+	return jf, err
+}
+
+// loadRoot loads the root justfile at path and everything it imports or
+// declares.
+func loadRoot(fsys sys.FS, path string, opts Options) (*ast.Justfile, error) {
 	e := &loadEnv{fsys: fsys, home: opts.Home, root: filepath.Dir(path), allow: opts.AllowOutsidePaths}
 	src, err := fsys.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read justfile: %w", err)
 	}
+	src = tangle(path, src)
 	jf, err := parser.Parse(path, src)
 	if err != nil {
 		return nil, diag.WithSource(err, src)

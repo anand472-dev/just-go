@@ -65,6 +65,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		_, _ = io.WriteString(stderr, "\nFor more information, try '--help'.\n")
 		return exitUsage
 	}
+	invoked := workDir
 	workDir = startDir(cfg, workDir)
 	workDir, err = searchDirectory(&cfg, workDir, fsys)
 	if err != nil {
@@ -76,11 +77,17 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if err := overridesOf(&cfg); err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
+	src, err := stdinSource(cfg, stdin)
+	if err != nil {
+		return fail(stderr, cfg.quiet, err)
+	}
 	childOut, childErr := childStreams(cfg.quiet, stdout, stderr)
 	opts := just.Options{
 		Overrides:         cfg.set,
 		Unstable:          cfg.isUnstable(env),
-		Justfile:          resolve(workDir, cfg.justfile),
+		Justfile:          resolve(invoked, cfg.justfile),
+		Source:            src,
+		SourceName:        "justfile",
 		SearchFrom:        workDir,
 		Ceiling:           resolve(workDir, ceilingOf(cfg, env)),
 		JustfileNames:     cfg.justfileNames,
@@ -288,9 +295,10 @@ func evaluate(cfg config, jf *just.Justfile, opts just.Options, stdout, stderr i
 
 // runDir is the directory the recipes run in when --working-directory names one,
 // which workDir already is, having been resolved by startDir. Without it, the
-// justfile's own directory is used, as upstream does, so this is empty. Pure.
+// justfile's own directory is used, as upstream does, so this is empty; a
+// justfile from standard input has none, so it runs where it was invoked. Pure.
 func runDir(cfg config, workDir string) string {
-	if cfg.workingDirectory == "" {
+	if cfg.workingDirectory == "" && cfg.justfile != "-" {
 		return ""
 	}
 	return workDir
@@ -464,6 +472,18 @@ func usage(format string, args ...any) *diag.Error {
 
 // resolve returns path joined onto dir when path is relative, and path itself
 // when it is absolute or empty. Pure.
+// stdinSource is the justfile's text read from standard input when --justfile
+// is `-`, and nil otherwise. Impure: it reads stdin.
+func stdinSource(cfg config, stdin io.Reader) ([]byte, error) {
+	if cfg.justfile != "-" {
+		return nil, nil
+	}
+	if stdin == nil {
+		return []byte{}, nil
+	}
+	return io.ReadAll(stdin)
+}
+
 // ceilingOf is the directory the search does not go above: --ceiling, or else
 // JUST_CEILING when the flag is not given. Pure.
 func ceilingOf(cfg config, env []string) string {
