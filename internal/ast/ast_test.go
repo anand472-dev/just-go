@@ -295,3 +295,17 @@ func TestListFeatureMessages(t *testing.T) {
 		}
 	}
 }
+
+// AbsentModuleOf finds the longest absent module a path is in.
+func TestAbsentModuleOfFindsTheLongestAbsentPrefix(t *testing.T) {
+	jf := &Justfile{AbsentModules: []string{"a", "a::b"}}
+	if got := jf.AbsentModuleOf("a::b::c"); got != "a::b" {
+		t.Errorf("AbsentModuleOf(a::b::c) = %q; want a::b", got)
+	}
+	if got := jf.AbsentModuleOf("a::x"); got != "a" {
+		t.Errorf("AbsentModuleOf(a::x) = %q; want a", got)
+	}
+	if got := jf.AbsentModuleOf("ab::x"); got != "" {
+		t.Errorf("AbsentModuleOf(ab::x) = %q; want none", got)
+	}
+}

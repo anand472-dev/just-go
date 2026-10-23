@@ -322,8 +322,50 @@ func (p *parser) statement(jf *ast.Justfile, attrs attributeSet) error {
 		return p.assignment(jf, attrs, t.Text)
 	case p.isImport():
 		return p.importItem(jf)
+	case p.isModule():
+		return p.moduleItem(jf, attrs)
 	}
 	return p.recipe(jf, attrs)
+}
+
+// isModule reports whether the current `mod` is the keyword: a name or a `?`
+// follows it, and then the line may end or give the file the module is in.
+func (p *parser) isModule() bool {
+	if p.peek().Kind != lexer.Ident || p.peek().Text != "mod" {
+		return false
+	}
+	switch p.peekAt(1).Kind {
+	case lexer.QuestionMark:
+		return true
+	case lexer.Ident:
+		switch p.peekAt(2).Kind {
+		case lexer.Newline, lexer.EOF, lexer.String, lexer.Comment:
+			return true
+		}
+	}
+	return false
+}
+
+// moduleItem parses `mod name`, `mod? name`, or either followed by the string of
+// the file the module is in.
+func (p *parser) moduleItem(jf *ast.Justfile, attrs attributeSet) error {
+	start := p.next()
+	optional := p.accept(lexer.QuestionMark)
+	name, err := p.expect(lexer.Ident)
+	if err != nil {
+		return err
+	}
+	m := ast.Module{
+		Name: name.Text, Optional: optional, Line: name.Line, Col: name.Col, Width: tokenWidth(name),
+		Doc: p.docFor(start, attrs),
+	}
+	if p.is(lexer.String) {
+		if m.Path, err = p.stringValue(); err != nil {
+			return err
+		}
+	}
+	jf.Modules = append(jf.Modules, m)
+	return p.endLine()
 }
 
 // isImport reports whether the current `import` is the keyword, which upstream
@@ -834,7 +876,11 @@ func (p *parser) dependencies() ([]ast.Dependency, error) {
 // is not part of the subset; it is left to the caller to report.
 func (p *parser) dependency() (ast.Dependency, bool, error) {
 	if p.is(lexer.Ident) {
-		return p.dependencyName(), true, nil
+		d, err := p.dependencyName()
+		if err != nil {
+			return ast.Dependency{}, false, err
+		}
+		return d, true, nil
 	}
 	if p.is(lexer.Asterisk) || !p.is(lexer.LParen) {
 		return ast.Dependency{}, false, nil
@@ -844,8 +890,11 @@ func (p *parser) dependency() (ast.Dependency, bool, error) {
 	if err != nil {
 		return ast.Dependency{}, false, err
 	}
-	d := ast.Dependency{Name: name.Text, Line: name.Line, Col: name.Col}
-	p.is(lexer.ColonColon) // a module path, which upstream would parse here
+	path, err := p.modulePath(name.Text)
+	if err != nil {
+		return ast.Dependency{}, false, err
+	}
+	d := ast.Dependency{Name: path, Line: name.Line, Col: name.Col}
 	for !p.accept(lexer.RParen) {
 		p.is(lexer.Asterisk) // a starred argument, which needs a mapped dependency
 		arg, err := p.expr()
@@ -857,12 +906,28 @@ func (p *parser) dependency() (ast.Dependency, bool, error) {
 	return d, true, nil
 }
 
-// dependencyName consumes the name of a dependency written without
-// arguments. The current token is an identifier.
-func (p *parser) dependencyName() ast.Dependency {
+// dependencyName consumes the name of a dependency written without arguments,
+// which may be a module path. The current token is an identifier.
+func (p *parser) dependencyName() (ast.Dependency, error) {
 	d := p.next()
-	p.is(lexer.ColonColon) // a module path, which upstream would parse here
-	return ast.Dependency{Name: d.Text, Line: d.Line, Col: d.Col}
+	path, err := p.modulePath(d.Text)
+	if err != nil {
+		return ast.Dependency{}, err
+	}
+	return ast.Dependency{Name: path, Line: d.Line, Col: d.Col}, nil
+}
+
+// modulePath extends name with each `::` and identifier that follows it, the
+// path of a recipe in a module (foo::bar::baz). It consumes those tokens.
+func (p *parser) modulePath(name string) (string, error) {
+	for p.accept(lexer.ColonColon) {
+		t, err := p.expect(lexer.Ident)
+		if err != nil {
+			return "", err
+		}
+		name += "::" + t.Text
+	}
+	return name, nil
 }
 
 // isParam reports whether a parameter starts at the current token.

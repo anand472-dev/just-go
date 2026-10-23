@@ -193,6 +193,12 @@ func LoadHome(fsys sys.FS, path, home string) (*ast.Justfile, error) {
 	if err := expandImports(fsys, jf, src, home); err != nil {
 		return nil, err
 	}
+	if err := checkModuleNames(jf); err != nil {
+		return nil, diag.WithSource(err, src)
+	}
+	if err := expandModules(fsys, jf, src, home, nil); err != nil {
+		return nil, err
+	}
 	if err := analyzer.Analyze(jf); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
@@ -263,6 +269,9 @@ func nextImport(fsys sys.FS, seen map[string]bool, cur pendingImport, imp ast.Im
 	seen[path] = true
 	next, err := readImport(fsys, path)
 	if err != nil {
+		return pendingImport{}, false, err
+	}
+	if err := expandModules(fsys, next.jf, next.src, home, chain); err != nil {
 		return pendingImport{}, false, err
 	}
 	next.parent = chain

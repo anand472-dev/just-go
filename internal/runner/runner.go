@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -226,6 +227,114 @@ func withSource(jf *ast.Justfile, err error) error {
 	return diag.WithSource(err, jf.Source)
 }
 
+// resolveRecipe is the recipe a requested name runs. A name is a recipe, or a
+// path through modules (foo::bar), which the loader has merged under the full
+// name. A name that is a module runs that module's default recipe. A recipe
+// that a path goes through is not a module, which upstream says. It is pure.
+func resolveRecipe(jf *ast.Justfile, name string, args []string) (string, error) {
+	if findRecipe(jf, name) != nil {
+		return name, nil
+	}
+	if m := jf.AbsentModuleOf(name); m != "" {
+		return "", usage("optional module `%s` is absent", m)
+	}
+	parts := strings.Split(name, "::")
+	for i := 1; i < len(parts); i++ {
+		if prefix := strings.Join(parts[:i], "::"); findRecipe(jf, prefix) != nil {
+			return "", usage("expected submodule at `%s` but found recipe", prefix)
+		}
+	}
+	module := strings.TrimSuffix(name, "::")
+	if !declaresModule(jf, module) {
+		return "", usage("justfile does not contain recipe `%s`", name)
+	}
+	r := moduleDefault(jf, module)
+	if r == nil {
+		return "", usage("justfile does not contain recipe `%s`", name)
+	}
+	if min := requiredParams(r); min > 0 && len(args) == 0 {
+		return "", usage("recipe `%s` cannot be used as default recipe since it requires at least %s",
+			module, count(min, "argument"))
+	}
+	return r.Name, nil
+}
+
+// absentDependencies is the absent optional modules that the recipe name needs,
+// through its dependencies at any depth, sorted. A recipe that depends on one is
+// disabled; seen holds the recipes already searched. It is pure.
+func absentDependencies(jf *ast.Justfile, name string, seen map[string]bool) []string {
+	if seen[name] {
+		return nil
+	}
+	seen[name] = true
+	r := findRecipe(jf, name)
+	if r == nil {
+		return nil
+	}
+	var out []string
+	for _, d := range r.Deps {
+		if m := jf.AbsentModuleOf(d.Name); m != "" {
+			out = append(out, m)
+		} else {
+			out = append(out, absentDependencies(jf, d.Name, seen)...)
+		}
+	}
+	sort.Strings(out)
+	return slices.Compact(out)
+}
+
+// absentList writes module names as upstream lists them: `foo`, or `foo` and
+// `bar`. It is pure.
+func absentList(names []string) string {
+	ticked := make([]string, len(names))
+	for i, n := range names {
+		ticked[i] = "`" + n + "`"
+	}
+	if len(ticked) == 1 {
+		return "module " + ticked[0]
+	}
+	return "modules " + strings.Join(ticked[:len(ticked)-1], ", ") + " and " + ticked[len(ticked)-1]
+}
+
+// declaresModule reports whether the file has a module called name, at any depth:
+// a module the file declares, or one whose recipes it holds under its name. It
+// is pure.
+func declaresModule(jf *ast.Justfile, name string) bool {
+	for _, m := range jf.Modules {
+		if m.Name == name {
+			return true
+		}
+	}
+	for _, r := range jf.Recipes {
+		if strings.HasPrefix(r.Name, name+"::") {
+			return true
+		}
+	}
+	return false
+}
+
+// moduleDefault is the recipe a module runs when it is named alone: the one with
+// `[default]` among the module's own recipes, else the first of them. It is nil
+// when the module has no recipes. It is pure.
+func moduleDefault(jf *ast.Justfile, module string) *ast.Recipe {
+	prefix := module + "::"
+	var own []ast.Recipe
+	for _, r := range jf.Recipes {
+		if rest, ok := strings.CutPrefix(r.Name, prefix); ok && !strings.Contains(rest, "::") {
+			own = append(own, r)
+		}
+	}
+	for i := range own {
+		if own[i].Attribute(ast.AttrDefault) != nil {
+			return &own[i]
+		}
+	}
+	if len(own) == 0 {
+		return nil
+	}
+	return &own[0]
+}
+
 // requested returns the calls the plan asks for. Plan.Calls when set, else
 // Plan.Recipes, with Plan.Args going to the only recipe; with no recipes at
 // all, the first recipe of the file. Every recipe must exist. It is pure.
@@ -238,12 +347,19 @@ func requested(plan Plan) ([]Call, error) {
 			return nil, err
 		}
 	}
-	for _, c := range calls {
-		if findRecipe(jf, c.Recipe) == nil {
-			return nil, usage("justfile does not contain recipe `%s`", c.Recipe)
+	resolved := make([]Call, len(calls))
+	for i, c := range calls {
+		name, err := resolveRecipe(jf, c.Recipe, plan.Args)
+		if err != nil {
+			return nil, err
 		}
+		if absent := absentDependencies(jf, name, map[string]bool{}); len(absent) > 0 {
+			return nil, usage("recipe `%s` depends on absent %s", c.Recipe, absentList(absent))
+		}
+		c.Recipe = name
+		resolved[i] = c
 	}
-	return calls, nil
+	return resolved, nil
 }
 
 // legacyCalls turns a list of names and one argument list into calls: the

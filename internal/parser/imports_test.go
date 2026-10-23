@@ -56,3 +56,78 @@ func TestImportStringEscapesAreChecked(t *testing.T) {
 		t.Error("an unknown escape in an import string was accepted")
 	}
 }
+
+// mod and mod? name a module, with the file it is in when a string follows.
+func TestParseModuleStatements(t *testing.T) {
+	jf, err := Parse("justfile", []byte("# docs\nmod foo\nmod? bar 'sub/bar.just'\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jf.Modules) != 2 {
+		t.Fatalf("Modules = %+v; want two", jf.Modules)
+	}
+	checkModule(t, jf.Modules[0], ast.Module{Name: "foo", Doc: "docs", Line: 2, Col: 5, Width: 3})
+	checkModule(t, jf.Modules[1], ast.Module{Name: "bar", Optional: true, Path: "sub/bar.just", Line: 3, Col: 6, Width: 3})
+}
+
+// checkModule fails unless m is want in every field the test sets.
+func checkModule(t *testing.T, m, want ast.Module) {
+	t.Helper()
+	if m != want {
+		t.Errorf("module = %+v; want %+v", m, want)
+	}
+}
+
+// A module name in a dependency is a path, and a path may go deeper.
+func TestParseModulePathsInDependencies(t *testing.T) {
+	jf, err := Parse("justfile", []byte("a: foo::bar::baz (x::y 'q')\n  echo\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := jf.Recipes[0].Deps
+	if len(deps) != 2 || deps[0].Name != "foo::bar::baz" || deps[1].Name != "x::y" || len(deps[1].Args) != 1 {
+		t.Errorf("dependencies = %+v; want the two paths, with the argument", deps)
+	}
+}
+
+// A path must end in a name: a `::` with nothing after it is a syntax error.
+func TestParseModulePathNeedsAName(t *testing.T) {
+	if _, err := Parse("justfile", []byte("a: foo::\n  echo\n")); err == nil {
+		t.Error("a path that ends in :: was accepted")
+	}
+}
+
+// A `mod` with a bad name, or a bad string after it, is a syntax error.
+func TestParseModuleStatementErrors(t *testing.T) {
+	for _, src := range []string{"mod ?\n", "mod foo 'x\n"} {
+		if _, err := Parse("justfile", []byte(src)); err == nil {
+			t.Errorf("%q: Parse accepted it", src)
+		}
+	}
+}
+
+// mod as a recipe name, or followed by a colon, is a recipe.
+func TestModWordIsARecipeWhenItIsNotAModule(t *testing.T) {
+	jf, err := Parse("justfile", []byte("mod:\n  echo\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jf.Modules) != 0 || len(jf.Recipes) != 1 {
+		t.Errorf("modules, recipes = %d, %d; want 0, 1", len(jf.Modules), len(jf.Recipes))
+	}
+}
+
+// A bad string after `mod` is a syntax error, and so is a bad path in brackets.
+func TestParseModuleWithBadStringIsAnError(t *testing.T) {
+	if _, err := Parse("justfile", []byte("mod foo \"\\q\"\n")); err == nil {
+		t.Error("an unknown escape in a module path was accepted")
+	}
+}
+
+func TestParseParenthesisedDependencyNeedsAName(t *testing.T) {
+	for _, src := range []string{"a: (1)\n  echo\n", "a: (foo::)\n  echo\n"} {
+		if _, err := Parse("justfile", []byte(src)); err == nil {
+			t.Errorf("%q: a malformed parenthesised dependency was accepted", src)
+		}
+	}
+}

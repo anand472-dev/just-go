@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -64,6 +65,8 @@ func (inv *invocation) directory(s step) string {
 		return joinDirectory(inv.base, *s.workdir)
 	case s.recipe.Attribute(ast.AttrNoCd) != nil:
 		return inv.here
+	case s.recipe.Unit != nil && s.recipe.Unit.IsModule:
+		return filepath.Dir(s.recipe.Unit.File)
 	}
 	return inv.dir
 }

@@ -34,10 +34,46 @@ type Justfile struct {
 	// Imports are the `import` statements of this file, in source order. The
 	// loader merges what they name into the justfile that holds them.
 	Imports []Import
+	// IsModule is true for the tree of a module's file. A recipe of a module
+	// runs in the directory of that file, unless it is `[no-cd]`, and a recipe
+	// of an import runs in the root's directory.
+	IsModule bool
 	// Unit is the file this tree was parsed from, when it is an imported file
 	// and so not the root. It is nil for the root, and it is what a recipe or
 	// assignment that came from an import points at for its error location.
 	Unit *Justfile
+	// Modules are the `mod` statements of this file, in source order. The loader
+	// loads each module's file and merges its items into this justfile under
+	// the module's name (see Module).
+	Modules []Module
+	// AbsentModules are the names of optional modules whose files are not
+	// there. A recipe that depends on one is disabled.
+	AbsentModules []string
+}
+
+// AbsentModuleOf is the absent optional module that a name (a recipe path such
+// as foo::bar) is in, or "" when none is. It is pure.
+func (j *Justfile) AbsentModuleOf(name string) string {
+	best := ""
+	for _, m := range j.AbsentModules {
+		if strings.HasPrefix(name, m+"::") && len(m) > len(best) {
+			best = m
+		}
+	}
+	return best
+}
+
+// Module is a `mod` or `mod?` statement. Name is the module's name, and Path
+// the file the statement names, empty when the file is found by its name. The
+// position locates the name. Doc is the comment above the statement.
+type Module struct {
+	Name     string
+	Path     string
+	Optional bool
+	Doc      string
+	Line     int
+	Col      int
+	Width    int
 }
 
 // Import is an `import` or `import?` statement. Path is the string as written,

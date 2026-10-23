@@ -431,8 +431,11 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 	}
 	var calls []just.Call
 	for i := 0; i < len(words); {
-		n, ok := params[words[i]]
+		n, ok := wordParams(words[i], params, infos)
 		if !ok {
+			if err := submoduleError(words[i], params); err != nil {
+				return nil, err
+			}
 			return nil, missingRecipe(words[i], infos)
 		}
 		take := min(n, len(words)-i-1)
@@ -440,6 +443,42 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 		i += 1 + take
 	}
 	return calls, nil
+}
+
+// wordParams is the number of parameters of the recipe a word runs. A word
+// that names a module runs the module's recipe, which the library chooses by its
+// own default; for grouping its arguments, the first of the module's recipes is
+// used. A word that is not a recipe or a module is not ok. It is pure.
+func wordParams(word string, params map[string]int, infos []just.RecipeInfo) (int, bool) {
+	if n, ok := params[word]; ok {
+		return n, true
+	}
+	module := strings.TrimSuffix(word, "::")
+	for _, info := range infos {
+		if rest, ok := strings.CutPrefix(info.Name, module+"::"); ok && !strings.Contains(rest, "::") {
+			return len(info.Params), true
+		}
+	}
+	return 0, false
+}
+
+// submoduleError is upstream's error for a path whose part before a `::` is a
+// recipe, not a module: the first such part is named. It is nil when no part is
+// a recipe. It is pure.
+func submoduleError(word string, params map[string]int) error {
+	parts := strings.Split(word, "::")
+	for i := 1; i < len(parts); i++ {
+		if prefix := strings.Join(parts[:i], "::"); hasRecipe(params, prefix) {
+			return usage("expected submodule at `%s` but found recipe", prefix)
+		}
+	}
+	return nil
+}
+
+// hasRecipe reports whether params names a recipe. It is pure.
+func hasRecipe(params map[string]int, name string) bool {
+	_, ok := params[name]
+	return ok
 }
 
 // missingRecipe is the error for a word that names no recipe, worded as

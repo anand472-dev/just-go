@@ -552,3 +552,13 @@ func TestAnalyzeAcceptsBuiltinConstantsAsDefined(t *testing.T) {
 		t.Errorf("Analyze with HEX assigned = %v; want no error", err)
 	}
 }
+
+// A recipe may depend on a recipe of an absent optional module: that is not an
+// unknown dependency, since the recipe is disabled instead.
+func TestAnalyzeAllowsADependencyOnAnAbsentModule(t *testing.T) {
+	jf := mustParse(t, "build: foo::setup\n  echo\n")
+	jf.AbsentModules = []string{"foo"}
+	if err := analyzer.Analyze(jf); err != nil {
+		t.Errorf("Analyze = %v; want no error for an absent module's recipe", err)
+	}
+}

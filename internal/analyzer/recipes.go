@@ -82,7 +82,11 @@ func (r *recipeResolver) resolve(rec *ast.Recipe) *diag.Error {
 func (r *recipeResolver) argumentCounts(rec *ast.Recipe) *diag.Error {
 	for _, deps := range dependencyLists(rec) {
 		for _, dep := range deps {
-			callee := r.byName[dep.Name]
+			callee, ok := r.byName[dep.Name]
+			if !ok {
+				// A dependency on an absent module has no recipe to count against.
+				continue
+			}
 			found, lo, hi := len(dep.Args), required(callee), len(callee.Params)
 			if found < lo || found > hi {
 				return fail(r.jf, name(dep.Line, dep.Col, dep.Name), "dependency `%s` got %s but takes %s",
@@ -145,6 +149,9 @@ func (r *recipeResolver) dependency(rec *ast.Recipe, dep ast.Dependency) *diag.E
 	}
 	next, ok := r.unresolved[dep.Name]
 	if !ok {
+		if r.jf.AbsentModuleOf(dep.Name) != "" {
+			return nil
+		}
 		return fail(r.jf, at, "recipe `%s` has unknown dependency `%s`", rec.Name, dep.Name)
 	}
 	delete(r.unresolved, dep.Name)

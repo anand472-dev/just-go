@@ -142,8 +142,9 @@ func parameters(jf *ast.Justfile, r ast.Recipe) *diag.Error {
 func checkRecipes(jf *ast.Justfile) *diag.Error {
 	first := make(map[string]int, len(jf.Recipes))
 	for _, r := range jf.Recipes {
-		if line, ok := first[r.Name]; ok && !jf.Settings.AllowDuplicateRecipes {
-			return fail(jf, name(r.Line, r.Col, r.Name),
+		unit := unitOf(jf, r.Unit)
+		if line, ok := first[r.Name]; ok && !allowsDuplicateRecipes(jf, r.Unit) {
+			return fail(unit, name(r.Line, r.Col, r.Name),
 				"recipe `%s` first defined on line %d is redefined on line %d", r.Name, line, r.Line)
 		}
 		first[r.Name] = r.Line
@@ -190,17 +191,35 @@ func extraIndent(jf *ast.Justfile, r ast.Recipe) *diag.Error {
 // assignment already uses, unless the justfile allows duplicate variables.
 // It is pure.
 func duplicateAssignment(jf *ast.Justfile) *diag.Error {
-	if jf.Settings.AllowDuplicateVariables {
-		return nil
-	}
 	seen := make(map[string]struct{}, len(jf.Assignments))
 	for _, a := range jf.Assignments {
-		if _, ok := seen[a.Name]; ok {
-			return fail(jf, name(a.Line, a.Col, a.Name), "variable `%s` has multiple definitions", a.Name)
+		if _, ok := seen[a.Name]; ok && !allowsDuplicateVariables(jf, a.Unit) {
+			return fail(unitOf(jf, a.Unit), name(a.Line, a.Col, a.Name), "variable `%s` has multiple definitions", a.Name)
 		}
 		seen[a.Name] = struct{}{}
 	}
 	return nil
+}
+
+// unitOf is the file a definition came from: its unit when it came from an
+// imported or module file, else the root. It is pure.
+func unitOf(root, unit *ast.Justfile) *ast.Justfile {
+	if unit != nil {
+		return unit
+	}
+	return root
+}
+
+// allowsDuplicateRecipes reports whether a recipe of the given unit may share its
+// name with another: the root's setting, or the setting of the unit it is in.
+// It is pure.
+func allowsDuplicateRecipes(root, unit *ast.Justfile) bool {
+	return root.Settings.AllowDuplicateRecipes || (unit != nil && unit.Settings.AllowDuplicateRecipes)
+}
+
+// allowsDuplicateVariables is allowsDuplicateRecipes for assignments. It is pure.
+func allowsDuplicateVariables(root, unit *ast.Justfile) bool {
+	return root.Settings.AllowDuplicateVariables || (unit != nil && unit.Settings.AllowDuplicateVariables)
 }
 
 // sortedNames returns the keys of m in byte order, which is the order of
