@@ -8,6 +8,7 @@ import (
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/eval"
+	"gitea.com/wimwian/just-go/internal/eval/builtins"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
@@ -40,6 +41,9 @@ func (inv *invocation) main(pre prepared) (int, error) {
 func (inv *invocation) evaluateGlobals(only map[string]bool) (eval.Scope, error) {
 	jf := inv.plan.Justfile
 	scope := make(eval.Scope, len(jf.Assignments))
+	for name, v := range builtins.ConstantsFor(inv.goos) {
+		scope[name] = v
+	}
 	cmd := inv.commander(nil, nil, site{})
 	for _, a := range evaluationOrder(wanted(jf.UniqueAssignments(), only)) {
 		v, err := eval.EvaluateWith(a.Value, scope, cmd)

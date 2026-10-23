@@ -3,6 +3,7 @@ package analyzer
 import (
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/eval/builtins"
 )
 
 // assignmentResolver walks the assignments depth first, as upstream does. Its
@@ -101,6 +102,9 @@ func (r *assignmentResolver) variable(v ast.Var) *diag.Error {
 	}
 	a, ok := r.byName[v.Name]
 	if !ok {
+		if builtins.IsConstant(v.Name) {
+			return nil
+		}
 		return fail(r.jf, name(v.Line, v.Col, v.Name), "variable `%s` not defined", v.Name)
 	}
 	if contains(r.stack, v.Name) {
@@ -188,7 +192,7 @@ func checkReference(jf *ast.Justfile, ref ast.Expr, globals, locals map[string]s
 	v := ref.(ast.Var)
 	_, inGlobals := globals[v.Name]
 	_, inLocals := locals[v.Name]
-	if inGlobals || inLocals {
+	if inGlobals || inLocals || builtins.IsConstant(v.Name) {
 		return nil
 	}
 	return undefinedVar(jf, v)

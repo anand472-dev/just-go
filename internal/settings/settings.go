@@ -23,6 +23,7 @@ import (
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/eval"
+	"gitea.com/wimwian/just-go/internal/eval/builtins"
 )
 
 // Resolved holds the expression settings of a justfile after evaluation.
@@ -328,6 +329,9 @@ func (c *consts) concat(cat ast.Concat) (string, error) {
 func (c *consts) variable(v ast.Var) (string, error) {
 	a, ok := c.byName[v.Name]
 	if !ok {
+		if got, isConst := builtins.ConstantValue(v.Name, ""); isConst {
+			return got, nil
+		}
 		return "", c.fail(v.Line, v.Col, v.Name, "variable `%s` not defined", v.Name)
 	}
 	got, ok := c.memo[v.Name]

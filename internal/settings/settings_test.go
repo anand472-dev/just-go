@@ -317,3 +317,12 @@ func TestConstValue(t *testing.T) {
 		}
 	}
 }
+
+// A builtin constant is a constant value in a setting, as the oracle gives it
+// on Unix (constants::built_in_constant in the settings group).
+func TestResolveReadsBuiltinConstants(t *testing.T) {
+	got, err := Resolve(parse(t, "set working-directory := HEX\n\nfoo:\n  echo\n"))
+	if err != nil || got.WorkingDirectory == nil || *got.WorkingDirectory != "0123456789abcdef" {
+		t.Errorf("Resolve(working-directory := HEX) = %+v, %v", got, err)
+	}
+}

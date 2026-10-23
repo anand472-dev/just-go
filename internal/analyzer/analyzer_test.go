@@ -538,3 +538,17 @@ func TestAnalyzeAcceptsDependencyArguments(t *testing.T) {
 		t.Errorf("Analyze = %v, want nil", err)
 	}
 }
+
+// A builtin constant is defined everywhere without an assignment, and a justfile
+// may still assign its name: the assignment wins (constants::constants_*).
+func TestAnalyzeAcceptsBuiltinConstantsAsDefined(t *testing.T) {
+	src := "x := HEX\n" +
+		"HEX2 := BOLD\n\n" +
+		"foo y=PATH_SEP:\n  echo {{ NORMAL }}{{ y }}\n"
+	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+		t.Errorf("Analyze = %v; want no error", err)
+	}
+	if err := analyzer.Analyze(mustParse(t, "HEX := 'foo'\n\nfoo:\n  echo {{ HEX }}\n")); err != nil {
+		t.Errorf("Analyze with HEX assigned = %v; want no error", err)
+	}
+}
