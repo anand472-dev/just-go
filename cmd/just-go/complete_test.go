@@ -69,7 +69,7 @@ func TestCompletionWithoutAJustfileOffersFilesAndFlags(t *testing.T) {
 }
 
 func TestEarlyIsOnlyForCompletionAndCompletions(t *testing.T) {
-	if _, done := early(config{}, nil, "/w", sysfake.FakeFS{}, nil, nil, nil); done {
+	if _, done := early(config{}, nil, "/w", sysfake.FakeFS{}, nil, nil, nil, nil); done {
 		t.Error("early handled a run that is neither a completion nor a script")
 	}
 }

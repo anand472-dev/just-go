@@ -68,6 +68,16 @@ choose::recipes_in_submodules_can_be_chosen#1
 choose::skip_private_recipes#1
 choose::skip_recipes_that_require_arguments#1
 choose::visit_modules_in_alphabetical_order#1
+command::command_exit_code_is_propagated#1
+command::command_not_found#1
+command::dont_evaluate_unnecessary_variables#1
+command::env_is_loaded#1
+command::exit_status#1
+command::exports_are_available#1
+command::long#1
+command::no_binary#1
+command::set_overrides_work#1
+command::short#1
 comparison::comparison_condition_without_lists#1
 comparison::comparisons_are_not_associative#1
 comparison::non_comparison_condition_requires_lists_setting#1
@@ -787,6 +797,7 @@ regexes::bad_regex_fails_at_runtime#1
 regexes::match_fails_evaluates_to_second_branch#1
 regexes::match_succeeds_evaluates_to_first_branch#1
 regexes::mismatch#1
+resolve::command_on_custom_path#1
 resolve::shell_on_custom_path#1
 run::dont_run_duplicate_recipes#1
 scope::dependencies_in_submodules_run_with_submodule_scope#1

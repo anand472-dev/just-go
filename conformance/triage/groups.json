@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1019,
-    "fail": 969,
+    "pass": 1030,
+    "fail": 958,
     "skip": 23,
     "total": 2011
   },
@@ -14,7 +14,6 @@
     "cli:choose": 3,
     "cli:clean": 1,
     "cli:color": 12,
-    "cli:command": 10,
     "cli:command-color": 1,
     "cli:default-list": 2,
     "cli:dotenv-command": 3,
@@ -41,7 +40,7 @@
     "cli:one": 2,
     "cli:request": 3,
     "cli:search-directory": 25,
-    "cli:set": 8,
+    "cli:set": 7,
     "cli:shell-command": 1,
     "cli:show": 11,
     "cli:summary": 1,
@@ -224,18 +223,6 @@
       "misc::no_highlight_is_respected_for_script_echoing#1": "passes --color",
       "misc::run_colors#1": "passes --color",
       "shebang::echo_with_command_color#1": "passes --color"
-    },
-    "cli:command": {
-      "command::command_exit_code_is_propagated#1": "passes --command",
-      "command::command_not_found#1": "passes --command",
-      "command::dont_evaluate_unnecessary_variables#1": "passes --command",
-      "command::env_is_loaded#1": "passes --command",
-      "command::exit_status#1": "passes --command",
-      "command::exports_are_available#1": "passes --command",
-      "command::long#1": "passes --command",
-      "command::no_binary#1": "passes --command",
-      "command::short#1": "passes --command",
-      "resolve::command_on_custom_path#1": "passes --command"
     },
     "cli:command-color": {
       "style::style_command_non_default#1": "passes --command-color"
@@ -537,7 +524,6 @@
       "search_arguments::passing_dot_as_argument_is_allowed#1": "runs just with a recipe named by a directory path"
     },
     "cli:set": {
-      "command::set_overrides_work#1": "passes --set",
       "lazy::overridden_assignment_dependencies_are_not_evaluated#1": "passes --set",
       "overrides::override_variable_used_in_setting#1": "passes --set",
       "overrides::override_variable_via_module_alias#1": "overrides a variable with NAME=VALUE",

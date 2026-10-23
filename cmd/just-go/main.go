@@ -62,9 +62,10 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	cfg, err := parseArgs(args)
 	if err != nil {
 		report(stderr, err)
+		_, _ = io.WriteString(stderr, "\nFor more information, try '--help'.\n")
 		return exitUsage
 	}
-	if status, done := early(cfg, env, workDir, fsys, exec, stdout, stderr); done {
+	if status, done := early(cfg, env, workDir, fsys, exec, stdin, stdout, stderr); done {
 		return status
 	}
 	if err := overridesOf(&cfg); err != nil {
@@ -440,6 +441,9 @@ type config struct {
 	chooser string
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
+	// command is the argument list --command runs, which is everything after it;
+	// nil when there is no --command.
+	command []string
 	// show and usage name the recipes --show and --usage describe.
 	show, usage string
 	// groups, summary, variables, and list-submodules are the switches of the
@@ -497,6 +501,8 @@ func parseWords(args []string) (config, error) {
 		case arg == "--":
 			cfg.words = append(cfg.words, args[i+1:]...)
 			return cfg, nil
+		case arg == "--command" || arg == "-c":
+			return commandWords(cfg, args[i+1:])
 		case strings.HasPrefix(arg, "--"):
 			used, err = parseLong(&cfg, arg, args[i+1:])
 		case len(arg) > 1 && arg[0] == '-':
@@ -510,6 +516,16 @@ func parseWords(args []string) (config, error) {
 		}
 		i += used
 	}
+	return cfg, nil
+}
+
+// commandWords sets the command --command runs to rest, every argument after it,
+// and needs at least one. Pure apart from its result.
+func commandWords(cfg config, rest []string) (config, error) {
+	if len(rest) == 0 {
+		return cfg, usage("a value is required for '--command <COMMAND>...' but none was supplied")
+	}
+	cfg.command = append([]string{}, rest...)
 	return cfg, nil
 }
 

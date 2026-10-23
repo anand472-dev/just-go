@@ -450,6 +450,18 @@ func (j *Justfile) Variables() []string {
 	return names
 }
 
+// RunCommand runs argv as a child of the justfile, with the environment its
+// recipes see at the top level: its exported variables, and its dotenv values.
+// It returns the child's exit code; a child that fails or cannot start is an
+// error whose exit code is that status. See runner.RunCommand.
+func (j *Justfile) RunCommand(ctx context.Context, opts Options, argv []string) (int, error) {
+	plan, err := j.plan(opts)
+	if err != nil {
+		return 1, err
+	}
+	return runner.RunCommand(ctx, plan, argv)
+}
+
 // Dump returns the source text of the justfile, as --dump prints it, with each
 // recipe body indented by indent. See internal/dump for what it writes.
 func (j *Justfile) Dump(indent string) string {

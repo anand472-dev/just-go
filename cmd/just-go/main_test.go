@@ -137,9 +137,9 @@ func TestRunCommandLineErrorsExitTwo(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"unknown flag", []string{"--bogus"}, "error: unexpected argument '--bogus' found\n"},
-		{"missing flag value", []string{"-f"}, "error: a value is required for '--justfile <JUSTFILE>' but none was supplied\n"},
-		{"-q does not silence them", []string{"-q", "--bogus"}, "error: unexpected argument '--bogus' found\n"},
+		{"unknown flag", []string{"--bogus"}, "error: unexpected argument '--bogus' found\n\nFor more information, try '--help'.\n"},
+		{"missing flag value", []string{"-f"}, "error: a value is required for '--justfile <JUSTFILE>' but none was supplied\n\nFor more information, try '--help'.\n"},
+		{"-q does not silence them", []string{"-q", "--bogus"}, "error: unexpected argument '--bogus' found\n\nFor more information, try '--help'.\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := runFake(t, files, nil, tc.args...)
@@ -636,7 +636,7 @@ func TestRunShellFlagsOverrideSetShell(t *testing.T) {
 
 func TestRunRepeatedShellExitsTwo(t *testing.T) {
 	o := runFake(t, map[string]string{"/w/justfile": "r:\n\techo hi\n"}, nil, "--shell", "a", "--shell", "b", "r")
-	want := "error: the argument '--shell <SHELL>' cannot be used multiple times\n"
+	want := "error: the argument '--shell <SHELL>' cannot be used multiple times\n\nFor more information, try '--help'.\n"
 	if o.code != 2 || o.stderr != want || len(o.proc.Specs) != 0 {
 		t.Errorf("run = %d, stderr %q, specs %d; want 2, %q, 0", o.code, o.stderr, len(o.proc.Specs), want)
 	}

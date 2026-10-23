@@ -1,6 +1,7 @@
 package just
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -122,5 +123,12 @@ func TestAbsentModuleOfNamesTheModuleItself(t *testing.T) {
 	}
 	if got := absentModuleOf(jf.tree, "bar"); got != "" {
 		t.Errorf("absentModuleOf(bar) = %q; want none", got)
+	}
+}
+
+func TestRunCommandOfAJustfileNeedsAWorkingDirectory(t *testing.T) {
+	j := mustParse(t, "a:\n  echo\n")
+	if code, err := j.RunCommand(context.Background(), Options{}, []string{"true"}); code != 1 || err == nil {
+		t.Errorf("RunCommand = %d, %v; want the plan's error", code, err)
 	}
 }

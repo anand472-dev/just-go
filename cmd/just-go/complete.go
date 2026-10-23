@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	just "gitea.com/wimwian/just-go"
 	"gitea.com/wimwian/just-go/internal/completion"
+	"gitea.com/wimwian/just-go/internal/runner"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
@@ -13,7 +15,10 @@ import (
 // shell asks for while it completes (JUST_COMPLETE set), and the script for
 // --completions. done is false when neither applies. Impure: it reads the file
 // system and writes to the streams.
-func early(cfg config, env []string, workDir string, fsys sys.FS, exec sys.Process, stdout, stderr io.Writer) (status int, done bool) {
+func early(cfg config, env []string, workDir string, fsys sys.FS, exec sys.Process, stdin io.Reader, stdout, stderr io.Writer) (status int, done bool) {
+	if cfg.command != nil {
+		return runCommandLine(cfg, env, workDir, fsys, exec, stdin, stdout, stderr), true
+	}
 	if v, ok := envValue(env, "JUST_COMPLETE"); ok && v != "" {
 		completeWords(cfg.words, workDir, fsys, stdout)
 		return 0, true
@@ -69,4 +74,36 @@ func writeCompletions(cfg config, stdout, stderr io.Writer) int {
 	}
 	_, _ = io.WriteString(stdout, script)
 	return 0
+}
+
+// runCommandLine runs the --command arguments as a child of the justfile, with
+// the justfile's environment; with no justfile, the child runs with the environment
+// of the command line alone. Its exit code is the run's. Impure: it runs the child.
+func runCommandLine(cfg config, env []string, workDir string, fsys sys.FS, exec sys.Process, stdin io.Reader, stdout, stderr io.Writer) int {
+	ctx := context.Background()
+	opts := just.Options{
+		Justfile:      resolve(workDir, cfg.justfile),
+		SearchFrom:    workDir,
+		Env:           env,
+		InvocationDir: workDir,
+		Stdin:         stdin,
+		Stdout:        stdout,
+		Stderr:        stderr,
+		FS:            fsys,
+		Exec:          exec,
+		Overrides:     cfg.set,
+	}
+	jf, err := just.Load(opts)
+	if err != nil {
+		code, err := runner.RunPlainCommand(ctx, exec, sys.ProcessSpec{Argv: cfg.command, Dir: workDir, Env: env, Stdin: stdin, Stdout: stdout, Stderr: stderr})
+		if err != nil {
+			return fail(stderr, cfg.quiet, err)
+		}
+		return code
+	}
+	code, err := jf.RunCommand(ctx, opts, cfg.command)
+	if err != nil {
+		return fail(stderr, cfg.quiet, err)
+	}
+	return code
 }
