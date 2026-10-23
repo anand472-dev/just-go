@@ -39,7 +39,10 @@ import (
 type Options struct {
 	Justfile   string // explicit path; empty means search from SearchFrom
 	SearchFrom string // directory to search upward from; used when Justfile is empty
-	WorkDir    string // working directory for recipes; empty means the justfile's directory
+	// Ceiling, when set, is the directory the search does not go above: it is
+	// examined, and no directory beyond it is.
+	Ceiling string
+	WorkDir string // working directory for recipes; empty means the justfile's directory
 	// InvocationDir is the directory the command was run from, where recipes
 	// run under set no-cd. Empty means WorkDir.
 	InvocationDir string
@@ -175,6 +178,9 @@ func locate(fsys sys.FS, opts Options) (string, error) {
 	}
 	if opts.SearchFrom == "" {
 		return "", usage("no justfile given: set Options.Justfile or Options.SearchFrom")
+	}
+	if opts.Ceiling != "" {
+		return loader.FindWithin(fsys, opts.SearchFrom, opts.Ceiling)
 	}
 	return loader.Find(fsys, opts.SearchFrom)
 }

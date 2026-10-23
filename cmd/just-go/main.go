@@ -65,6 +65,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		_, _ = io.WriteString(stderr, "\nFor more information, try '--help'.\n")
 		return exitUsage
 	}
+	workDir = startDir(cfg, workDir)
 	if status, done := early(cfg, env, workDir, fsys, exec, stdin, stdout, stderr); done {
 		return status
 	}
@@ -77,6 +78,8 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Unstable:          cfg.isUnstable(env),
 		Justfile:          resolve(workDir, cfg.justfile),
 		SearchFrom:        workDir,
+		Ceiling:           resolve(workDir, cfg.ceiling),
+		WorkDir:           runDir(cfg, workDir),
 		Env:               env,
 		InvocationDir:     workDir,
 		Stdin:             stdin,
@@ -256,6 +259,26 @@ func evaluate(cfg config, jf *just.Justfile, opts just.Options, stdout, stderr i
 	}
 	_, _ = io.WriteString(stdout, output.Evaluate(bindings, cfg.evaluateName))
 	return 0
+}
+
+// runDir is the directory the recipes run in when --working-directory names one,
+// which workDir already is, having been resolved by startDir. Without it, the
+// justfile's own directory is used, as upstream does, so this is empty. Pure.
+func runDir(cfg config, workDir string) string {
+	if cfg.workingDirectory == "" {
+		return ""
+	}
+	return workDir
+}
+
+// startDir is the directory the command runs in: the --working-directory value,
+// resolved against workDir, else workDir. The justfile, its search and the recipes
+// all start there. Pure.
+func startDir(cfg config, workDir string) string {
+	if cfg.workingDirectory == "" {
+		return workDir
+	}
+	return resolve(workDir, cfg.workingDirectory)
 }
 
 // childStreams are the streams the recipes write to: the command's own, or
@@ -439,6 +462,10 @@ type config struct {
 	// choose is --choose; chooser is the --chooser command, if given.
 	choose  bool
 	chooser string
+	// workingDirectory is --working-directory, and ceiling --ceiling: where the
+	// command runs and starts its search, and the directory it does not search above.
+	workingDirectory string
+	ceiling          string
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
 	// command is the argument list --command runs, which is everything after it;
@@ -704,6 +731,7 @@ type flagSpec struct {
 // completions offer its names, so a flag added here is parsed and completed.
 var flags = []flagSpec{
 	{"allow-outside-project-paths", switchFlag},
+	{"ceiling", valueFlag},
 	{"choose", switchFlag},
 	{"chooser", valueFlag},
 	{"completions", valueFlag},
@@ -728,6 +756,7 @@ var flags = []flagSpec{
 	{"summary", switchFlag},
 	{"unsorted", switchFlag},
 	{"unstable", switchFlag},
+	{"working-directory", valueFlag},
 	{"usage", valueFlag},
 	{"variables", switchFlag},
 	{"yes", switchFlag},
@@ -810,18 +839,20 @@ func setSwitch(cfg *config, long string) {
 // setters records the value of each flag that takes one in the config field it
 // names. A second --shell is a usage error, checked by its setter.
 var setters = map[string]func(*config, string) error{
-	"completions":   func(c *config, v string) error { c.completions = v; return nil },
-	"indentation":   func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
-	"justfile":      func(c *config, v string) error { c.justfile = v; return nil },
-	"chooser":       func(c *config, v string) error { c.chooser = v; return nil },
-	"group":         func(c *config, v string) error { c.group = append(c.group, v); return nil },
-	"justfile-name": func(c *config, v string) error { c.justfileName = v; return nil },
-	"list-heading":  func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
-	"list-prefix":   func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
-	"shell":         setShell,
-	"shell-arg":     func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
-	"show":          func(c *config, v string) error { c.show = v; return nil },
-	"usage":         func(c *config, v string) error { c.usage = v; return nil },
+	"completions":       func(c *config, v string) error { c.completions = v; return nil },
+	"indentation":       func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
+	"justfile":          func(c *config, v string) error { c.justfile = v; return nil },
+	"ceiling":           func(c *config, v string) error { c.ceiling = v; return nil },
+	"chooser":           func(c *config, v string) error { c.chooser = v; return nil },
+	"working-directory": func(c *config, v string) error { c.workingDirectory = v; return nil },
+	"group":             func(c *config, v string) error { c.group = append(c.group, v); return nil },
+	"justfile-name":     func(c *config, v string) error { c.justfileName = v; return nil },
+	"list-heading":      func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
+	"list-prefix":       func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
+	"shell":             setShell,
+	"shell-arg":         func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
+	"show":              func(c *config, v string) error { c.show = v; return nil },
+	"usage":             func(c *config, v string) error { c.usage = v; return nil },
 }
 
 // setShell records --shell, which may not be given twice, as upstream's.

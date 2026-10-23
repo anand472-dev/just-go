@@ -56,6 +56,8 @@ booleans::path_exists_without_lists_returns_string#1
 byte_order_mark::dont_mention_byte_order_mark_in_errors#1
 byte_order_mark::ignore_leading_byte_order_mark#1
 byte_order_mark::non_leading_byte_order_mark_produces_error#1
+ceiling::justfile_init_search_stops_at_ceiling_dir#1
+ceiling::justfile_run_search_stops_at_ceiling_dir#1
 choose::chooser#1
 choose::chooser_selections_are_processed_separately#1
 choose::chooser_signal_exit_code_is_propagated#1
@@ -236,6 +238,7 @@ export::shebang#1
 export::success#1
 export::variables_exported_with_setting_are_visible_in_child#1
 fallback::doesnt_work_with_justfile#1
+fallback::doesnt_work_with_justfile_and_working_directory#1
 fallback::prints_correct_error_message_when_recipe_not_found#1
 fallback::requires_setting#1
 format::adjacency_is_respected#1
@@ -449,6 +452,7 @@ imports::missing_optional_imports_are_ignored#1
 imports::multiply_imported_items_do_not_conflict#1
 imports::nested_import_paths_are_relative_to_containing_submodule#1
 imports::nested_multiply_imported_items_do_not_conflict#1
+imports::recipes_imported_in_root_run_in_command_line_provided_working_directory#1
 imports::recipes_in_import_are_overridden_by_recipes_in_parent#1
 imports::recipes_in_nested_imports_run_in_parent_module#1
 imports::reused_import_are_allowed#1
@@ -460,6 +464,7 @@ init::exists#2
 init::fmt_compatibility#1
 init::invocation_directory#1
 init::justfile_name_from_invocation_directory#1
+init::working_directory_without_justfile#1
 init::write_error#1
 interpolation::closing_curly_brace_can_abut_interpolation_close#1
 interpolation::comment_in_interopolation#1
@@ -1028,3 +1033,5 @@ working_directory::setting_and_attribute#1
 working_directory::working_dir_applies_to_backticks#1
 working_directory::working_dir_applies_to_shell_function#1
 working_directory::working_directory_setting_conflicts_with_no_cd_setting#1
+working_directory::working_directory_without_justfile#1
+working_directory::working_directory_without_justfile_searches_from_working_directory#1

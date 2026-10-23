@@ -141,6 +141,27 @@ func Find(fsys sys.FS, startDir string) (string, error) {
 	}
 }
 
+// FindWithin is Find, but it does not look above ceiling: the search stops once
+// ceiling has been examined. A ceiling that is not above startDir is no limit
+// beyond the filesystem root. Impure: it reads fsys.
+func FindWithin(fsys sys.FS, startDir, ceiling string) (string, error) {
+	dir := filepath.Clean(startDir)
+	limit := filepath.Clean(ceiling)
+	for {
+		if path, err := findIn(fsys, dir); err != nil || path != "" {
+			return path, err
+		}
+		if dir == limit {
+			return "", ErrNoJustfile
+		}
+		up, ok := parent(dir)
+		if !ok {
+			return "", ErrNoJustfile
+		}
+		dir = up
+	}
+}
+
 // findIn returns the path of the justfile in dir, or "" when there is none,
 // or a *MultipleCandidatesError when there are several. Impure: it reads
 // fsys.

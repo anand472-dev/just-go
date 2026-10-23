@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1030,
-    "fail": 958,
+    "pass": 1037,
+    "fail": 951,
     "skip": 23,
     "total": 2011
   },
@@ -9,7 +9,7 @@
     "attribute": 112,
     "cli:alias-style": 3,
     "cli:allow-missing": 5,
-    "cli:ceiling": 8,
+    "cli:ceiling": 7,
     "cli:check": 2,
     "cli:choose": 3,
     "cli:clean": 1,
@@ -26,7 +26,7 @@
     "cli:fmt": 24,
     "cli:global-justfile": 4,
     "cli:groups": 1,
-    "cli:init": 5,
+    "cli:init": 3,
     "cli:jobs": 1,
     "cli:json": 1,
     "cli:justfile": 2,
@@ -50,7 +50,7 @@
     "cli:unsorted": 3,
     "cli:usage": 11,
     "cli:verbose": 3,
-    "cli:working-directory": 7,
+    "cli:working-directory": 3,
     "completions": 12,
     "dotenv": 1,
     "grammar": 51,
@@ -190,7 +190,6 @@
     },
     "cli:ceiling": {
       "ceiling::ceiling_can_be_passed_as_environment_variable#1": "sets JUST_CEILING",
-      "ceiling::justfile_run_search_stops_at_ceiling_dir#1": "passes --ceiling",
       "global_fallback_justfile::can_be_passed_as_environment_variable#1": "passes --ceiling",
       "global_fallback_justfile::ignored_with_justfile#1": "passes --ceiling",
       "global_fallback_justfile::used_at_most_once#1": "passes --ceiling",
@@ -430,9 +429,7 @@
       "groups::reject_extra_arguments#1": "passes --groups"
     },
     "cli:init": {
-      "ceiling::justfile_init_search_stops_at_ceiling_dir#1": "passes --init",
       "init::justfile_name_from_search_directory#1": "passes --init",
-      "init::working_directory_without_justfile#1": "passes --init",
       "justfile_from_stdin::init_error#1": "passes --init",
       "markdown::init_error#1": "passes --init"
     },
@@ -588,13 +585,9 @@
       "modules::verbose_message_includes_module_path#1": "passes --verbose"
     },
     "cli:working-directory": {
-      "fallback::doesnt_work_with_justfile_and_working_directory#1": "passes --working-directory",
-      "imports::recipes_imported_in_root_run_in_command_line_provided_working_directory#1": "passes --working-directory",
       "justfile_from_stdin::with_working_directory#1": "passes --working-directory",
       "markdown::with_working_directory#1": "passes --working-directory",
-      "search::justfile_with_no_parent_returns_correct_error#1": "passes --working-directory",
-      "working_directory::working_directory_without_justfile#1": "passes --working-directory",
-      "working_directory::working_directory_without_justfile_searches_from_working_directory#1": "passes --working-directory"
+      "search::justfile_with_no_parent_returns_correct_error#1": "passes --working-directory"
     },
     "completions": {
       "completions::aliases_completed_with_environment_variable#1": "generates or runs completions",
