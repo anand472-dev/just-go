@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1079,
-    "fail": 909,
+    "pass": 1090,
+    "fail": 898,
     "skip": 23,
     "total": 2011
   },
@@ -15,7 +15,6 @@
     "cli:clean": 1,
     "cli:color": 12,
     "cli:command-color": 1,
-    "cli:default-list": 2,
     "cli:dotenv-command": 1,
     "cli:dry-run": 4,
     "cli:dump": 104,
@@ -25,7 +24,6 @@
     "cli:global-justfile": 4,
     "cli:groups": 1,
     "cli:init": 2,
-    "cli:jobs": 1,
     "cli:json": 1,
     "cli:justfile": 2,
     "cli:justfile-name": 1,
@@ -33,8 +31,6 @@
     "cli:list-submodules": 8,
     "cli:man": 1,
     "cli:no-aliases": 1,
-    "cli:no-deps": 3,
-    "cli:one": 2,
     "cli:request": 3,
     "cli:search-directory": 2,
     "cli:set": 7,
@@ -46,7 +42,7 @@
     "cli:timestamp": 5,
     "cli:unsorted": 3,
     "cli:usage": 10,
-    "cli:verbose": 3,
+    "cli:verbose": 1,
     "cli:working-directory": 3,
     "completions": 12,
     "dotenv": 1,
@@ -55,7 +51,7 @@
     "setting:fallback": 6,
     "shebang": 1,
     "unstable:cached-recipes": 85,
-    "unstable:lists": 240,
+    "unstable:lists": 239,
     "unstable:user-defined-functions": 32
   },
   "groups": {
@@ -222,10 +218,6 @@
     },
     "cli:command-color": {
       "style::style_command_non_default#1": "passes --command-color"
-    },
-    "cli:default-list": {
-      "default::default_list_flag_does_not_override_explicit_recipe#1": "passes --default-list",
-      "default::default_list_flag_lists_recipes#1": "passes --default-list"
     },
     "cli:dotenv-command": {
       "dotenv::command_only_runs_in_root_module#1": "passes --dotenv-command"
@@ -417,9 +409,6 @@
       "justfile_from_stdin::init_error#1": "passes --init",
       "markdown::init_error#1": "passes --init"
     },
-    "cli:jobs": {
-      "parallel::zero_jobs_is_an_error#1": "passes --jobs"
-    },
     "cli:json": {
       "dump::json#1": "passes --json"
     },
@@ -454,15 +443,6 @@
     },
     "cli:no-aliases": {
       "no_aliases::skip_alias#1": "passes --no-aliases"
-    },
-    "cli:no-deps": {
-      "no_dependencies::skip_dependency_multi#1": "passes --no-deps",
-      "no_dependencies::skip_normal_dependency#1": "passes --no-deps",
-      "no_dependencies::skip_prior_dependency#1": "passes --no-deps"
-    },
-    "cli:one": {
-      "run::one_flag_only_allows_one_invocation#1": "passes --one",
-      "run::one_flag_only_allows_one_invocation#2": "passes --one"
     },
     "cli:request": {
       "constants::constants_are_not_exported#1": "runs just with --request",
@@ -530,9 +510,7 @@
       "usage::submodule#1": "passes --usage"
     },
     "cli:verbose": {
-      "fallback::fallback_from_subdir_verbose_message#1": "passes --verbose",
-      "misc::verbose#1": "passes --verbose",
-      "modules::verbose_message_includes_module_path#1": "passes --verbose"
+      "fallback::fallback_from_subdir_verbose_message#1": "passes --verbose"
     },
     "cli:working-directory": {
       "justfile_from_stdin::with_working_directory#1": "passes --working-directory",
@@ -893,7 +871,6 @@
       "format::assignment_if_without_else#1": "uses `set lists`",
       "format::assignment_list_concat_values#1": "uses `set lists`",
       "functions::num_jobs_falls_back_to_empty_list#1": "uses `set lists`",
-      "functions::num_jobs_returns_jobs#1": "uses `set lists`",
       "functions::show_empty_list#1": "uses `set lists`",
       "functions::show_escapes_contents#1": "uses `set lists`",
       "functions::show_list#1": "uses `set lists`",

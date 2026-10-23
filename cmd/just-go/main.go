@@ -85,6 +85,9 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Ceiling:           resolve(workDir, cfg.ceiling),
 		JustfileNames:     cfg.justfileNames,
 		Dotenv:            dotenvOf(cfg),
+		NoDeps:            cfg.noDeps,
+		Verbose:           cfg.verbose,
+		Jobs:              cfg.jobs,
 		WorkDir:           runDir(cfg, workDir),
 		Env:               env,
 		InvocationDir:     workDir,
@@ -134,7 +137,7 @@ func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, std
 	case cfg.dump:
 		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
 		return 0, true
-	case cfg.list || (len(cfg.words) == 0 && jf.DefaultList()):
+	case cfg.list || (len(cfg.words) == 0 && (jf.DefaultList() || cfg.defaultList)):
 		return listRecipes(cfg, jf, stdout, stderr), true
 	}
 	return 0, false
@@ -485,6 +488,10 @@ type config struct {
 	// choose is --choose; chooser is the --chooser command, if given.
 	choose  bool
 	chooser string
+	// defaultList, noDeps, one and verbose are the switches of the same names;
+	// jobs is --jobs, which num_jobs() reports.
+	defaultList, noDeps, one, verbose bool
+	jobs                              int
 	// dotenvFilename, dotenvPath and dotenvCommand are the repeatable dotenv
 	// flags; noDotenv is --no-dotenv.
 	dotenvFilename, dotenvPath, dotenvCommand []string
@@ -673,7 +680,14 @@ func chooseCalls(cfg config, jf *just.Justfile) ([]just.Call, error) {
 	if err := jf.CheckOverrides(cfg.set); err != nil {
 		return nil, err
 	}
-	return selectRecipes(jf.Recipes(), cfg.words)
+	calls, err := selectRecipes(jf.Recipes(), cfg.words)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.one && len(calls) > 1 {
+		return nil, usage("expected 1 command-line recipe invocation but found %d", len(calls))
+	}
+	return calls, nil
 }
 
 // takeOverrides moves the leading words of the form name=value into the
@@ -771,7 +785,12 @@ var flags = []flagSpec{
 	{"justfile", valueFlag},
 	{"list", switchFlag},
 	{"quiet", switchFlag},
+	{"default-list", switchFlag},
 	{"group", valueFlag},
+	{"jobs", valueFlag},
+	{"no-deps", switchFlag},
+	{"one", switchFlag},
+	{"verbose", switchFlag},
 	{"edit", switchFlag},
 	{"init", switchFlag},
 	{"justfile-name", valueFlag},
@@ -845,7 +864,11 @@ func takesValue(long string) bool {
 var switches = map[string]func(*config){
 	"allow-outside-project-paths": func(c *config) { c.allowOutside = true },
 	"choose":                      func(c *config) { c.choose = true },
+	"default-list":                func(c *config) { c.defaultList = true },
 	"dump":                        func(c *config) { c.dump = true },
+	"no-deps":                     func(c *config) { c.noDeps = true },
+	"one":                         func(c *config) { c.one = true },
+	"verbose":                     func(c *config) { c.verbose = true },
 	"no-dotenv":                   func(c *config) { c.noDotenv = true },
 	"edit":                        func(c *config) { c.edit = true },
 	"init":                        func(c *config) { c.init = true },
@@ -881,6 +904,7 @@ var setters = map[string]func(*config, string) error{
 	"chooser":           func(c *config, v string) error { c.chooser = v; return nil },
 	"working-directory": func(c *config, v string) error { c.workingDirectory = v; return nil },
 	"group":             func(c *config, v string) error { c.group = append(c.group, v); return nil },
+	"jobs":              setJobs,
 	"justfile-name": func(c *config, v string) error {
 		c.justfileName = v
 		c.justfileNames = append(c.justfileNames, strings.Split(v, ",")...)
@@ -892,6 +916,20 @@ var setters = map[string]func(*config, string) error{
 	"shell-arg":    func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
 	"show":         func(c *config, v string) error { c.show = v; return nil },
 	"usage":        func(c *config, v string) error { c.usage = v; return nil },
+}
+
+// setJobs records --jobs, which takes a positive number: zero is refused with
+// clap's wording, and anything that is not a number with the number parser's.
+func setJobs(cfg *config, value string) error {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return usage("invalid value '%s' for '--jobs <N>': %s", value, err.(*strconv.NumError).Err.Error())
+	}
+	if n == 0 {
+		return usage("invalid value '0' for '--jobs <N>': number would be zero for non-zero type")
+	}
+	cfg.jobs = n
+	return nil
 }
 
 // setShell records --shell, which may not be given twice, as upstream's.

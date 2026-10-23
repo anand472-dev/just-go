@@ -77,10 +77,13 @@ type Plan struct {
 	// their names (a module's variable is `module::name`). An overridden
 	// variable takes its value, and its expression is not evaluated.
 	Overrides map[string]string
+	// NoDeps is --no-deps: recipes run without their dependencies, before or
+	// after. Verbose is --verbose: each recipe announces itself on Stderr first.
+	NoDeps, Verbose bool
 	// Dotenv holds the dotenv choices of the command line, which replace the
 	// justfile's settings; see DotenvFlags.
 	Dotenv DotenvFlags
-	Exec              sys.Process // nil uses the OS implementation from internal/sys
+	Exec   sys.Process // nil uses the OS implementation from internal/sys
 	// FS is where script recipes write their scripts, in a directory it makes
 	// and removes again. Nil uses the OS implementation from internal/sys.
 	FS sys.FS
@@ -723,11 +726,18 @@ func hasKey(m map[string]string, key string) bool {
 	return ok
 }
 
-// echoes reports whether a line with prefix p is echoed before it runs: not
-// when it has `@`, and not when quiet (Plan.Quiet or set quiet) holds. It is
-// pure.
-func echoes(p ast.Prefix, quiet bool) bool {
-	return !quiet && p != ast.PrefixAt && p != ast.PrefixAtDash
+// echoes reports whether a line with prefix p is echoed before it runs. --quiet
+// (quiet) echoes nothing. Otherwise a line is hidden by its `@`, or by `set
+// quiet` (setQuiet), but --verbose (loud) echoes every line, as upstream does.
+// It is pure.
+func echoes(p ast.Prefix, quiet, setQuiet, loud bool) bool {
+	if quiet {
+		return false
+	}
+	if loud {
+		return true
+	}
+	return !setQuiet && p != ast.PrefixAt && p != ast.PrefixAtDash
 }
 
 // infallible reports whether a line with prefix p ignores a failing status.

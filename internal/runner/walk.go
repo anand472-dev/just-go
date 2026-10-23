@@ -113,9 +113,10 @@ func (inv *invocation) execute(r *ast.Recipe, args []string, shared *ran, chain 
 	if code, err := inv.confirm(r, f); err != nil || code != 0 {
 		return code, err
 	}
-	if code, err := inv.dependencies(r, r.Deps, f, shared, chain); err != nil || code != 0 {
+	if code, err := inv.normalDependencies(r, f, shared, chain); err != nil || code != 0 {
 		return code, err
 	}
+	inv.announce(r)
 	s, err := inv.stepOf(r, f)
 	if err != nil {
 		return 0, err
@@ -126,11 +127,28 @@ func (inv *invocation) execute(r *ast.Recipe, args []string, shared *ran, chain 
 	return inv.subsequents(r, f, chain)
 }
 
+// announce writes the line --verbose gives before a recipe runs, unless --quiet
+// is given. Impure: it writes to the invocation's stderr.
+func (inv *invocation) announce(r *ast.Recipe) {
+	if inv.plan.Verbose && !inv.plan.Quiet {
+		fmt.Fprintf(inv.stderr, "===> running recipe `%s`...\n", r.Name)
+	}
+}
+
+// normalDependencies runs the dependencies that come before r, unless --no-deps
+// leaves them out. Impure: it runs commands.
+func (inv *invocation) normalDependencies(r *ast.Recipe, f frame, shared *ran, chain *callChain) (int, error) {
+	if inv.plan.NoDeps {
+		return 0, nil
+	}
+	return inv.dependencies(r, r.Deps, f, shared, chain)
+}
+
 // subsequents runs the dependencies that follow `&&` in the header of r. Each
 // list of them has a record of the calls made of its own: a recipe that ran
-// before may run again. Impure: it runs commands.
+// before may run again. --no-deps leaves them out too. Impure: it runs commands.
 func (inv *invocation) subsequents(r *ast.Recipe, f frame, chain *callChain) (int, error) {
-	if len(r.Subsequents) == 0 {
+	if len(r.Subsequents) == 0 || inv.plan.NoDeps {
 		return 0, nil
 	}
 	return inv.dependencies(r, r.Subsequents, f, newRan(), chain)
