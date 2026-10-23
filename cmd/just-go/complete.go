@@ -95,6 +95,7 @@ func runCommandLine(cfg config, env []string, workDir string, fsys sys.FS, exec 
 		FS:            fsys,
 		Exec:          exec,
 		Overrides:     cfg.set,
+		ShellCommand:  cfg.shellCommand,
 	}
 	jf, err := just.Load(opts)
 	if err != nil {

@@ -27,6 +27,9 @@ func RunCommand(ctx context.Context, plan Plan, argv []string) (int, error) {
 	if err != nil {
 		return 1, withSource(jf, err)
 	}
+	if plan.ShellCommand {
+		argv = append(shellOf(set), strings.Join(argv, " "))
+	}
 	fsys, exec := plan.FS, plan.Exec
 	if fsys == nil {
 		fsys = sys.OSFS{}

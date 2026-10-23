@@ -190,3 +190,19 @@ func TestDumpFormatJSONRefusesWhatItDoesNotEncode(t *testing.T) {
 		t.Errorf("run = %d, stderr %q", got.code, got.stderr)
 	}
 }
+
+// --groups takes no argument, as upstream refuses one.
+func TestGroupsRefusesAnArgument(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "[group('foo')]\nbar:\n"}, nil, "--groups", "baz")
+	if got.code != 1 || got.stderr != "error: `--groups` used with unexpected argument: `baz`\n" {
+		t.Errorf("run = %d, stderr %q", got.code, got.stderr)
+	}
+}
+
+// --shell-command runs the --command words as one script in the justfile's shell.
+func TestCommandWithShellCommandRunsItsWordsAsOneScript(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "set shell := ['printf']\n"}, nil, "--shell-command", "--command", "bar", "baz")
+	if got.code != 0 || len(got.proc.Specs) != 1 || strings.Join(got.proc.Specs[0].Argv, "|") != "printf|bar baz" {
+		t.Errorf("run = %d, argv %v", got.code, got.proc.Specs)
+	}
+}

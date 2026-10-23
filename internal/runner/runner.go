@@ -92,6 +92,11 @@ type Plan struct {
 	// is the SGR foreground code of --command-color, or "" for none.
 	Color, NoHighlight bool
 	CommandColor       string
+	// Tempdir is --tempdir, which replaces the set tempdir setting when it is not
+	// "". ShellCommand is --shell-command: RunCommand passes its argv as one
+	// script to the justfile's shell.
+	Tempdir      string
+	ShellCommand bool
 	// Dotenv holds the dotenv choices of the command line, which replace the
 	// justfile's settings; see DotenvFlags.
 	Dotenv DotenvFlags
@@ -870,7 +875,7 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared, goos string) *i
 		platform: plan.Platform, random: plan.Random,
 		shell: justfileShell(jf.Settings, pre.set, goos), dir: workingDirectory(plan, pre.set),
 		base: baseDirectory(plan, pre.set), here: invocationDirectory(plan), goos: goos,
-		scriptInterpreter: pre.set.ScriptInterpreter, tempdir: pre.set.Tempdir,
+		scriptInterpreter: pre.set.ScriptInterpreter, tempdir: tempdirOf(plan, pre.set),
 		exported: exportedGlobals(jf), recipes: make(map[string]*ast.Recipe, len(jf.Recipes)),
 	}
 	for i := range jf.Recipes {

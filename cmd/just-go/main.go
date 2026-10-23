@@ -102,6 +102,8 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		TimestampFormat:   cfg.timestampFormat,
 		Color:             colorOf(cfg, stderr),
 		NoHighlight:       cfg.noHighlight,
+		Tempdir:           cfg.tempdir,
+		ShellCommand:      cfg.shellCommand,
 		CommandColor:      commandCodes[cfg.commandColor],
 		Jobs:              cfg.jobs,
 		WorkDir:           runDir(cfg, workDir),
@@ -169,6 +171,16 @@ func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, std
 	return 0, false
 }
 
+// groupsOf writes the recipe groups, which --groups takes no argument for: one is
+// refused, as upstream refuses it. Impure: it writes to stdout or stderr.
+func groupsOf(cfg config, jf *just.Justfile, stdout, stderr io.Writer) int {
+	if len(cfg.words) > 0 {
+		return fail(stderr, cfg, usage("`--groups` used with unexpected argument: `%s`", cfg.words[0]))
+	}
+	_, _ = io.WriteString(stdout, formatGroups(jf.Recipes(), cfg.unsorted, listPrefix(cfg)))
+	return 0
+}
+
 // describeInfo prints what --show, --variables or --groups asks for. done is false
 // when none of them was asked for. Impure: it writes to stdout or stderr.
 func describeInfo(cfg config, env []string, jf *just.Justfile, stdout, stderr io.Writer) (status int, done bool) {
@@ -193,8 +205,7 @@ func describeInfo(cfg config, env []string, jf *just.Justfile, stdout, stderr io
 	case cfg.summary:
 		return summarize(cfg, jf, stdout, stderr), true
 	case cfg.groups:
-		_, _ = io.WriteString(stdout, formatGroups(jf.Recipes(), cfg.unsorted, listPrefix(cfg)))
-		return 0, true
+		return groupsOf(cfg, jf, stdout, stderr), true
 	}
 	return 0, false
 }
@@ -583,8 +594,11 @@ type config struct {
 	// commandColor the --command-color name, or "" for none.
 	color, commandColor string
 	noHighlight         bool
-	request             string
-	requestGiven        bool
+	// tempdir is --tempdir; shellCommand is --shell-command.
+	tempdir      string
+	shellCommand bool
+	request      string
+	requestGiven bool
 
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
@@ -862,6 +876,8 @@ type flagSpec struct {
 var flags = []flagSpec{
 	{"allow-missing", switchFlag},
 	{"color", valueFlag},
+	{"shell-command", switchFlag},
+	{"tempdir", valueFlag},
 	{"command-color", valueFlag},
 	{"dry-run", switchFlag},
 	{"highlight", switchFlag},
@@ -967,6 +983,7 @@ func takesValue(long string) bool {
 
 // switches sets the config field each switch flag names.
 var switches = map[string]func(*config){
+	"shell-command":               func(c *config) { c.shellCommand = true },
 	"json":                        func(c *config) { c.dump, c.dumpFormat = true, "json" },
 	"allow-outside-project-paths": func(c *config) { c.allowOutside = true },
 	"choose":                      func(c *config) { c.choose = true },
@@ -1040,6 +1057,7 @@ var setters = map[string]func(*config, string) error{
 	"show":             func(c *config, v string) error { c.show = v; return nil },
 	"request":          func(c *config, v string) error { c.request, c.requestGiven = v, true; return nil },
 	"timestamp-format": func(c *config, v string) error { c.timestampFormat = v; return nil },
+	"tempdir":          func(c *config, v string) error { c.tempdir = v; return nil },
 	"color": func(c *config, v string) error {
 		switch v {
 		case "always", "auto", "never":

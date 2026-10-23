@@ -88,6 +88,7 @@ command::exit_status#1
 command::exports_are_available#1
 command::long#1
 command::no_binary#1
+command::run_in_shell#1
 command::set_overrides_work#1
 command::short#1
 comparison::comparison_condition_without_lists#1
@@ -451,6 +452,7 @@ groups::list_multiple_groups#1
 groups::list_with_groups#1
 groups::list_with_groups_unsorted#1
 groups::list_with_groups_unsorted_group_order#1
+groups::reject_extra_arguments#1
 guards::exit_codes_above_one_are_reserved#1
 guards::guard_lines_are_ignored_without_setting#1
 guards::guard_lines_halt_execution#1
@@ -1121,6 +1123,7 @@ summary::summary_implies_unstable#1
 summary::summary_none#1
 summary::summary_sorted#1
 summary::summary_unsorted#1
+tempdir::argument_overrides_setting#1
 tempdir::setting#1
 timestamps::attribute#1
 timestamps::attribute_format#1

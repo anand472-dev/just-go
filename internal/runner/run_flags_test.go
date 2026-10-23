@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"gitea.com/wimwian/just-go/internal/settings"
 	"gitea.com/wimwian/just-go/internal/sys"
 	"gitea.com/wimwian/just-go/internal/sys/sysfake"
 )
@@ -141,5 +142,19 @@ func TestRunDryRunDoesNotRunTheDotenvCommand(t *testing.T) {
 	mustRun(t, plan)
 	if got := stderr.String(); got != "echo bar\n" || len(fake.Specs) != 0 {
 		t.Errorf("stderr %q, ran %d; want the line and nothing run", got, len(fake.Specs))
+	}
+}
+
+// --tempdir replaces the set tempdir setting; without it the setting is used.
+func TestTempdirOfPrefersTheFlag(t *testing.T) {
+	setting := "from-setting"
+	if got := tempdirOf(Plan{Tempdir: "flag"}, settings.Resolved{Tempdir: &setting}); got == nil || *got != "flag" {
+		t.Errorf("tempdirOf with --tempdir = %v", got)
+	}
+	if got := tempdirOf(Plan{}, settings.Resolved{Tempdir: &setting}); got == nil || *got != "from-setting" {
+		t.Errorf("tempdirOf without --tempdir = %v", got)
+	}
+	if got := tempdirOf(Plan{}, settings.Resolved{}); got != nil {
+		t.Errorf("tempdirOf with neither = %v", got)
 	}
 }

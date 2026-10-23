@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1175,
-    "fail": 812,
+    "pass": 1178,
+    "fail": 809,
     "skip": 24,
     "total": 2011
   },
@@ -18,16 +18,13 @@
     "cli:evaluate": 31,
     "cli:fmt": 24,
     "cli:global-justfile": 4,
-    "cli:groups": 1,
     "cli:list": 7,
     "cli:list-submodules": 8,
     "cli:no-aliases": 1,
     "cli:search-directory": 2,
     "cli:set": 2,
-    "cli:shell-command": 1,
     "cli:show": 9,
     "cli:summary": 1,
-    "cli:tempdir": 1,
     "cli:unsorted": 3,
     "cli:usage": 10,
     "cli:verbose": 1,
@@ -328,9 +325,6 @@
       "global::unix#1": "passes --global-justfile",
       "global::unix#2": "passes --global-justfile"
     },
-    "cli:groups": {
-      "groups::reject_extra_arguments#1": "passes --groups"
-    },
     "cli:list": {
       "alias::module_alias_resolves_in_list#1": "lists a submodule",
       "list::list_invalid_path#1": "lists a submodule",
@@ -361,9 +355,6 @@
       "overrides::override_variable_via_module_alias#1": "overrides a variable with NAME=VALUE",
       "settings::overrides_are_ignored_in_submodules#1": "passes --set"
     },
-    "cli:shell-command": {
-      "command::run_in_shell#1": "passes --shell-command"
-    },
     "cli:show": {
       "alias::module_alias_resolves_in_show#1": "passes --show",
       "show::alias_show#1": "passes --show",
@@ -377,9 +368,6 @@
     },
     "cli:summary": {
       "modules::disabled_recipes_are_hidden_from_summary#1": "passes --summary"
-    },
-    "cli:tempdir": {
-      "tempdir::argument_overrides_setting#1": "passes --tempdir"
     },
     "cli:unsorted": {
       "list::modules_unsorted#1": "passes --unsorted",
