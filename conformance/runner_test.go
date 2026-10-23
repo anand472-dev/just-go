@@ -148,12 +148,22 @@ func loadExceptions(t *testing.T, fsys sys.FS) map[string]string {
 // strict-path is the one category the oracle passes: upstream allows a path
 // that just-go's strict path rule refuses, the documented divergence that the
 // opt-out lifts. Adding a category here widens what the oracle is excused from,
-// so it needs a controller ruling.
+// so it needs a controller ruling. unsupported-shell is the same kind of
+// case: the oracle generates a completion script for a shell the spec does not
+// target (elvish, nushell), and just-go refuses to generate one.
 var exceptionCategories = map[string]bool{
-	"path-hash":   true,
-	"machine-env": true,
-	"fifo":        true,
-	"strict-path": true,
+	"path-hash":         true,
+	"machine-env":       true,
+	"fifo":              true,
+	"strict-path":       true,
+	"unsupported-shell": true,
+}
+
+// oracleCategories are the categories whose cases the oracle passes: the
+// exception is a divergence of just-go, not of the oracle.
+var oracleCategories = map[string]bool{
+	"strict-path":       true,
+	"unsupported-shell": true,
 }
 
 // parseExceptions maps case id to reason. Each entry line is an id, white
@@ -501,8 +511,9 @@ func TestOracleExceptionsStillFail(t *testing.T) {
 			if exceptionCategory(reason) == "machine-env" {
 				t.Skip("machine-env: the case fails only on a machine other than the recording one")
 			}
-			if exceptionCategory(reason) == "strict-path" {
-				// Upstream allows the path, so the oracle passes the case.
+			if oracleCategories[exceptionCategory(reason)] {
+				// The oracle passes the case: upstream allows the path, or
+				// generates the script that just-go refuses.
 				if err := h.check(t, byID[id]); err != nil {
 					t.Errorf("strict-path exception %q fails against the oracle: %v", id, err)
 				}

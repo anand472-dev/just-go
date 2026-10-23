@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gitea.com/wimwian/just-go/internal/analyzer"
@@ -254,6 +255,19 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 	}
 	res, err := runner.Run(ctx, plan)
 	return Result{ExitCode: res.ExitCode}, err
+}
+
+// Variables returns the names of the justfile's public assignments, sorted. It
+// does not evaluate them, so it runs nothing; completions use it.
+func (j *Justfile) Variables() []string {
+	var names []string
+	for _, a := range j.tree.UniqueAssignments() {
+		if !a.Private {
+			names = append(names, a.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 // Dump returns the source text of the justfile, as --dump prints it, with each

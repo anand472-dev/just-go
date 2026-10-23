@@ -18,6 +18,8 @@
 #   fifo         a named pipe fed by a thread in the upstream test, which the
 #                corpus cannot record
 #   strict-path  a path upstream allows and just-go's strict path rule refuses
+#   unsupported-shell  a completion script for a shell the spec does not target
+#                (elvish, nushell); just-go refuses to generate it
 #                (the documented divergence; the oracle passes these cases)
 # Empty directories, symbolic links, and file modes are recorded (R8) and the
 # harness materializes them, so they are never a reason here.
@@ -43,3 +45,5 @@ functions::test_os_arch_functions_in_expression#1 machine-env: expects the recor
 functions::test_os_arch_functions_in_interpolation#1 machine-env: expects the recording machine's architecture, operating system and processor count (aarch64, macos, 10), which the oracle prints on any other machine differently
 dotenv::dotenv_path_does_not_override_dotenv_file#1 strict-path: dotenv-path '.' in sub/justfile searches upward past the project directory to the root's .env, which upstream allows
 error_messages::file_paths_not_in_subdir_are_absolute#1 strict-path: foo/justfile imports ../bar.just, outside the project directory foo/, which upstream allows
+completions::completion_scripts#2 unsupported-shell: the spec's completion shells are bash, zsh, fish and PowerShell; elvish is not one, so just-go generates no script for it (ruling, Phase 5 Task 31)
+completions::completion_scripts#4 unsupported-shell: the spec's completion shells are bash, zsh, fish and PowerShell; nushell is not one, so just-go generates no script for it (ruling, Phase 5 Task 31)

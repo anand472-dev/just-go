@@ -63,6 +63,9 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		report(stderr, err)
 		return exitUsage
 	}
+	if status, done := early(cfg, env, workDir, fsys, stdout, stderr); done {
+		return status
+	}
 	childOut, childErr := childStreams(cfg.quiet, stdout, stderr)
 	opts := just.Options{
 		Unstable:          cfg.isUnstable(env),
@@ -89,10 +92,6 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if status, done := inspect(cfg, env, jf, opts, stdout, stderr); done {
 		return status
 	}
-	if cfg.list || (len(cfg.words) == 0 && jf.DefaultList()) {
-		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
-		return 0
-	}
 	opts.Calls, err = selectRecipes(jf.Recipes(), cfg.words)
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
@@ -104,15 +103,19 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	return res.ExitCode
 }
 
-// inspect prints what --dump or --evaluate asks for, instead of running
-// recipes. done is false when neither was asked for. Impure: it writes to
-// stdout and runs an --evaluate's backticks through opts.Exec.
+// inspect prints what --dump, --evaluate or --list asks for, or the recipes
+// when none is named and the justfile lists them by default, instead of running
+// recipes. done is false when none of these applies. Impure: it writes to stdout
+// and runs an --evaluate's backticks through opts.Exec.
 func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) (status int, done bool) {
 	switch {
 	case cfg.evaluate:
 		return evaluate(cfg, jf, opts, stdout, stderr), true
 	case cfg.dump:
 		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
+		return 0, true
+	case cfg.list || (len(cfg.words) == 0 && jf.DefaultList()):
+		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
 		return 0, true
 	}
 	return 0, false
@@ -322,6 +325,8 @@ type config struct {
 	dump             bool
 	indentation      string
 	indentationGiven bool
+	// completions is the shell --completions asks a script for, if any.
+	completions string
 	// evaluate is --evaluate, and evaluateName the name it was given, if any:
 	// the value is optional, so it may be attached or the next argument.
 	evaluate     bool
@@ -371,7 +376,7 @@ func parseLong(cfg *config, arg string, rest []string) (int, error) {
 	if !ok {
 		return 0, usage("unexpected argument '%s' found", arg)
 	}
-	if long == "evaluate" {
+	if kindOf(long) == optionalFlag {
 		return parseEvaluate(cfg, value, attached, rest)
 	}
 	if !takesValue(long) {
@@ -449,14 +454,66 @@ func valueName(long string) string {
 	return strings.ReplaceAll(strings.ToUpper(long), "-", "_")
 }
 
+// flagKind is how a long flag takes its value.
+type flagKind int
+
+const (
+	switchFlag   flagKind = iota // takes no value
+	valueFlag                    // takes a value, which must follow or be attached
+	optionalFlag                 // takes a value that may follow or be attached
+)
+
+// flagSpec is one long flag and how it takes its value.
+type flagSpec struct {
+	name string
+	kind flagKind
+}
+
+// flags is every long flag the command accepts. The parser reads it, and
+// completions offer its names, so a flag added here is parsed and completed.
+var flags = []flagSpec{
+	{"allow-outside-project-paths", switchFlag},
+	{"completions", valueFlag},
+	{"dump", switchFlag},
+	{"evaluate", optionalFlag},
+	{"indentation", valueFlag},
+	{"justfile", valueFlag},
+	{"list", switchFlag},
+	{"quiet", switchFlag},
+	{"shell", valueFlag},
+	{"shell-arg", valueFlag},
+	{"unstable", switchFlag},
+	{"yes", switchFlag},
+}
+
 // longFlagName reports whether name is the spelling of a long flag, which
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
-	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes", "allow-outside-project-paths", "evaluate", "dump", "indentation":
-		return name, true
+	for _, f := range flags {
+		if f.name == name {
+			return name, true
+		}
 	}
 	return "", false
+}
+
+// kindOf is how the long flag with this name takes its value. Pure.
+func kindOf(long string) flagKind {
+	for _, f := range flags {
+		if f.name == long {
+			return f.kind
+		}
+	}
+	return switchFlag
+}
+
+// flagNames is the name of every long flag, in the table's order. Pure.
+func flagNames() []string {
+	out := make([]string, len(flags))
+	for i, f := range flags {
+		out[i] = f.name
+	}
+	return out
 }
 
 // shortFlagName maps a one-letter flag to its long name. Pure.
@@ -474,11 +531,7 @@ func shortFlagName(letter string) (string, bool) {
 
 // takesValue reports whether the flag with this long name has a value. Pure.
 func takesValue(long string) bool {
-	switch long {
-	case "justfile", "shell", "shell-arg", "indentation":
-		return true
-	}
-	return false
+	return kindOf(long) == valueFlag
 }
 
 // setSwitch records the flag with this long name, which takes no value, in
@@ -516,6 +569,8 @@ func setFlag(cfg *config, long, value string) error {
 		cfg.shellArgs = append(cfg.shellArgs, value)
 	case "indentation":
 		cfg.indentation, cfg.indentationGiven = value, true
+	case "completions":
+		cfg.completions = value
 	}
 	return nil
 }
