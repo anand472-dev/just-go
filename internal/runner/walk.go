@@ -46,6 +46,10 @@ func (inv *invocation) evaluateGlobals(only map[string]bool) (eval.Scope, error)
 	}
 	cmd := inv.commander(nil, nil, site{})
 	for _, a := range evaluationOrder(wanted(jf.UniqueAssignments(), only)) {
+		if v, ok := inv.plan.Overrides[a.Name]; ok {
+			scope[a.Name] = v
+			continue
+		}
 		v, err := eval.EvaluateWith(a.Value, scope, cmd)
 		if err != nil {
 			return nil, locate(err, jf.File, a.Line)

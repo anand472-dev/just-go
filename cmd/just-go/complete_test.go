@@ -24,7 +24,7 @@ func completeOf(t *testing.T, files map[string]string, words ...string) string {
 func TestCompletionOffersTheRecipesOfTheJustfile(t *testing.T) {
 	files := map[string]string{"/w/justfile": "# does it\nfoo:\nbar:\n_hid:\n"}
 	got := completeOf(t, files, "just", "")
-	want := "bar\nfoo\tdoes it\n.\njustfile\n--allow-outside-project-paths\n--completions\n--dump\n--evaluate\n--indentation\n--justfile\n--list\n--quiet\n--group\n--groups\n--list-heading\n--list-prefix\n--list-submodules\n--shell\n--shell-arg\n--show\n--summary\n--unsorted\n--unstable\n--usage\n--variables\n--yes\n"
+	want := "bar\nfoo\tdoes it\n.\njustfile\n--allow-outside-project-paths\n--completions\n--dump\n--evaluate\n--indentation\n--justfile\n--list\n--quiet\n--group\n--groups\n--list-heading\n--list-prefix\n--list-submodules\n--shell\n--shell-arg\n--set\n--show\n--summary\n--unsorted\n--unstable\n--usage\n--variables\n--yes\n"
 	if got != want {
 		t.Errorf("completion = %q; want %q", got, want)
 	}

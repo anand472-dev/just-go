@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -48,13 +47,16 @@ type Options struct {
 	// AllowOutsidePaths lifts the strict path rule: an import, module or dotenv file
 	// may lie outside the root justfile's directory. Off, such a file is refused.
 	AllowOutsidePaths bool
-	Stdin             io.Reader // nil means no input; commands, and the commands of backticks, read it
-	Stdout            io.Writer // nil discards
-	Stderr            io.Writer // nil discards; receives echoed commands and failure messages
-	Recipes           []string  // recipes to run; empty means the first recipe in the file
-	Args              []string  // positional arguments for the single requested recipe
-	Calls             []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
-	Quiet             bool      // suppress command echo, as if `set quiet` held
+	// Overrides are the values given on the command line for variables, by name
+	// (a module's variable is `module::name`); see runner.Plan.Overrides.
+	Overrides map[string]string
+	Stdin     io.Reader // nil means no input; commands, and the commands of backticks, read it
+	Stdout    io.Writer // nil discards
+	Stderr    io.Writer // nil discards; receives echoed commands and failure messages
+	Recipes   []string  // recipes to run; empty means the first recipe in the file
+	Args      []string  // positional arguments for the single requested recipe
+	Calls     []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
+	Quiet     bool      // suppress command echo, as if `set quiet` held
 	// Yes answers yes to every `[confirm]` prompt without asking, as
 	// upstream's --yes does. Without it a prompt is written to Prompt and the
 	// answer is read, one line, from Stdin; no Stdin means no.
@@ -307,7 +309,7 @@ func (j *Justfile) Usage(name string) (string, error) {
 // near recipe's name when there is one.
 func (j *Justfile) recipe(name string) (string, ast.Recipe, error) {
 	path := strings.Join(strings.Fields(name), "::")
-	if !validPath(path) {
+	if !ast.ValidPath(path) {
 		return "", ast.Recipe{}, usage(fmt.Sprintf("invalid module path `%s`", name))
 	}
 	if m := absentModuleOf(j.tree, path); m != "" {
@@ -350,25 +352,6 @@ func usageOf(path string, r ast.Recipe) string {
 	return b.String()
 }
 
-// validPath reports whether p is a module path: identifiers joined by `::`. Pure.
-func validPath(p string) bool {
-	for _, seg := range strings.Split(p, "::") {
-		if seg == "" || !isIdent(seg) {
-			return false
-		}
-	}
-	return true
-}
-
-// identPattern is a name a justfile may give a recipe or module: a letter or
-// underscore, then letters, digits, underscores or dashes.
-var identPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
-
-// isIdent reports whether s is such a name. Pure.
-func isIdent(s string) bool {
-	return identPattern.MatchString(s)
-}
-
 // lastSegment is the part of a module path after its last `::`. Pure.
 func lastSegment(path string) string {
 	if i := strings.LastIndex(path, "::"); i >= 0 {
@@ -400,6 +383,13 @@ func absentModuleOf(jf *ast.Justfile, name string) string {
 		}
 	}
 	return ""
+}
+
+// CheckOverrides reports whether overrides, the values given on the command line
+// for variables, name variables of the justfile, as upstream requires before any
+// recipe runs. It evaluates nothing.
+func (j *Justfile) CheckOverrides(overrides map[string]string) error {
+	return runner.CheckOverrides(j.tree, overrides)
 }
 
 // Summary returns the names of the justfile's public recipes, module recipes
@@ -498,6 +488,7 @@ func (j *Justfile) plan(opts Options) (runner.Plan, error) {
 		Justfile:          j.tree,
 		Recipes:           opts.Recipes,
 		AllowOutsidePaths: opts.AllowOutsidePaths,
+		Overrides:         opts.Overrides,
 		Args:              opts.Args,
 		Calls:             runnerCalls(opts.Calls),
 		Env:               opts.Env,

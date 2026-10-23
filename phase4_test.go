@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/sys/sysfake"
 )
@@ -101,15 +102,9 @@ func TestSummaryOrderSortsEachLevelOrKeepsTheSource(t *testing.T) {
 	}
 }
 
-func TestIsIdentAcceptsOnlyNamesAJustfileMayGive(t *testing.T) {
-	if !isIdent("a-b_1") || isIdent("1a") || isIdent("") || isIdent("a b") {
-		t.Error("isIdent does not accept only names a justfile may give")
-	}
-}
-
 func TestValidPathNeedsIdentifiersBetweenSeparators(t *testing.T) {
-	if validPath("a::") || validPath("::a") || !validPath("a::b") {
-		t.Error("validPath accepts empty segments or rejects a valid path")
+	if ast.ValidPath("a::") || ast.ValidPath("::a") || ast.ValidPath("1a") || ast.ValidPath("a b") || !ast.ValidPath("a::b-c_1") {
+		t.Error("ValidPath accepts empty or non-identifier segments, or rejects a valid path")
 	}
 }
 

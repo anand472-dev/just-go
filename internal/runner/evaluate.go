@@ -29,6 +29,9 @@ type Binding struct {
 // with its dotenv variables.
 func Evaluate(ctx context.Context, plan Plan, names []string) ([]Binding, error) {
 	jf := plan.Justfile
+	if err := CheckOverrides(jf, plan.Overrides); err != nil {
+		return nil, err
+	}
 	if err := unknownName(jf, names); err != nil {
 		return nil, err
 	}

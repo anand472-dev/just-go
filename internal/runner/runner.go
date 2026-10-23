@@ -73,6 +73,10 @@ type Plan struct {
 	// AllowOutsidePaths lifts the strict path rule for dotenv files, which may lie
 	// outside the justfile's directory.
 	AllowOutsidePaths bool
+	// Overrides are the values given on the command line for variables, by
+	// their names (a module's variable is `module::name`). An overridden
+	// variable takes its value, and its expression is not evaluated.
+	Overrides map[string]string
 	Exec              sys.Process // nil uses the OS implementation from internal/sys
 	// FS is where script recipes write their scripts, in a directory it makes
 	// and removes again. Nil uses the OS implementation from internal/sys.
@@ -172,6 +176,9 @@ type prepared struct {
 // processes through plan.Exec, and reads the host's operating system when
 // plan.OS is empty.
 func Run(ctx context.Context, plan Plan) (Result, error) {
+	if err := CheckOverrides(plan.Justfile, plan.Overrides); err != nil {
+		return Result{}, err
+	}
 	pre, err := prepare(plan)
 	if err != nil {
 		return Result{}, withSource(plan.Justfile, err)

@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	just "gitea.com/wimwian/just-go"
+	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/output"
 	"gitea.com/wimwian/just-go/internal/suggest"
@@ -66,8 +67,12 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if status, done := early(cfg, env, workDir, fsys, stdout, stderr); done {
 		return status
 	}
+	if err := overridesOf(&cfg); err != nil {
+		return fail(stderr, cfg.quiet, err)
+	}
 	childOut, childErr := childStreams(cfg.quiet, stdout, stderr)
 	opts := just.Options{
+		Overrides:         cfg.set,
 		Unstable:          cfg.isUnstable(env),
 		Justfile:          resolve(workDir, cfg.justfile),
 		SearchFrom:        workDir,
@@ -92,7 +97,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if status, done := inspect(cfg, env, jf, opts, stdout, stderr); done {
 		return status
 	}
-	opts.Calls, err = selectRecipes(jf.Recipes(), cfg.words)
+	opts.Calls, err = chooseCalls(cfg, jf)
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
@@ -423,6 +428,8 @@ type config struct {
 	indentationGiven bool
 	// completions is the shell --completions asks a script for, if any.
 	completions string
+	// set holds the --set overrides of variables, by name.
+	set map[string]string
 	// show and usage name the recipes --show and --usage describe.
 	show, usage string
 	// groups, summary, variables, and list-submodules are the switches of the
@@ -508,6 +515,9 @@ func parseLong(cfg *config, arg string, rest []string) (int, error) {
 	if kindOf(long) == optionalFlag {
 		return parseEvaluate(cfg, value, attached, rest)
 	}
+	if kindOf(long) == pairFlag {
+		return parsePair(cfg, long, attached, rest)
+	}
 	if !takesValue(long) {
 		if attached {
 			return 0, usage("unexpected value for '--%s'", long)
@@ -539,6 +549,71 @@ func parseEvaluate(cfg *config, value string, attached bool, rest []string) (int
 		return 1, nil
 	}
 	return 0, nil
+}
+
+// parsePair applies --set NAME VALUE, which takes the two words that follow it:
+// an attached value is an error, and so is a missing word. The result is how
+// many of rest it consumed. Pure apart from updating cfg.
+func parsePair(cfg *config, long string, attached bool, rest []string) (int, error) {
+	if attached {
+		return 0, usage("unexpected value for '--%s'", long)
+	}
+	if len(rest) < 2 {
+		return 0, usage("a name and a value are required for '--%s <NAME> <VALUE>'", long)
+	}
+	if cfg.set == nil {
+		cfg.set = make(map[string]string)
+	}
+	cfg.set[rest[0]] = rest[1]
+	return 2, nil
+}
+
+// overridesOf moves the name=value words into cfg.set, and refuses a name that is
+// not a module path, before the justfile is read, as upstream does. It updates
+// cfg only.
+func overridesOf(cfg *config) error {
+	cfg.set, cfg.words = takeOverrides(cfg.set, cfg.words)
+	names := make([]string, 0, len(cfg.set))
+	for name := range cfg.set {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if !ast.ValidPath(name) {
+			return usage("invalid override path `%s`", name)
+		}
+	}
+	return nil
+}
+
+// chooseCalls is the recipes the command line names, each with its arguments.
+// The library checks the overrides first: they name variables, which is what
+// upstream reports before it looks at the recipes.
+func chooseCalls(cfg config, jf *just.Justfile) ([]just.Call, error) {
+	if err := jf.CheckOverrides(cfg.set); err != nil {
+		return nil, err
+	}
+	return selectRecipes(jf.Recipes(), cfg.words)
+}
+
+// takeOverrides moves the leading words of the form name=value into the
+// overrides, which --set gives too: a word names the variable and sets its
+// value, and it wins over a --set of the same name. The other words are
+// returned as they are. Pure.
+func takeOverrides(set map[string]string, words []string) (map[string]string, []string) {
+	out := make(map[string]string, len(set))
+	for k, v := range set {
+		out[k] = v
+	}
+	i := 0
+	for ; i < len(words); i++ {
+		name, value, ok := strings.Cut(words[i], "=")
+		if !ok {
+			break
+		}
+		out[name] = value
+	}
+	return out, words[i:]
 }
 
 // parseShort applies the short flags in arg ("-l", "-lq", "-fPATH"). A flag
@@ -590,6 +665,7 @@ const (
 	switchFlag   flagKind = iota // takes no value
 	valueFlag                    // takes a value, which must follow or be attached
 	optionalFlag                 // takes a value that may follow or be attached
+	pairFlag                     // takes a name and a value, the two words that follow
 )
 
 // flagSpec is one long flag and how it takes its value.
@@ -616,6 +692,7 @@ var flags = []flagSpec{
 	{"list-submodules", switchFlag},
 	{"shell", valueFlag},
 	{"shell-arg", valueFlag},
+	{"set", pairFlag},
 	{"show", valueFlag},
 	{"summary", switchFlag},
 	{"unsorted", switchFlag},

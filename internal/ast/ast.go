@@ -10,6 +10,7 @@
 package ast
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -776,3 +777,18 @@ func (List) exprNode()      { return }
 func (Comparison) exprNode()  { return }
 func (Conditional) exprNode() { return }
 func (Assert) exprNode()      { return }
+
+// identPattern is a name a justfile may give a recipe, variable or module: a
+// letter or underscore, then letters, digits, underscores or dashes.
+var identPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+
+// ValidPath reports whether p is a module path, identifiers joined by `::`, as
+// the command line and the justfile name the things they refer to. Pure.
+func ValidPath(p string) bool {
+	for _, seg := range strings.Split(p, "::") {
+		if !identPattern.MatchString(seg) {
+			return false
+		}
+	}
+	return true
+}
