@@ -73,7 +73,14 @@ func Expressions(jf *ast.Justfile) []ast.Expr {
 // failure as a *diag.Error of KindAnalysis, located at the variable or call
 // concerned. Resolve is pure.
 func Resolve(jf *ast.Justfile) (Resolved, error) {
-	c := newConst(jf)
+	return ResolveWith(jf, nil)
+}
+
+// ResolveWith is Resolve with the --set overrides given: a variable that
+// overrides names is that value wherever a setting reads it, as upstream's is.
+// Pure.
+func ResolveWith(jf *ast.Justfile, overrides map[string]string) (Resolved, error) {
+	c := newConst(jf, overrides)
 	var out Resolved
 	set := jf.Settings
 	steps := []func() error{
@@ -100,16 +107,17 @@ func Resolve(jf *ast.Justfile) (Resolved, error) {
 // *diag.Error of KindAnalysis, located at the variable or call concerned,
 // or a *ListError. ConstValue is pure.
 func ConstValue(jf *ast.Justfile, e ast.Expr) (string, error) {
-	v, err := newConst(jf).expr(e)
+	v, err := newConst(jf, nil).expr(e)
 	return v, unfault(err)
 }
 
 // consts evaluates expressions in a const context. memo holds the assignments
 // evaluated so far, by name.
 type consts struct {
-	jf     *ast.Justfile
-	byName map[string]ast.Assignment
-	memo   map[string]constValue
+	jf        *ast.Justfile
+	byName    map[string]ast.Assignment
+	memo      map[string]constValue
+	overrides map[string]string // --set values, which replace the variables they name
 }
 
 // constValue is the result of evaluating an assignment in a const context:
@@ -130,12 +138,12 @@ type ListError struct{ Diag *diag.Error }
 // Error returns the message of the diagnostic. It is pure.
 func (e *ListError) Error() string { return e.Diag.Error() }
 
-func newConst(jf *ast.Justfile) *consts {
+func newConst(jf *ast.Justfile, overrides map[string]string) *consts {
 	byName := make(map[string]ast.Assignment, len(jf.Assignments))
 	for _, a := range jf.Assignments {
 		byName[a.Name] = a
 	}
-	return &consts{jf: jf, byName: byName, memo: make(map[string]constValue, len(byName))}
+	return &consts{jf: jf, byName: byName, memo: make(map[string]constValue, len(byName)), overrides: overrides}
 }
 
 // list evaluates the expressions of an interpreter setting, one string each.
@@ -327,6 +335,9 @@ func (c *consts) concat(cat ast.Concat) (string, error) {
 // variable evaluates a reference to an assignment. An assignment that is not
 // const makes the reference an error at the reference. It is pure.
 func (c *consts) variable(v ast.Var) (string, error) {
+	if value, ok := c.overrides[v.Name]; ok {
+		return value, nil
+	}
 	a, ok := c.byName[v.Name]
 	if !ok {
 		if got, isConst := builtins.ConstantValue(v.Name, ""); isConst {

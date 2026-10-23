@@ -229,7 +229,7 @@ func prepare(plan Plan) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	set, err := settings.Resolve(jf)
+	set, err := settings.ResolveWith(jf, plan.Overrides)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -238,7 +238,7 @@ func prepare(plan Plan) (prepared, error) {
 			return prepared{}, err
 		}
 	}
-	return prepared{calls: calls, set: set, only: usedAssignments(jf, calls), parallel: forks(jf)}, nil
+	return prepared{calls: calls, set: set, only: usedAssignments(jf, calls, plan.Overrides), parallel: forks(jf)}, nil
 }
 
 // forks reports whether some recipe of jf has more than one dependency, or

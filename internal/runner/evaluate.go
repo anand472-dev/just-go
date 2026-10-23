@@ -35,7 +35,7 @@ func Evaluate(ctx context.Context, plan Plan, names []string) ([]Binding, error)
 	if err := unknownName(jf, names); err != nil {
 		return nil, err
 	}
-	set, err := settings.Resolve(jf)
+	set, err := settings.ResolveWith(jf, plan.Overrides)
 	if err != nil {
 		return nil, withSource(jf, err)
 	}

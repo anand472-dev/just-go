@@ -48,6 +48,12 @@ import (
 // result. Each error is located where upstream locates it: at the name,
 // dependency, variable or text it is about, with Width covering it.
 func Analyze(jf *ast.Justfile) error {
+	return AnalyzeWith(jf, nil)
+}
+
+// AnalyzeWith is Analyze with the --set overrides given, which the settings
+// see in place of the variables they name.
+func AnalyzeWith(jf *ast.Justfile, overrides map[string]string) error {
 	if err := checkItems(jf); err != nil {
 		return err
 	}
@@ -57,7 +63,7 @@ func Analyze(jf *ast.Justfile) error {
 	if err := resolveAssignments(jf); err != nil {
 		return err
 	}
-	if err := resolveSettings(jf); err != nil {
+	if err := resolveSettings(jf, overrides); err != nil {
 		return err
 	}
 	if err := checkListFeatures(jf); err != nil {

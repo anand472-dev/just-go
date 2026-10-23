@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1170,
-    "fail": 817,
+    "pass": 1175,
+    "fail": 812,
     "skip": 24,
     "total": 2011
   },
@@ -23,7 +23,7 @@
     "cli:list-submodules": 8,
     "cli:no-aliases": 1,
     "cli:search-directory": 2,
-    "cli:set": 7,
+    "cli:set": 2,
     "cli:shell-command": 1,
     "cli:show": 9,
     "cli:summary": 1,
@@ -358,13 +358,8 @@
       "fallback::works_with_provided_search_directory#1": "names a recipe by a directory path"
     },
     "cli:set": {
-      "lazy::overridden_assignment_dependencies_are_not_evaluated#1": "passes --set",
-      "overrides::override_variable_used_in_setting#1": "passes --set",
       "overrides::override_variable_via_module_alias#1": "overrides a variable with NAME=VALUE",
-      "settings::backtick_override#1": "passes --set",
-      "settings::expression_with_override#1": "passes --set",
-      "settings::overrides_are_ignored_in_submodules#1": "passes --set",
-      "settings::variable_with_override#1": "passes --set"
+      "settings::overrides_are_ignored_in_submodules#1": "passes --set"
     },
     "cli:shell-command": {
       "command::run_in_shell#1": "passes --shell-command"

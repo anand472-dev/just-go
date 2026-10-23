@@ -474,7 +474,7 @@ func TestUsedAssignmentsIsNilWithoutLazy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := usedAssignments(jf, []Call{{Recipe: "foo"}}); got != nil {
+	if got := usedAssignments(jf, []Call{{Recipe: "foo"}}, nil); got != nil {
 		t.Errorf("usedAssignments = %v, want nil", got)
 	}
 }
@@ -486,7 +486,7 @@ func TestUsedAssignmentsFollowsAssignmentsAndDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := usedAssignments(jf, []Call{{Recipe: "foo"}})
+	got := usedAssignments(jf, []Call{{Recipe: "foo"}}, nil)
 	var names []string
 	for name := range got {
 		names = append(names, name)
@@ -497,7 +497,7 @@ func TestUsedAssignmentsFollowsAssignmentsAndDependencies(t *testing.T) {
 	}
 	// An unknown recipe, which requested() refuses before this is called, is
 	// skipped.
-	if got := usedAssignments(jf, []Call{{Recipe: "missing"}}); len(got) != 0 {
+	if got := usedAssignments(jf, []Call{{Recipe: "missing"}}, nil); len(got) != 0 {
 		t.Errorf("usedAssignments of an unknown recipe = %v", got)
 	}
 }
@@ -536,7 +536,7 @@ func BenchmarkUsedAssignments(b *testing.B) {
 	calls := []Call{{Recipe: "r0"}}
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = usedAssignments(jf, calls)
+		_ = usedAssignments(jf, calls, nil)
 	}
 }
 
@@ -591,7 +591,7 @@ func TestUsedAssignmentsCountsTheCommentsOfScripts(t *testing.T) {
 				t.Fatal(err)
 			}
 			var names []string
-			for name := range usedAssignments(jf, []Call{{Recipe: "foo"}}) {
+			for name := range usedAssignments(jf, []Call{{Recipe: "foo"}}, nil) {
 				names = append(names, name)
 			}
 			sort.Strings(names)
@@ -599,5 +599,17 @@ func TestUsedAssignmentsCountsTheCommentsOfScripts(t *testing.T) {
 				t.Errorf("usedAssignments = %v, want %v", names, tc.want)
 			}
 		})
+	}
+}
+
+// Under set lazy, an assignment that a --set override replaces is not
+// evaluated, so the assignments its value names are not in use either.
+func TestUsedAssignmentsDoesNotFollowAnOverride(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("set lazy\n\nx := `exit 1`\ny := x\n\nfoo:\n  @echo {{ y }}\n"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got := usedAssignments(jf, []Call{{Recipe: "foo"}}, map[string]string{"y": "bar"}); got["x"] || !got["y"] {
+		t.Errorf("used = %v; want y in use and x not", got)
 	}
 }

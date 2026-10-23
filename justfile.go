@@ -185,7 +185,7 @@ func Load(opts Options) (*Justfile, error) {
 	if filepath.Dir(path) == path {
 		return nil, fmt.Errorf("justfile path had no parent: %s", path)
 	}
-	tree, err := loader.LoadWith(fsys, path, loader.Options{Home: homeOf(opts.Env), AllowOutsidePaths: opts.AllowOutsidePaths})
+	tree, err := loader.LoadWith(fsys, path, loader.Options{Home: homeOf(opts.Env), AllowOutsidePaths: opts.AllowOutsidePaths, Overrides: opts.Overrides})
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func Load(opts Options) (*Justfile, error) {
 // directory on disk, so its imports and modules are not resolved, and Run needs
 // Options.WorkDir for it. Impure: it reads nothing.
 func loadSource(opts Options) (*Justfile, error) {
-	j, err := Parse(opts.SourceName, opts.Source)
+	j, err := parseWith(opts.SourceName, opts.Source, opts.Overrides)
 	if err != nil {
 		return nil, err
 	}
@@ -228,11 +228,16 @@ func locate(fsys sys.FS, opts Options) (string, error) {
 // accepts a justfile that uses unstable features; Run refuses it unless they
 // are enabled. Pure.
 func Parse(name string, src []byte) (*Justfile, error) {
+	return parseWith(name, src, nil)
+}
+
+// parseWith is Parse with the --set overrides given to the analysis.
+func parseWith(name string, src []byte, overrides map[string]string) (*Justfile, error) {
 	tree, err := parser.Parse(name, src)
 	if err != nil {
 		return nil, diag.WithSource(err, src)
 	}
-	if err := analyzer.Analyze(tree); err != nil {
+	if err := analyzer.AnalyzeWith(tree, overrides); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
 	tree.Source = src

@@ -23,7 +23,7 @@ func RunCommand(ctx context.Context, plan Plan, argv []string) (int, error) {
 	if err := CheckOverrides(jf, plan.Overrides); err != nil {
 		return exitStatus(err), err
 	}
-	set, err := settings.Resolve(jf)
+	set, err := settings.ResolveWith(jf, plan.Overrides)
 	if err != nil {
 		return 1, withSource(jf, err)
 	}

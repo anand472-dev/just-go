@@ -207,6 +207,8 @@ func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
 
 // Options are what loading a justfile takes beyond the file system and the path.
 type Options struct {
+	// Overrides are the --set values, which the analysis of the settings sees.
+	Overrides map[string]string
 	// Home is the directory an import beginning with `~/` starts from. With
 	// Home empty, such an import is not found.
 	Home string
@@ -247,7 +249,7 @@ func loadRoot(fsys sys.FS, path string, opts Options) (*ast.Justfile, error) {
 	if err := expandModules(e, jf, src, nil); err != nil {
 		return nil, err
 	}
-	if err := analyzer.Analyze(jf); err != nil {
+	if err := analyzer.AnalyzeWith(jf, opts.Overrides); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
 	jf.Source = src

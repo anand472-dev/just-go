@@ -65,7 +65,7 @@ func conflictsOf(site ast.SettingSite) []string {
 // many arguments and every variable must be an assignment; then the
 // expressions are evaluated in a const context, and the first that cannot be
 // is reported. It is pure.
-func resolveSettings(jf *ast.Justfile) *diag.Error {
+func resolveSettings(jf *ast.Justfile, overrides map[string]string) *diag.Error {
 	globals := make(map[string]struct{}, len(jf.Assignments))
 	for _, a := range jf.Assignments {
 		globals[a.Name] = struct{}{}
@@ -76,7 +76,7 @@ func resolveSettings(jf *ast.Justfile) *diag.Error {
 			return err
 		}
 	}
-	_, err := settings.Resolve(jf)
+	_, err := settings.ResolveWith(jf, overrides)
 	var listed *settings.ListError
 	switch {
 	case err == nil:

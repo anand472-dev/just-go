@@ -8,11 +8,14 @@ import "gitea.com/wimwian/just-go/internal/ast"
 // assignments, and those that are evaluated whether or not anything uses
 // them: the exported ones, all of them under set export, and the ones
 // written with `eager`. It is pure.
-func usedAssignments(jf *ast.Justfile, calls []Call) map[string]bool {
+func usedAssignments(jf *ast.Justfile, calls []Call, overrides map[string]string) map[string]bool {
 	if !jf.Settings.Lazy {
 		return nil
 	}
 	u := newInUse(jf.UniqueAssignments())
+	for name := range overrides {
+		u.frozen[name] = true // an override's value is not evaluated, so its references are not in use
+	}
 	for _, a := range u.assignments {
 		if a.Exported || a.Eager || jf.Settings.Export {
 			u.mark([]string{a.Name})
@@ -32,6 +35,7 @@ type inUse struct {
 	byName      map[string]ast.Assignment
 	used        map[string]bool
 	queue       []string
+	frozen      map[string]bool // names used but never followed: those a --set overrides
 }
 
 // newInUse returns an inUse over assignments, with none in use. It is pure.
@@ -40,6 +44,7 @@ func newInUse(assignments []ast.Assignment) *inUse {
 		assignments: assignments,
 		byName:      make(map[string]ast.Assignment, len(assignments)),
 		used:        make(map[string]bool, len(assignments)),
+		frozen:      map[string]bool{},
 	}
 	for _, a := range assignments {
 		u.byName[a.Name] = a
@@ -54,7 +59,9 @@ func (u *inUse) mark(names []string) {
 	for _, name := range names {
 		if _, ok := u.byName[name]; ok && !u.used[name] {
 			u.used[name] = true
-			u.queue = append(u.queue, name)
+			if !u.frozen[name] {
+				u.queue = append(u.queue, name)
+			}
 		}
 	}
 }

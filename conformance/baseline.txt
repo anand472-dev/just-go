@@ -547,6 +547,7 @@ lazy::assignment_with_set_export_is_evaluated#1
 lazy::eager_assignments_are_evaluated#1
 lazy::exported_assignment_is_evaluated#1
 lazy::multiple_invocations_evaluate_union#1
+lazy::overridden_assignment_dependencies_are_not_evaluated#1
 lazy::transitively_used_assignment_evaluated#1
 lazy::unconditionally_evaluated_assignment_dependencies_are_evaluated#1
 lazy::unconditionally_evaluated_assignment_dependencies_are_evaluated#2
@@ -830,6 +831,7 @@ overrides::invalid_override_path_positional#1
 overrides::invalid_override_path_set#1
 overrides::override_variable_in_nested_submodule#1
 overrides::override_variable_in_submodule#1
+overrides::override_variable_used_in_setting#1
 overrides::overrides_first#1
 overrides::overrides_not_evaluated#1
 overrides::overrides_of_import_shared_across_modules#1
@@ -963,9 +965,11 @@ search_arguments::passing_dot_as_argument_is_allowed#1
 settings::all_settings_allow_expressions#1
 settings::assert#1
 settings::backtick#1
+settings::backtick_override#1
 settings::bad_regex#1
 settings::built_in_constant#1
 settings::expression#1
+settings::expression_with_override#1
 settings::function_call#1
 settings::invalid_attribute#1
 settings::no_cd_setting_conflicts_with_working_directory_setting#1
@@ -983,6 +987,7 @@ settings::undefined_variable_in_windows_shell_command#1
 settings::undefined_variable_in_working_directory#1
 settings::unused_non_const_assignments#1
 settings::variable#1
+settings::variable_with_override#1
 shadowing_parameters::exporting_shadowing_parameters_does_change_environment#1
 shadowing_parameters::parameter_may_shadow_variable#1
 shadowing_parameters::shadowing_parameters_do_not_change_environment#1
