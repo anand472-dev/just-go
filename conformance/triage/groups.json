@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 996,
-    "fail": 992,
+    "pass": 1019,
+    "fail": 969,
     "skip": 23,
     "total": 2011
   },
@@ -11,7 +11,7 @@
     "cli:allow-missing": 5,
     "cli:ceiling": 8,
     "cli:check": 2,
-    "cli:choose": 17,
+    "cli:choose": 3,
     "cli:clean": 1,
     "cli:color": 12,
     "cli:command": 10,
@@ -22,13 +22,12 @@
     "cli:dotenv-path": 3,
     "cli:dry-run": 4,
     "cli:dump": 104,
-    "cli:edit": 2,
     "cli:evaluate": 31,
     "cli:explain": 1,
     "cli:fmt": 24,
     "cli:global-justfile": 4,
     "cli:groups": 1,
-    "cli:init": 12,
+    "cli:init": 5,
     "cli:jobs": 1,
     "cli:json": 1,
     "cli:justfile": 2,
@@ -205,23 +204,9 @@
       "init::fmt_compatibility#2": "passes --check"
     },
     "cli:choose": {
-      "choose::chooser#1": "passes --choose",
-      "choose::chooser_selections_are_processed_separately#1": "passes --choose",
-      "choose::chooser_signal_exit_code_is_propagated#1": "passes --choose",
-      "choose::env#1": "passes --choose",
-      "choose::filter_by_group#1": "passes --choose",
       "choose::invoke_error_function#1": "passes --choose",
-      "choose::multiple_recipes#1": "passes --choose",
-      "choose::no_choosable_recipes#1": "passes --choose",
-      "choose::override_variable#1": "passes --choose",
-      "choose::recipes_in_submodules_can_be_chosen#1": "passes --choose",
-      "choose::skip_private_recipes#1": "passes --choose",
       "choose::skip_recipes_in_private_modules#1": "passes --choose",
-      "choose::skip_recipes_that_require_arguments#1": "passes --choose",
-      "choose::visit_modules_in_alphabetical_order#1": "passes --choose",
-      "quiet::choose_invocation#1": "passes --choose",
-      "quiet::choose_none#1": "passes --choose",
-      "quiet::choose_status#1": "passes --choose"
+      "quiet::choose_invocation#1": "passes --choose"
     },
     "cli:clean": {
       "cache::clean_succeeds_without_cache_directory#1": "passes --clean"
@@ -386,10 +371,6 @@
       "modules::optional_modules_with_paths_are_dumped_correctly#1": "passes --dump",
       "shell_expansion::shell_expanded_strings_are_dumped_correctly#1": "passes --dump"
     },
-    "cli:edit": {
-      "quiet::edit_invocation#1": "passes --edit",
-      "quiet::edit_status#1": "passes --edit"
-    },
     "cli:evaluate": {
       "datetime::datetime#1": "passes --evaluate",
       "datetime::datetime_utc#1": "passes --evaluate",
@@ -463,17 +444,10 @@
     },
     "cli:init": {
       "ceiling::justfile_init_search_stops_at_ceiling_dir#1": "passes --init",
-      "init::exists#1": "passes --init",
-      "init::exists#2": "passes --init",
-      "init::fmt_compatibility#1": "passes --init",
-      "init::invocation_directory#1": "passes --init",
-      "init::justfile_name_from_invocation_directory#1": "passes --init",
       "init::justfile_name_from_search_directory#1": "passes --init",
       "init::working_directory_without_justfile#1": "passes --init",
-      "init::write_error#1": "passes --init",
       "justfile_from_stdin::init_error#1": "passes --init",
-      "markdown::init_error#1": "passes --init",
-      "quiet::init_exists#1": "passes --init"
+      "markdown::init_error#1": "passes --init"
     },
     "cli:jobs": {
       "parallel::zero_jobs_is_an_error#1": "passes --jobs"

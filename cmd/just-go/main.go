@@ -64,7 +64,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		report(stderr, err)
 		return exitUsage
 	}
-	if status, done := early(cfg, env, workDir, fsys, stdout, stderr); done {
+	if status, done := early(cfg, env, workDir, fsys, exec, stdout, stderr); done {
 		return status
 	}
 	if err := overridesOf(&cfg); err != nil {
@@ -119,6 +119,8 @@ func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, std
 	switch {
 	case cfg.evaluate:
 		return evaluate(cfg, jf, opts, stdout, stderr), true
+	case cfg.choose:
+		return chooseRecipes(cfg, env, jf, opts, stdout, stderr), true
 	case cfg.dump:
 		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
 		return 0, true
@@ -428,6 +430,14 @@ type config struct {
 	indentationGiven bool
 	// completions is the shell --completions asks a script for, if any.
 	completions string
+	// init is --init, and justfileName the --justfile-name for it, if given.
+	init         bool
+	justfileName string
+	// edit is --edit, which opens the justfile in the editor.
+	edit bool
+	// choose is --choose; chooser is the --chooser command, if given.
+	choose  bool
+	chooser string
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
 	// show and usage name the recipes --show and --usage describe.
@@ -678,6 +688,8 @@ type flagSpec struct {
 // completions offer its names, so a flag added here is parsed and completed.
 var flags = []flagSpec{
 	{"allow-outside-project-paths", switchFlag},
+	{"choose", switchFlag},
+	{"chooser", valueFlag},
 	{"completions", valueFlag},
 	{"dump", switchFlag},
 	{"evaluate", optionalFlag},
@@ -686,6 +698,9 @@ var flags = []flagSpec{
 	{"list", switchFlag},
 	{"quiet", switchFlag},
 	{"group", valueFlag},
+	{"edit", switchFlag},
+	{"init", switchFlag},
+	{"justfile-name", valueFlag},
 	{"groups", switchFlag},
 	{"list-heading", valueFlag},
 	{"list-prefix", valueFlag},
@@ -753,7 +768,10 @@ func takesValue(long string) bool {
 // switches sets the config field each switch flag names.
 var switches = map[string]func(*config){
 	"allow-outside-project-paths": func(c *config) { c.allowOutside = true },
+	"choose":                      func(c *config) { c.choose = true },
 	"dump":                        func(c *config) { c.dump = true },
+	"edit":                        func(c *config) { c.edit = true },
+	"init":                        func(c *config) { c.init = true },
 	"groups":                      func(c *config) { c.groups = true },
 	"list":                        func(c *config) { c.list = true },
 	"list-submodules":             func(c *config) { c.listSubmodules = true },
@@ -776,16 +794,18 @@ func setSwitch(cfg *config, long string) {
 // setters records the value of each flag that takes one in the config field it
 // names. A second --shell is a usage error, checked by its setter.
 var setters = map[string]func(*config, string) error{
-	"completions":  func(c *config, v string) error { c.completions = v; return nil },
-	"indentation":  func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
-	"justfile":     func(c *config, v string) error { c.justfile = v; return nil },
-	"group":        func(c *config, v string) error { c.group = append(c.group, v); return nil },
-	"list-heading": func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
-	"list-prefix":  func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
-	"shell":        setShell,
-	"shell-arg":    func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
-	"show":         func(c *config, v string) error { c.show = v; return nil },
-	"usage":        func(c *config, v string) error { c.usage = v; return nil },
+	"completions":   func(c *config, v string) error { c.completions = v; return nil },
+	"indentation":   func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
+	"justfile":      func(c *config, v string) error { c.justfile = v; return nil },
+	"chooser":       func(c *config, v string) error { c.chooser = v; return nil },
+	"group":         func(c *config, v string) error { c.group = append(c.group, v); return nil },
+	"justfile-name": func(c *config, v string) error { c.justfileName = v; return nil },
+	"list-heading":  func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
+	"list-prefix":   func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
+	"shell":         setShell,
+	"shell-arg":     func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
+	"show":          func(c *config, v string) error { c.show = v; return nil },
+	"usage":         func(c *config, v string) error { c.usage = v; return nil },
 }
 
 // setShell records --shell, which may not be given twice, as upstream's.

@@ -13,13 +13,19 @@ import (
 // shell asks for while it completes (JUST_COMPLETE set), and the script for
 // --completions. done is false when neither applies. Impure: it reads the file
 // system and writes to the streams.
-func early(cfg config, env []string, workDir string, fsys sys.FS, stdout, stderr io.Writer) (status int, done bool) {
+func early(cfg config, env []string, workDir string, fsys sys.FS, exec sys.Process, stdout, stderr io.Writer) (status int, done bool) {
 	if v, ok := envValue(env, "JUST_COMPLETE"); ok && v != "" {
 		completeWords(cfg.words, workDir, fsys, stdout)
 		return 0, true
 	}
 	if cfg.completions != "" {
 		return writeCompletions(cfg, stdout, stderr), true
+	}
+	if cfg.init {
+		return writeInit(cfg, workDir, fsys, stderr), true
+	}
+	if cfg.edit {
+		return editJustfile(cfg, env, workDir, fsys, exec, stderr), true
 	}
 	return 0, false
 }
