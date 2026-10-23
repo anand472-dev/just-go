@@ -1,6 +1,6 @@
 GOCYCLO_VERSION := v0.6.0
 
-.PHONY: build test vet oracle corpus conformance-report baseline ratchet cover cyclo bench check tools triage-test
+.PHONY: build test vet oracle corpus conformance-report baseline ratchet cover cyclo bench check tools triage-test cross
 
 build:
 	go build -o bin/just-go ./cmd/just-go
@@ -54,3 +54,12 @@ triage-test:
 # Developer tool, not a module dependency.
 tools:
 	go install github.com/fzipp/gocyclo/cmd/gocyclo@$(GOCYCLO_VERSION)
+
+# Compiles and vets for the platforms this machine cannot run: Windows, which the
+# spec requires, and FreeBSD and OpenBSD, which are best-effort. It runs no tests;
+# docs/platforms.md says which suites have run where.
+cross:
+	GOOS=windows GOARCH=amd64 go vet ./...
+	GOOS=windows GOARCH=amd64 go test -c -o /dev/null ./internal/sys
+	GOOS=freebsd GOARCH=amd64 go vet ./...
+	GOOS=openbsd GOARCH=amd64 go vet ./...
