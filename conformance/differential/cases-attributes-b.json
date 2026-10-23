@@ -1,0 +1,1595 @@
+[
+ {
+  "name": "gate: unix recipe",
+  "files": {
+   "justfile": "[unix]\nfoo:\n  @echo unix\n"
+  }
+ },
+ {
+  "name": "gate: macos recipe",
+  "files": {
+   "justfile": "[macos]\nfoo:\n  @echo macos\n"
+  }
+ },
+ {
+  "name": "gate: linux recipe, none enabled",
+  "files": {
+   "justfile": "[linux]\nfoo:\n  @echo linux\n"
+  }
+ },
+ {
+  "name": "gate: windows recipe, none enabled",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo windows\n"
+  }
+ },
+ {
+  "name": "gate: android with another recipe",
+  "files": {
+   "justfile": "[android]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: android list",
+  "files": {
+   "justfile": "[android]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: dragonfly with another recipe",
+  "files": {
+   "justfile": "[dragonfly]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: dragonfly list",
+  "files": {
+   "justfile": "[dragonfly]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: freebsd with another recipe",
+  "files": {
+   "justfile": "[freebsd]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: freebsd list",
+  "files": {
+   "justfile": "[freebsd]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: linux with another recipe",
+  "files": {
+   "justfile": "[linux]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: linux list",
+  "files": {
+   "justfile": "[linux]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: macos with another recipe",
+  "files": {
+   "justfile": "[macos]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: macos list",
+  "files": {
+   "justfile": "[macos]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: netbsd with another recipe",
+  "files": {
+   "justfile": "[netbsd]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: netbsd list",
+  "files": {
+   "justfile": "[netbsd]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: openbsd with another recipe",
+  "files": {
+   "justfile": "[openbsd]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: openbsd list",
+  "files": {
+   "justfile": "[openbsd]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: unix with another recipe",
+  "files": {
+   "justfile": "[unix]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: unix list",
+  "files": {
+   "justfile": "[unix]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: windows with another recipe",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "gate: windows list",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo foo\n\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: all of them",
+  "files": {
+   "justfile": "[android]\n[linux]\n[macos]\n[openbsd]\n[freebsd]\n[dragonfly]\n[netbsd]\n[unix]\n[windows]\nfoo:\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "gate: several recipes, one name",
+  "files": {
+   "justfile": "[macos]\nfoo:\n  @echo macos\n[windows]\nfoo:\n  @echo windows\n[linux]\nfoo:\n  @echo linux\n[openbsd]\nfoo:\n  @echo bob\n"
+  }
+ },
+ {
+  "name": "gate: unix and windows share a name",
+  "files": {
+   "justfile": "[unix]\nfoo:\n  @echo u\n[windows]\nfoo:\n  @echo w\n"
+  }
+ },
+ {
+  "name": "gate: comma separated",
+  "files": {
+   "justfile": "[windows, unix]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "gate: comma separated, none",
+  "files": {
+   "justfile": "[windows, linux]\nfoo:\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: with other attributes",
+  "files": {
+   "justfile": "[linux, private]\nfoo:\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: private kept on enabled",
+  "files": {
+   "justfile": "[unix, private]\nfoo:\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: assignment unix",
+  "files": {
+   "justfile": "[unix]\nx := 'unix'\n[windows]\nx := 'windows'\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "gate: assignment, only a disabled one",
+  "files": {
+   "justfile": "[windows]\nx := 'w'\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "gate: assignment with private",
+  "files": {
+   "justfile": "[unix, private]\nx := 'u'\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "gate: disabled assignment is not evaluated",
+  "files": {
+   "justfile": "[windows]\nx := `exit 1`\nfoo:\n  @echo hi\n"
+  },
+  "known": "backticks are Task 10"
+ },
+ {
+  "name": "gate: disabled assignment may use an undefined variable",
+  "files": {
+   "justfile": "[windows]\nx := nope\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "gate: disabled assignment may define a name twice",
+  "files": {
+   "justfile": "x := 'a'\n[windows]\nx := 'b'\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "gate: enabled assignment duplicate",
+  "files": {
+   "justfile": "x := 'a'\n[unix]\nx := 'b'\nfoo:\n  @echo {{x}}\n"
+  }
+ },
+ {
+  "name": "gate: setting quiet",
+  "files": {
+   "justfile": "[unix]\nset quiet := true\n[windows]\nset quiet := false\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: setting disabled",
+  "files": {
+   "justfile": "[windows]\nset quiet\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: setting shell disabled",
+  "files": {
+   "justfile": "[windows]\nset shell := ['nonexistent-shell']\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: setting export",
+  "files": {
+   "justfile": "[unix]\nset export\nx := 'v'\nfoo:\n  @echo $x\n"
+  }
+ },
+ {
+  "name": "gate: setting twice, one disabled",
+  "files": {
+   "justfile": "set quiet\n[windows]\nset quiet := false\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: setting twice, enabled",
+  "files": {
+   "justfile": "set quiet\n[unix]\nset quiet := false\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: setting conflicting, one disabled",
+  "files": {
+   "justfile": "set lazy\n[windows]\nset export\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: unknown setting still an error",
+  "files": {
+   "justfile": "[windows]\nset nonsense\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: invalid attribute on setting",
+  "files": {
+   "justfile": "[unix, doc]\nset quiet\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: setting takes a gate and parallel",
+  "files": {
+   "justfile": "[unix, parallel]\nset quiet\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: assignment takes env, no",
+  "files": {
+   "justfile": "[unix, env('A','b')]\nx := 'a'\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "gate: disabled recipe with undefined variable",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo {{nope}}\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: disabled recipe with unknown dependency",
+  "files": {
+   "justfile": "[windows]\nfoo: nope\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: disabled recipe with circular dependency",
+  "files": {
+   "justfile": "[windows]\nfoo: foo\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: disabled recipe with duplicate parameters",
+  "files": {
+   "justfile": "[windows]\nfoo a a:\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: disabled recipe with a parse error",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo {{\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: disabled recipe with extra whitespace",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  a\n    b\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: depends on a disabled recipe",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo foo\nbar: foo\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: depends on an enabled recipe",
+  "files": {
+   "justfile": "[unix]\nfoo:\n  @echo foo\nbar: foo\n  @echo bar\n"
+  },
+  "args": [
+   "bar"
+  ]
+ },
+ {
+  "name": "gate: the default recipe skips a disabled one",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo foo\nbar:\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "gate: the default attribute on a disabled recipe",
+  "files": {
+   "justfile": "[windows, default]\nfoo:\n  @echo foo\nbar:\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "gate: two defaults, one disabled",
+  "files": {
+   "justfile": "[default]\nfoo:\n  @echo foo\n[windows, default]\nbar:\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "gate: duplicate recipes, one disabled",
+  "files": {
+   "justfile": "foo:\n  @echo a\n[windows]\nfoo:\n  @echo b\n"
+  }
+ },
+ {
+  "name": "gate: duplicate recipes, both enabled",
+  "files": {
+   "justfile": "foo:\n  @echo a\n[unix]\nfoo:\n  @echo b\n"
+  }
+ },
+ {
+  "name": "gate: doc comment goes with the gated recipe",
+  "files": {
+   "justfile": "# the doc\n[unix]\nfoo:\n  @echo a\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: doc comment of a disabled recipe is not carried",
+  "files": {
+   "justfile": "# the doc\n[windows]\nfoo:\n  @echo a\nbar:\n  @echo b\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: no recipes left",
+  "files": {
+   "justfile": "[windows]\nfoo:\n  @echo a\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "gate: attribute without an item",
+  "files": {
+   "justfile": "[unix]\n"
+  }
+ },
+ {
+  "name": "gate: with arguments",
+  "files": {
+   "justfile": "[unix('x')]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "gate: duplicate",
+  "files": {
+   "justfile": "[unix]\n[unix]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "gate: duplicate in a list",
+  "files": {
+   "justfile": "[unix, unix]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "gate: both unix and macos",
+  "files": {
+   "justfile": "[unix, macos]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "gate: gates are not attributes of a group",
+  "files": {
+   "justfile": "[group('a'), windows]\nfoo:\n  @echo foo\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "env: single",
+  "files": {
+   "justfile": "[env('FOO', 'bar')]\nfoo:\n  @echo $FOO\n"
+  }
+ },
+ {
+  "name": "env: multiple",
+  "files": {
+   "justfile": "[env('VAR1', 'value1')]\n[env('VAR2', 'value 2')]\nfoo:\n  @echo $VAR1 $VAR2\n"
+  }
+ },
+ {
+  "name": "env: one line",
+  "files": {
+   "justfile": "[env('A', '1'), env('B', '2')]\nfoo:\n  @echo $A $B\n"
+  }
+ },
+ {
+  "name": "env: duplicate last wins",
+  "files": {
+   "justfile": "[env('VAR1', 'value1')]\n[env('VAR1', 'value 2')]\nfoo:\n  @echo $VAR1\n"
+  }
+ },
+ {
+  "name": "env: duplicate last wins, reversed",
+  "files": {
+   "justfile": "[env('VAR1', 'b')]\n[env('VAR1', 'a')]\nfoo:\n  @echo $VAR1\n"
+  }
+ },
+ {
+  "name": "env: three with a repeat",
+  "files": {
+   "justfile": "[env('A', 'a')]\n[env('B', 'b')]\n[env('A', 'c')]\nfoo:\n  @echo $A $B\n"
+  }
+ },
+ {
+  "name": "env: expression",
+  "files": {
+   "justfile": "suffix := 'world'\n[env('GREETING', 'hello ' + suffix)]\nfoo:\n  @echo $GREETING\n"
+  }
+ },
+ {
+  "name": "env: name expression",
+  "files": {
+   "justfile": "prefix := 'MY_'\n[env(prefix + 'VAR', 'value')]\nfoo:\n  @echo $MY_VAR\n"
+  }
+ },
+ {
+  "name": "env: overrides export",
+  "files": {
+   "justfile": "export FOO := 'export'\n[env('FOO', 'attribute')]\nbar:\n  @echo $FOO\n"
+  }
+ },
+ {
+  "name": "env: overrides set export",
+  "files": {
+   "justfile": "set export\nFOO := 'export'\n[env('FOO', 'attribute')]\nbar:\n  @echo $FOO\n"
+  }
+ },
+ {
+  "name": "env: overrides exported parameter",
+  "files": {
+   "justfile": "[env('p', 'attribute')]\nbar $p='param':\n  @echo $p\n"
+  }
+ },
+ {
+  "name": "env: overrides the environment",
+  "files": {
+   "justfile": "[env('FOO', 'attribute')]\nbar:\n  @echo $FOO\n"
+  },
+  "env": {
+   "FOO": "outer"
+  }
+ },
+ {
+  "name": "env: empty value",
+  "files": {
+   "justfile": "[env('FOO', '')]\nbar:\n  @echo \"[${FOO-unset}]\"\n"
+  }
+ },
+ {
+  "name": "env: not inherited by dependencies",
+  "files": {
+   "justfile": "[env('FOO', 'x')]\nbar: baz\n  @echo bar ${FOO-unset}\nbaz:\n  @echo baz ${FOO-unset}\n"
+  }
+ },
+ {
+  "name": "env: not inherited by subsequents",
+  "files": {
+   "justfile": "[env('FOO', 'x')]\nbar: && baz\n  @echo bar ${FOO-unset}\nbaz:\n  @echo baz ${FOO-unset}\n"
+  }
+ },
+ {
+  "name": "env: on the dependency",
+  "files": {
+   "justfile": "bar: baz\n  @echo bar ${FOO-unset}\n[env('FOO', 'x')]\nbaz:\n  @echo baz ${FOO-unset}\n"
+  }
+ },
+ {
+  "name": "env: global defined later",
+  "files": {
+   "justfile": "[env('A', x)]\nfoo:\n  @echo $A\nx := 'late'\n"
+  }
+ },
+ {
+  "name": "env: global chain",
+  "files": {
+   "justfile": "a := b\nb := 'c'\n[env('A', a)]\nfoo:\n  @echo $A\n"
+  }
+ },
+ {
+  "name": "env: name cannot reference parameter",
+  "files": {
+   "justfile": "[env(name, 'value')]\nfoo name:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: value cannot reference parameter",
+  "files": {
+   "justfile": "[env('TARGET', target)]\ndeploy target:\n  @echo hi\n"
+  },
+  "args": [
+   "deploy",
+   "x"
+  ]
+ },
+ {
+  "name": "env: undefined",
+  "files": {
+   "justfile": "[env('A', nope)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: undefined name",
+  "files": {
+   "justfile": "[env(nope, 'a')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: first of two undefined",
+  "files": {
+   "justfile": "[env(z, '1')]\n[env(a, '2')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: second of two undefined",
+  "files": {
+   "justfile": "[env('A', 'b')]\n[env(c, 'd')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: before working-directory",
+  "files": {
+   "justfile": "[working-directory(a)]\n[env(b, 'x')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: after doc",
+  "files": {
+   "justfile": "[env(b, 'x')]\n[doc(a)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: after confirm",
+  "files": {
+   "justfile": "[env(b, 'x')]\n[confirm(a)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: before timestamp",
+  "files": {
+   "justfile": "[timestamp(a)]\n[env(b, 'x')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "env: too few",
+  "files": {
+   "justfile": "[env('MY_VAR')]\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: too many",
+  "files": {
+   "justfile": "[env('A', 'B', 'C')]\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: none",
+  "files": {
+   "justfile": "[env]\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: colon form",
+  "files": {
+   "justfile": "[env: 'A']\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: function call undefined",
+  "files": {
+   "justfile": "[env('A', nope())]\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: on an assignment",
+  "files": {
+   "justfile": "[env('A', 'b')]\nx := 'a'\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: on a setting",
+  "files": {
+   "justfile": "[env('A', 'b')]\nset quiet\nfoo:\n  echo bar\n"
+  }
+ },
+ {
+  "name": "env: with a shell argument",
+  "files": {
+   "justfile": "[env('A', 'b')]\nfoo:\n  @bash -c 'echo $A'\n"
+  }
+ },
+ {
+  "name": "env: positional arguments",
+  "files": {
+   "justfile": "set positional-arguments\n[env('A', 'b')]\nfoo x:\n  @echo $A $1\n"
+  },
+  "args": [
+   "foo",
+   "z"
+  ]
+ },
+ {
+  "name": "env: private",
+  "files": {
+   "justfile": "[env('A', 'b'), private]\nfoo:\n  @echo $A\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "timestamp: default",
+  "files": {
+   "justfile": "[timestamp]\nrecipe:\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: format",
+  "files": {
+   "justfile": "[timestamp('%H:%M:%S%.3f')]\nrecipe:\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: format expression",
+  "files": {
+   "justfile": "format := '%H:%M:%S' + '%.3f'\n[timestamp(format)]\nrecipe:\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: quiet line",
+  "files": {
+   "justfile": "[timestamp]\nrecipe:\n  @echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: set quiet",
+  "files": {
+   "justfile": "set quiet\n[timestamp]\nrecipe:\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: quiet flag",
+  "files": {
+   "justfile": "[timestamp]\nrecipe:\n  echo foo\n"
+  },
+  "args": [
+   "-q"
+  ],
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: two lines",
+  "files": {
+   "justfile": "[timestamp('%S')]\nrecipe:\n  echo one\n  echo two\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: parameter",
+  "files": {
+   "justfile": "[timestamp(format)]\nrecipe format='%M':\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: parameter from the command line",
+  "files": {
+   "justfile": "[timestamp(format)]\nrecipe format:\n  echo foo\n"
+  },
+  "args": [
+   "recipe",
+   "%S"
+  ],
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: empty format",
+  "files": {
+   "justfile": "[timestamp('')]\nrecipe:\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: literal text",
+  "files": {
+   "justfile": "[timestamp('at %H')]\nrecipe:\n  echo foo\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: invalid format",
+  "files": {
+   "justfile": "[timestamp('%Q')]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: lone percent",
+  "files": {
+   "justfile": "[timestamp('%')]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: unformattable",
+  "files": {
+   "justfile": "[timestamp('%#z')]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: invalid after valid",
+  "files": {
+   "justfile": "[timestamp('%H %Q')]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: empty body",
+  "files": {
+   "justfile": "[timestamp('%Q')]\nrecipe:\n"
+  }
+ },
+ {
+  "name": "timestamp: only a comment line",
+  "files": {
+   "justfile": "[timestamp('%Q')]\nrecipe:\n  # hi\n"
+  }
+ },
+ {
+  "name": "timestamp: second line invalid",
+  "files": {
+   "justfile": "[timestamp(f)]\nrecipe f:\n  echo foo\n"
+  },
+  "args": [
+   "recipe",
+   "%Q"
+  ]
+ },
+ {
+  "name": "timestamp: not on the dependency",
+  "files": {
+   "justfile": "[timestamp]\nrecipe: dep\n  echo foo\ndep:\n  echo dep\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: on the dependency",
+  "files": {
+   "justfile": "recipe: dep\n  echo foo\n[timestamp]\ndep:\n  echo dep\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: failing command",
+  "files": {
+   "justfile": "[timestamp]\nrecipe:\n  exit 3\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: infallible command",
+  "files": {
+   "justfile": "[timestamp]\nrecipe:\n  -exit 3\n  echo after\n"
+  },
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: too many arguments",
+  "files": {
+   "justfile": "[timestamp('a', 'b')]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: undefined variable",
+  "files": {
+   "justfile": "[timestamp(nope)]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: duplicate",
+  "files": {
+   "justfile": "[timestamp]\n[timestamp('%H')]\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "timestamp: with positional arguments",
+  "files": {
+   "justfile": "set positional-arguments\n[timestamp]\nrecipe x:\n  echo $1\n"
+  },
+  "args": [
+   "recipe",
+   "a"
+  ],
+  "mask_time": true
+ },
+ {
+  "name": "timestamp: dry run",
+  "files": {
+   "justfile": "[timestamp]\nrecipe:\n  echo foo\n"
+  },
+  "args": [
+   "--dry-run"
+  ],
+  "mask_time": true,
+  "known": "dry-run is Task 29"
+ },
+ {
+  "name": "timestamp: on an assignment",
+  "files": {
+   "justfile": "[timestamp]\nx := 'a'\nrecipe:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "continue: invalid signal",
+  "files": {
+   "justfile": "[continue('SIGTERM')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: invalid second signal",
+  "files": {
+   "justfile": "[continue('SIGINT', 'nope')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: lower case",
+  "files": {
+   "justfile": "[continue('sigint')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: not a literal",
+  "files": {
+   "justfile": "[continue(x)]\nx := 'SIGINT'\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: parenthesized literal",
+  "files": {
+   "justfile": "[continue(('SIGINT'))]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: concatenation",
+  "files": {
+   "justfile": "[continue('SIG' + 'INT')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: valid",
+  "files": {
+   "justfile": "[continue('SIGINT', 'SIGHUP', 'SIGQUIT')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: duplicate",
+  "files": {
+   "justfile": "[continue]\n[continue('SIGHUP')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: on an assignment",
+  "files": {
+   "justfile": "[continue]\nx := 'a'\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "continue: interrupt, none",
+  "files": {
+   "justfile": "foo:\n  @kill -INT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: interrupt, bare",
+  "files": {
+   "justfile": "[continue]\nfoo:\n  @kill -INT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: interrupt, named",
+  "files": {
+   "justfile": "[continue('SIGINT')]\nfoo:\n  @kill -INT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: interrupt, other named",
+  "files": {
+   "justfile": "[continue('SIGHUP')]\nfoo:\n  @kill -INT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: hangup, bare",
+  "files": {
+   "justfile": "[continue]\nfoo:\n  @kill -HUP $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: hangup, named",
+  "files": {
+   "justfile": "[continue('SIGHUP')]\nfoo:\n  @kill -HUP $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: quit, named",
+  "files": {
+   "justfile": "[continue('SIGQUIT')]\nfoo:\n  @kill -QUIT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: quit, among others",
+  "files": {
+   "justfile": "[continue('SIGINT', 'SIGQUIT')]\nfoo:\n  @kill -QUIT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: quit, none",
+  "files": {
+   "justfile": "foo:\n  @kill -QUIT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: failing command after the signal",
+  "files": {
+   "justfile": "[continue]\nfoo:\n  @kill -INT $PPID; exit 3\n  @echo after\n"
+  }
+ },
+ {
+  "name": "continue: the next recipe",
+  "files": {
+   "justfile": "[continue]\nfoo: bar\n  @echo foo\nbar:\n  @kill -INT $PPID\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "continue: only its own recipe",
+  "files": {
+   "justfile": "foo: bar\n  @echo foo\n[continue]\nbar:\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "continue: interrupt in a dependency of a continuing recipe",
+  "files": {
+   "justfile": "[continue]\nfoo: bar\n  @echo foo\nbar:\n  @kill -INT $PPID\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "continue: infallible line",
+  "files": {
+   "justfile": "foo:\n  -kill -INT $PPID\n  @echo after\n"
+  }
+ },
+ {
+  "name": "metadata: one",
+  "files": {
+   "justfile": "[metadata('a')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: many arguments",
+  "files": {
+   "justfile": "[metadata('a', 'b', 'c')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: repeated",
+  "files": {
+   "justfile": "[metadata('example')]\n[metadata('sample')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: none",
+  "files": {
+   "justfile": "[metadata]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: not a literal",
+  "files": {
+   "justfile": "[metadata(x)]\nx := 'a'\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: concatenation",
+  "files": {
+   "justfile": "[metadata('a' + 'b')]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: colon",
+  "files": {
+   "justfile": "[metadata: 'a']\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "metadata: on an assignment",
+  "files": {
+   "justfile": "[metadata('a')]\nx := 'a'\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: shell recipe",
+  "files": {
+   "justfile": "[extension: '.txt']\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: shell attribute with shebang",
+  "files": {
+   "justfile": "[extension: '.txt']\n[shell]\nfoo:\n  #!/bin/sh\n  echo hi\n"
+  }
+ },
+ {
+  "name": "extension: two",
+  "files": {
+   "justfile": "[extension: '.txt']\n[extension: '.md']\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: none",
+  "files": {
+   "justfile": "[extension]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: not a literal",
+  "files": {
+   "justfile": "[extension: x]\nx := 'a'\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: with script",
+  "files": {
+   "justfile": "[extension: '.txt']\n[script]\nfoo:\n  echo hi\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "extension: with shebang",
+  "files": {
+   "justfile": "[extension: '.txt']\nfoo:\n  #!/bin/sh\n  echo hi\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "extension: with default-script",
+  "files": {
+   "justfile": "set default-script\n[extension: '.txt']\nfoo:\n  echo hi\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "extension: default-script false",
+  "files": {
+   "justfile": "set default-script := false\n[extension: '.txt']\nfoo:\n  echo hi\n"
+  }
+ },
+ {
+  "name": "extension: error comes after the duplicate recipe",
+  "files": {
+   "justfile": "foo:\n  @echo hi\n[extension: '.txt']\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: error comes after extra whitespace",
+  "files": {
+   "justfile": "[extension: '.txt']\nfoo:\n  a\n    b\n"
+  }
+ },
+ {
+  "name": "extension: later recipe",
+  "files": {
+   "justfile": "foo:\n  @echo hi\n[extension: '.txt']\nbar:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "extension: first of two",
+  "files": {
+   "justfile": "[extension: '.txt']\nfoo:\n  @echo hi\n[extension: '.md']\nbar:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "script and shell",
+  "files": {
+   "justfile": "[script, shell]\nbar:\n"
+  }
+ },
+ {
+  "name": "script and shell, reversed",
+  "files": {
+   "justfile": "[shell, script]\nbar:\n"
+  }
+ },
+ {
+  "name": "script and shell, separate lines",
+  "files": {
+   "justfile": "[script]\n[shell]\nbar:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "script with an interpreter and shell",
+  "files": {
+   "justfile": "[script('sh')]\n[shell]\nbar:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "script and no-cd and working-directory come first",
+  "files": {
+   "justfile": "[script, shell]\n[no-cd]\n[working-directory('x')]\nbar:\n"
+  }
+ },
+ {
+  "name": "script and exit-message pair comes first",
+  "files": {
+   "justfile": "[script, shell]\n[exit-message, no-exit-message]\nbar:\n"
+  }
+ },
+ {
+  "name": "script: arguments",
+  "files": {
+   "justfile": "[script('sh', '-x')]\nfoo:\n  echo hi\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "script: not literal",
+  "files": {
+   "justfile": "[script(x)]\nx := 'sh'\nfoo:\n  echo hi\n"
+  }
+ },
+ {
+  "name": "script: concatenation",
+  "files": {
+   "justfile": "[script('s' + 'h')]\nfoo:\n  echo hi\n"
+  }
+ },
+ {
+  "name": "script: extra whitespace allowed",
+  "files": {
+   "justfile": "[script]\nfoo:\n  a\n    b\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "script: guard and infallible together allowed",
+  "files": {
+   "justfile": "set guards\n[script]\nfoo:\n  ?-a\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "shell: attribute",
+  "files": {
+   "justfile": "[shell]\nfoo:\n  echo hi\n"
+  }
+ },
+ {
+  "name": "shell: with shebang runs as shell lines",
+  "files": {
+   "justfile": "[shell]\nfoo:\n  #!/bin/sh\n  echo foo\n"
+  }
+ },
+ {
+  "name": "shell: extra whitespace is an error",
+  "files": {
+   "justfile": "[shell]\nfoo:\n  a\n    b\n"
+  }
+ },
+ {
+  "name": "shell: with default-script",
+  "files": {
+   "justfile": "set default-script\n[shell]\nfoo:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "shell: with default-script and extra whitespace",
+  "files": {
+   "justfile": "set default-script\n[shell]\nfoo:\n  echo foo\n    echo bar\n"
+  }
+ },
+ {
+  "name": "shell: arguments",
+  "files": {
+   "justfile": "[shell('x')]\nfoo:\n  echo hi\n"
+  }
+ },
+ {
+  "name": "shell: duplicate",
+  "files": {
+   "justfile": "[shell]\n[shell]\nfoo:\n  echo hi\n"
+  }
+ },
+ {
+  "name": "default-script: extra whitespace allowed",
+  "files": {
+   "justfile": "set default-script\nfoo:\n  echo foo\n    echo bar\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "default-script: false is shell",
+  "files": {
+   "justfile": "set default-script := false\nfoo:\n  echo foo\n"
+  }
+ },
+ {
+  "name": "shebang: extra whitespace allowed",
+  "files": {
+   "justfile": "foo:\n  #!/bin/sh\n    echo hi\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "shebang: guard and infallible together allowed",
+  "files": {
+   "justfile": "set guards\nfoo:\n  #!/bin/sh\n  ?-a\n"
+  },
+  "args": [
+   "--list"
+  ]
+ },
+ {
+  "name": "shebang: not on the first line is shell",
+  "files": {
+   "justfile": "foo:\n  echo a\n  #!/bin/sh\n    echo hi\n"
+  }
+ },
+ {
+  "name": "shebang: interpolated first line is shell",
+  "files": {
+   "justfile": "x := 'y'\nfoo:\n  {{x}}\n    echo hi\n"
+  }
+ },
+ {
+  "name": "parallel: plain",
+  "files": {
+   "justfile": "[parallel]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "parallel: arguments",
+  "files": {
+   "justfile": "[parallel('x')]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "parallel: duplicate",
+  "files": {
+   "justfile": "[parallel]\n[parallel]\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "parallel: on an assignment",
+  "files": {
+   "justfile": "[parallel]\nx := 'a'\nfoo:\n  @echo foo\n"
+  }
+ },
+ {
+  "name": "parallel: one dependency",
+  "files": {
+   "justfile": "[parallel]\nfoo: bar\n  @echo foo\nbar:\n  @echo bar\n"
+  }
+ },
+ {
+  "name": "parallel: independent sleeps",
+  "files": {
+   "justfile": "[parallel]\nall: a b c\n  @echo all\na:\n  @sleep 0.6; echo a\nb:\n  @sleep 0.3; echo b\nc:\n  @echo c\n"
+  }
+ },
+ {
+  "name": "parallel: sequential for comparison",
+  "files": {
+   "justfile": "all: a b c\n  @echo all\na:\n  @sleep 0.2; echo a\nb:\n  @sleep 0.1; echo b\nc:\n  @echo c\n"
+  }
+ },
+ {
+  "name": "parallel: subsequents",
+  "files": {
+   "justfile": "[parallel]\nall: && a b c\n  @echo all\na:\n  @sleep 0.6; echo a\nb:\n  @sleep 0.3; echo b\nc:\n  @echo c\n"
+  }
+ },
+ {
+  "name": "parallel: dependencies and subsequents",
+  "files": {
+   "justfile": "[parallel]\nall: x && a b\n  @echo all\nx:\n  @echo x\na:\n  @sleep 0.4; echo a\nb:\n  @echo b\n"
+  }
+ },
+ {
+  "name": "parallel: shared dependency runs once",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na: c\n  @echo a\nb: c\n  @sleep 0.3; echo b\nc:\n  @sleep 0.3; echo c\n"
+  }
+ },
+ {
+  "name": "parallel: shared dependency, both ways",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na: c\n  @sleep 0.3; echo a\nb: c\n  @echo b\nc:\n  @sleep 0.3; echo c\n"
+  }
+ },
+ {
+  "name": "parallel: dependency already run",
+  "files": {
+   "justfile": "[parallel]\nall: c a b\n  @echo all\na: c\n  @echo a\nb: c\n  @sleep 0.3; echo b\nc:\n  @echo c\n"
+  }
+ },
+ {
+  "name": "parallel: the dependencies of a branch are sequential",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na: x y\n  @sleep 0.3; echo a\nx:\n  @sleep 0.2; echo x\ny:\n  @echo y\nb:\n  @echo b\n"
+  }
+ },
+ {
+  "name": "parallel: nested",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\n[parallel]\na: x y\n  @echo a\nx:\n  @sleep 0.3; echo x\ny:\n  @echo y\nb:\n  @sleep 0.15; echo b\n"
+  }
+ },
+ {
+  "name": "parallel: first fails",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na:\n  @sleep 0.2; echo a-fail; exit 1\nb:\n  @echo b; exit 2\n"
+  }
+ },
+ {
+  "name": "parallel: second fails",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na:\n  @sleep 0.2; echo a\nb:\n  @echo b; exit 2\n"
+  }
+ },
+ {
+  "name": "parallel: both fail, reported by order",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na:\n  @sleep 0.3; exit 1\nb:\n  exit 2\n"
+  }
+ },
+ {
+  "name": "parallel: failure message echoes",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na:\n  @sleep 0.3; exit 1\nb:\n  @true\n"
+  }
+ },
+ {
+  "name": "parallel: arguments",
+  "files": {
+   "justfile": "[parallel]\nall: (a 'x') (a 'y') (a 'x')\n  @echo all\na p:\n  @if [ {{p}} = y ]; then sleep 0.3; fi; echo a {{p}}\n"
+  }
+ },
+ {
+  "name": "parallel: arguments, one sleeps",
+  "files": {
+   "justfile": "[parallel]\nall: (a 'x') (a 'y')\n  @echo all\na p:\n  @if [ {{p}} = x ]; then sleep 0.3; fi; echo a {{p}}\n"
+  }
+ },
+ {
+  "name": "parallel: unknown argument count",
+  "files": {
+   "justfile": "[parallel]\nall: a (b)\n  @echo all\na:\n  @echo a\nb x:\n  @echo b\n"
+  }
+ },
+ {
+  "name": "parallel: dependency that waits for a failing one",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na: c\n  @echo a\nb: c\n  @echo b\nc:\n  @exit 1\n"
+  }
+ },
+ {
+  "name": "parallel: output order of equal commands",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\na:\n  @echo a1; echo a2\nb:\n  @sleep 0.3; echo b1; echo b2\n"
+  }
+ },
+ {
+  "name": "parallel: confirm on a branch",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  @echo all\n[confirm]\na:\n  @echo a\nb:\n  @sleep 0.3; echo b\n"
+  },
+  "args": [
+   "--yes"
+  ]
+ },
+ {
+  "name": "parallel: set quiet",
+  "files": {
+   "justfile": "set quiet\n[parallel]\nall: a b\n  echo all\na:\n  echo a\nb:\n  @sleep 0.3; echo b\n"
+  }
+ },
+ {
+  "name": "parallel: quiet flag",
+  "files": {
+   "justfile": "[parallel]\nall: a b\n  echo all\na:\n  exit 1\nb:\n  echo b\n"
+  },
+  "args": [
+   "-q"
+  ]
+ },
+ {
+  "name": "parallel: positional arguments",
+  "files": {
+   "justfile": "set positional-arguments\n[parallel]\nall: (a 'x') (b 'y')\n  @echo all\na p:\n  @echo a $1\nb p:\n  @sleep 0.3; echo b $1\n"
+  }
+ },
+ {
+  "name": "lazy: env uses a global",
+  "files": {
+   "justfile": "set lazy\nx := 'v'\ny := 'unused'\n[env('A', x)]\nfoo:\n  @echo $A\n"
+  }
+ },
+ {
+  "name": "lazy: env name uses a global",
+  "files": {
+   "justfile": "set lazy\nx := 'A'\n[env(x, 'v')]\nfoo:\n  @echo $A\n"
+  }
+ },
+ {
+  "name": "lazy: timestamp format uses a global",
+  "files": {
+   "justfile": "set lazy\nx := 'fixed'\n[timestamp(x)]\nfoo:\n  @echo hi\n"
+  }
+ },
+ {
+  "name": "lazy: env global is undefined when a parameter has the name",
+  "files": {
+   "justfile": "set lazy\nx := 'v'\n[env('A', x)]\nfoo x='p':\n  @echo $A\n"
+  }
+ },
+ {
+  "name": "env: parameter of the same name as a global",
+  "files": {
+   "justfile": "x := 'global'\n[env('A', x)]\nfoo x='param':\n  @echo $A\n"
+  }
+ }
+]

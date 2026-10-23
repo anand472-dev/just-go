@@ -172,7 +172,8 @@ func findIn(fsys sys.FS, dir string) (string, error) {
 // Load reads the justfile at path, parses it with path as the file name, and
 // analyzes it. It returns the first error: a read failure (wrapped), or a
 // *diag.Error from parsing or analysis whose File is path and whose Source is
-// the line it is on. Impure: it reads fsys.
+// the line it is on. The tree keeps the text it was read from, so that a
+// failure while a recipe runs can quote its line. Impure: it reads fsys.
 func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
 	src, err := fsys.ReadFile(path)
 	if err != nil {
@@ -185,5 +186,6 @@ func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
 	if err := analyzer.Analyze(jf); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
+	jf.Source = src
 	return jf, nil
 }

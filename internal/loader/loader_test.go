@@ -92,6 +92,12 @@ func (l listFS) ReadFile(string) ([]byte, error)  { return nil, errors.New("unus
 func (l listFS) ReadDir(string) ([]string, error) { return l.entries, nil }
 func (l listFS) IsFile(p string) (bool, error)    { return l.regular[p], l.isErr }
 
+func (listFS) WriteFile(string, []byte, fs.FileMode) error { return errors.New("unused") }
+func (listFS) MkdirTemp(string, string) (string, error)    { return "", errors.New("unused") }
+func (listFS) RemoveAll(string) error                      { return errors.New("unused") }
+func (listFS) Exists(string) bool                          { return false }
+func (listFS) Canonicalize(string) (string, error)         { return "", errors.New("unused") }
+
 func TestFindSkipsDirectoriesNamedLikeJustfiles(t *testing.T) {
 	fsys := listFS{
 		entries: []string{".justfile", "justfile"},
@@ -168,6 +174,12 @@ func (e errFS) ReadFile(string) ([]byte, error)  { return nil, e.err }
 func (e errFS) IsFile(string) (bool, error)      { return false, e.err }
 func (e errFS) ReadDir(string) ([]string, error) { return nil, e.err }
 
+func (e errFS) WriteFile(string, []byte, fs.FileMode) error { return e.err }
+func (e errFS) MkdirTemp(string, string) (string, error)    { return "", e.err }
+func (e errFS) RemoveAll(string) error                      { return e.err }
+func (e errFS) Exists(string) bool                          { return false }
+func (e errFS) Canonicalize(string) (string, error)         { return "", e.err }
+
 func TestFindFilesystemErrorIsNotNoJustfile(t *testing.T) {
 	boom := errors.New("boom")
 	_, err := Find(errFS{boom}, "/proj")
@@ -212,6 +224,15 @@ func TestLoadReportsAnalysisError(t *testing.T) {
 	}
 	if de.Source != "a: nope" || de.Col != 4 {
 		t.Errorf("Source = %q at col %d, want the dependency's line and column", de.Source, de.Col)
+	}
+}
+
+// The tree keeps the text it was read from, so that a failure while a recipe
+// runs can quote its line.
+func TestLoadKeepsTheSource(t *testing.T) {
+	jf, err := Load(sysfake.FakeFS{"/p/justfile": "x := `pwd`\n"}, "/p/justfile")
+	if err != nil || string(jf.Source) != "x := `pwd`\n" {
+		t.Errorf("Load = %v, %v; want a tree that holds the text", jf, err)
 	}
 }
 

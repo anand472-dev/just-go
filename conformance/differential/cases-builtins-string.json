@@ -1,0 +1,2740 @@
+[
+ {
+  "name": "case functions: \"CamelCase\"",
+  "files": {
+   "justfile": "s := \"CamelCase\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"This is Human case.\"",
+  "files": {
+   "justfile": "s := \"This is Human case.\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"MixedUP CamelCase, with some Spaces\"",
+  "files": {
+   "justfile": "s := \"MixedUP CamelCase, with some Spaces\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"mixed_up_ snake_case with some _spaces\"",
+  "files": {
+   "justfile": "s := \"mixed_up_ snake_case with some _spaces\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"kebab-case\"",
+  "files": {
+   "justfile": "s := \"kebab-case\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"SHOUTY_SNAKE_CASE\"",
+  "files": {
+   "justfile": "s := \"SHOUTY_SNAKE_CASE\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"snake_case\"",
+  "files": {
+   "justfile": "s := \"snake_case\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"this-contains_ ALLKinds OfWord_Boundaries\"",
+  "files": {
+   "justfile": "s := \"this-contains_ ALLKinds OfWord_Boundaries\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"XΣXΣ baﬄe\"",
+  "files": {
+   "justfile": "s := \"XΣXΣ baﬄe\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"XMLHttpRequest\"",
+  "files": {
+   "justfile": "s := \"XMLHttpRequest\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"لِنَذْهَبْ إِلَى السِّيْنَمَا\"",
+  "files": {
+   "justfile": "s := \"لِنَذْهَبْ إِلَى السِّيْنَمَا\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ファイルを読み込み\"",
+  "files": {
+   "justfile": "s := \"ファイルを読み込み\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"祝你一天过得愉快\"",
+  "files": {
+   "justfile": "s := \"祝你一天过得愉快\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"FIELD_NAME11\"",
+  "files": {
+   "justfile": "s := \"FIELD_NAME11\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"99BOTTLES\"",
+  "files": {
+   "justfile": "s := \"99BOTTLES\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"FieldNamE11\"",
+  "files": {
+   "justfile": "s := \"FieldNamE11\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"abc123def456\"",
+  "files": {
+   "justfile": "s := \"abc123def456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"abc123DEF456\"",
+  "files": {
+   "justfile": "s := \"abc123DEF456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"abc123Def456\"",
+  "files": {
+   "justfile": "s := \"abc123Def456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"abc123DEf456\"",
+  "files": {
+   "justfile": "s := \"abc123DEf456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ABC123def456\"",
+  "files": {
+   "justfile": "s := \"ABC123def456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ABC123DEF456\"",
+  "files": {
+   "justfile": "s := \"ABC123DEF456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ABC123Def456\"",
+  "files": {
+   "justfile": "s := \"ABC123Def456\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"\"",
+  "files": {
+   "justfile": "s := \"\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"  \"",
+  "files": {
+   "justfile": "s := \"  \"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"__--\"",
+  "files": {
+   "justfile": "s := \"__--\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"a\"",
+  "files": {
+   "justfile": "s := \"a\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"A\"",
+  "files": {
+   "justfile": "s := \"A\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"aB\"",
+  "files": {
+   "justfile": "s := \"aB\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"Ab\"",
+  "files": {
+   "justfile": "s := \"Ab\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ß straße\"",
+  "files": {
+   "justfile": "s := \"ß straße\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"İstanbul\"",
+  "files": {
+   "justfile": "s := \"İstanbul\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ǅungla\"",
+  "files": {
+   "justfile": "s := \"ǅungla\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ΑΣ ΑΣ.\"",
+  "files": {
+   "justfile": "s := \"ΑΣ ΑΣ.\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"ΑΣΣ\"",
+  "files": {
+   "justfile": "s := \"ΑΣΣ\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"Σ\"",
+  "files": {
+   "justfile": "s := \"Σ\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"foo.bar\"",
+  "files": {
+   "justfile": "s := \"foo.bar\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"tab\\tsep\\nnl\"",
+  "files": {
+   "justfile": "s := \"tab\\tsep\\nnl\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"éÉ ÀB\"",
+  "files": {
+   "justfile": "s := \"éÉ ÀB\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "case functions: \"1a2B3c\"",
+  "files": {
+   "justfile": "s := \"1a2B3c\"\nfoo:\n  @echo {{ kebabcase(s) + '|' + snakecase(s) + '|' + shoutykebabcase(s) + '|' + shoutysnakecase(s) + '|' + lowercamelcase(s) + '|' + uppercamelcase(s) + '|' + titlecase(s) + '|' + capitalize(s) + '|' + lowercase(s) + '|' + uppercase(s) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"//\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"//\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"//\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"//\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"//\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"//\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"//\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"//\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a//b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a//b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a//b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a//b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a//b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a//b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a//b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a//b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/b/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/b/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/b/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/b/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/b/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/b/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/b/\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/b/\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"/a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"/a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"/a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"/a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"/a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"/a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"/a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"/a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"/a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"/a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"/a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"/a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"/a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"/a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"/a/b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"/a/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"//a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"//a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"//a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"//a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"//a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"//a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"//a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"//a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"./a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"./a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"./a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"./a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"./a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"./a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"./a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"./a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\".\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\".\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\".\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\".\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\".\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\".\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\".\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\".\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"./\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"./\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"./\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"./\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"./\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"./\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"./\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"./\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"../a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"../a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"../a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"../a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"../a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"../a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"../a\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"../a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/..\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/..\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/./b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/./b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/./b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/./b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/./b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/./b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/./b\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/./b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/b/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/b/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/b/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/b/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/b/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/b/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/b/.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/b/.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"./.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"./.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"./.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"./.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"./.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"./.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"./.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"./.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"foo.txt\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"foo.txt\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"foo.txt\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"foo.txt\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"foo.txt\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"foo.txt\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"foo.txt\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"foo.txt\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"foo.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"foo.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"foo.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"foo.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"foo.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"foo.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"foo.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"foo.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"foo.tar.gz\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"foo.tar.gz\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"foo.tar.gz\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"foo.tar.gz\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"foo.tar.gz\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"foo.tar.gz\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"foo.tar.gz\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"foo.tar.gz\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\".bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\".bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\".bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\".bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\".bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\".bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\".bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\".bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\".bashrc.bak\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\".bashrc.bak\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\".bashrc.bak\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\".bashrc.bak\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\".bashrc.bak\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\".bashrc.bak\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\".bashrc.bak\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\".bashrc.bak\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/.bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/.bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/.bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/.bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/.bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/.bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/.bashrc\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/.bashrc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a.b/c\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a.b/c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a.b/c\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a.b/c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a.b/c\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a.b/c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a.b/c\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a.b/c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a.b/c.d\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a.b/c.d\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a.b/c.d\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a.b/c.d\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a.b/c.d\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a.b/c.d\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a.b/c.d\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a.b/c.d\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"/foo/bar/baz.hello\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"/foo/bar/baz.hello\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"/foo/bar/baz.hello\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"/foo/bar/baz.hello\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"/foo/bar/baz.hello\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"/foo/bar/baz.hello\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"/foo/bar/baz.hello\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"/foo/bar/baz.hello\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/b.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/b.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/b.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/b.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/b.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/b.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/b.\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/b.\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a/...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a/...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a/...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a/...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a/...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a/...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a/...\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a/...\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"x/./y.z\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"x/./y.z\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"x/./y.z\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"x/./y.z\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"x/./y.z\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"x/./y.z\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"x/./y.z\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"x/./y.z\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"é/ü.ß\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"é/ü.ß\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"é/ü.ß\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"é/ü.ß\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"é/ü.ß\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"é/ü.ß\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"é/ü.ß\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"é/ü.ß\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_name(\"a b/c d.e f\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_name(\"a b/c d.e f\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "file_stem(\"a b/c d.e f\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ file_stem(\"a b/c d.e f\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "extension(\"a b/c d.e f\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ extension(\"a b/c d.e f\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "without_extension(\"a b/c d.e f\")",
+  "files": {
+   "justfile": "foo:\n  @echo {{ without_extension(\"a b/c d.e f\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim([\"  a b  \"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim(\"  a b  \") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim([\"​x​\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim(\"​x​\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim([\"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim([\" a \"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim(\" a \") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim([\"᠎a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim(\"᠎a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start([\"  a b  \"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start(\"  a b  \") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start([\"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end([\"  a b  \"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end(\"  a b  \") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end([\"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"aaa\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"aaa\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"aaa\", \"aa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"aaa\", \"aa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"abab\", \"ab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"abab\", \"ab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"abc\", \"x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"abc\", \"x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"abc\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"abc\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"é€é\", \"é\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"é€é\", \"é\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"aaa\", \"aaaa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"aaa\", \"aaaa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_match([\"ababab\", \"bab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_match(\"ababab\", \"bab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"aaa\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"aaa\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"aaa\", \"aa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"aaa\", \"aa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"abab\", \"ab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"abab\", \"ab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"abc\", \"x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"abc\", \"x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"abc\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"abc\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"é€é\", \"é\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"é€é\", \"é\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"aaa\", \"aaaa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"aaa\", \"aaaa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_match([\"ababab\", \"bab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_match(\"ababab\", \"bab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"aaa\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"aaa\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"aaa\", \"aa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"aaa\", \"aa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"abab\", \"ab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"abab\", \"ab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"abc\", \"x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"abc\", \"x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"abc\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"abc\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"é€é\", \"é\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"é€é\", \"é\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"aaa\", \"aaaa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"aaa\", \"aaaa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_start_matches([\"ababab\", \"bab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_start_matches(\"ababab\", \"bab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"aaa\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"aaa\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"aaa\", \"aa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"aaa\", \"aa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"abab\", \"ab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"abab\", \"ab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"abc\", \"x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"abc\", \"x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"abc\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"abc\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"é€é\", \"é\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"é€é\", \"é\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"aaa\", \"aaaa\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"aaa\", \"aaaa\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "trim_end_matches([\"ababab\", \"bab\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_end_matches(\"ababab\", \"bab\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"barbarbar\", \"bar\", \"foo\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"barbarbar\", \"bar\", \"foo\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"abc\", \"\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"abc\", \"\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"\", \"\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"\", \"\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"aaa\", \"aa\", \"b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"aaa\", \"aa\", \"b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"é\", \"é\", \"e\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"é\", \"é\", \"e\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"abc\", \"b\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"abc\", \"b\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"xyz\", \"q\", \"r\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"xyz\", \"q\", \"r\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace([\"日本\", \"\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace(\"日本\", \"\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"123bar123bar123bar\", \"\\\\d+bar\", \"foo\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"123bar123bar123bar\", \"\\\\d+bar\", \"foo\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"(a)(b)\", \"$2$1\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"(a)(b)\", \"$2$1\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"(?P<x>b)\", \"[${x}]\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"(?P<x>b)\", \"[${x}]\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"b\", \"$$\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"b\", \"$$\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"b\", \"$\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"b\", \"$\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"b\", \"$-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"b\", \"$-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"(b)\", \"$1x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"(b)\", \"$1x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"(b)\", \"${1}x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"(b)\", \"${1}x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"x*\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"x*\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"b*\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"b*\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"aaa\", \"a*\", \"x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"aaa\", \"a*\", \"x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"ab\", \"(?i)A\", \"z\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"ab\", \"(?i)A\", \"z\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"a.b\", \"\\\\.\", \"-\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"a.b\", \"\\\\.\", \"-\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"Hello World\", \"(?P<first>\\\\w+) (?P<second>\\\\w+)\", \"$second $first\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"Hello World\", \"(?P<first>\\\\w+) (?P<second>\\\\w+)\", \"$second $first\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"c$\", \"!\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"c$\", \"!\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"a\\nb\", \"(?m)^b\", \"X\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"a\\nb\", \"(?m)^b\", \"X\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"日本語\", \".\", \"x\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"日本語\", \".\", \"x\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"é\", \"\\\\w\", \"w\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"é\", \"\\\\w\", \"w\") }}\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "known": "Rust's regex reads \\w and \\d as Unicode classes; Go's regexp reads them as ASCII (Task 12 F5 lists the same engine difference)"
+ },
+ {
+  "name": "replace_regex([\"١٢٣\", \"\\\\d\", \"n\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"١٢٣\", \"\\\\d\", \"n\") }}\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "known": "Rust's regex reads \\w and \\d as Unicode classes; Go's regexp reads them as ASCII (Task 12 F5 lists the same engine difference)"
+ },
+ {
+  "name": "replace_regex([\"abc\", \"(b)\", \"$2\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"(b)\", \"$2\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex([\"abc\", \"b\", \"\\\\$\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex(\"abc\", \"b\", \"\\\\$\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quote([\"abc\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ quote(\"abc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quote([\"it's\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ quote(\"it's\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quote([\"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ quote(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quote([\"'\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ quote(\"'\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quote([\"a b\\n\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ quote(\"a b\\n\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "quote([\"''\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ quote(\"''\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "append([\"8\", \"r s t\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ append(\"8\", \"r s t\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "append([\"-\", \"c v h y\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ append(\"-\", \"c v h y\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "append([\"x\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ append(\"x\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "append([\"x\", \"  \"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ append(\"x\", \"  \") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "append([\"x\", \"a b c\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ append(\"x\", \"a b c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "append([\"\", \"a b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ append(\"\", \"a b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "prepend([\"8\", \"r s t\\n\\n  \"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ prepend(\"8\", \"r s t\\n\\n  \") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "prepend([\"x\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ prepend(\"x\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "prepend([\"-\", \"c\\tv h\\ny\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ prepend(\"-\", \"c\\tv h\\ny\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "prepend([\"é\", \"a　b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ prepend(\"é\", \"a　b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"a b/é€\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"a b/é€\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"-_.!~*'()\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"-_.!~*'()\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"日本語\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"日本語\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"A-Za-z0-9\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"A-Za-z0-9\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"%\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"%\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "encode_uri_component([\"\\n\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ encode_uri_component(\"\\n\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "len([\"abc\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ len(\"abc\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "len([\"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ len(\"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "len([\"a b c\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ len(\"a b c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a\", \"b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a\", \"b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a\", \"b\", \"c\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a\", \"b\", \"c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"\", \"b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"\", \"b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a\", \"\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a\", \"\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a/\", \"b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a/\", \"b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a\", \"/b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a\", \"/b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"/\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"/\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a//\", \"b\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a//\", \"b\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\"a\", \"b\", \"\", \"c\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\"a\", \"b\", \"\", \"c\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join([\".\", \"a\"])",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join(\".\", \"a\") }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join('a')",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join('a') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "join('a', 'b', 'c', 'd')",
+  "files": {
+   "justfile": "foo:\n  @echo {{ join('a', 'b', 'c', 'd') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex with a bad pattern",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex('abc', '(', 'x') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex with a trailing backslash",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex('abc', 'a\\', 'x') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "replace_regex with an unopened group",
+  "files": {
+   "justfile": "foo:\n  @echo {{ replace_regex('abc', 'a)', 'x') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in an assignment",
+  "files": {
+   "justfile": "x := extension('a')\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in a call argument is the argument's",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim(nope) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "nested calls",
+  "files": {
+   "justfile": "x := uppercase(trim_end_matches(replace('abcabc', 'b', ''), 'c'))\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "_dir spelling is not a string function",
+  "files": {
+   "justfile": "foo:\n  @echo {{ trim_dir('a') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ }
+]

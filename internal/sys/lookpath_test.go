@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,8 +94,11 @@ func TestResolveProgramUsesChildPATHOnly(t *testing.T) {
 		t.Fatalf("resolveProgram = %q, %v; want %q", got, err, want)
 	}
 	_, err := resolveProgram("jgprobe", []string{"PATH=" + first})
-	if !errors.Is(err, exec.ErrNotFound) {
-		t.Fatalf("err = %v, want exec.ErrNotFound", err)
+	if !errors.Is(err, exec.ErrNotFound) || !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("err = %v, want exec.ErrNotFound and fs.ErrNotExist", err)
+	}
+	if want := `exec: "jgprobe": executable file not found in $PATH`; err.Error() != want {
+		t.Fatalf("err = %q, want %q", err, want)
 	}
 	if got, err := resolveProgram("./rel/x", nil); err != nil || got != "./rel/x" {
 		t.Fatalf("resolveProgram(path) = %q, %v", got, err)

@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"gitea.com/wimwian/just-go/internal/analyzer"
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -25,25 +26,43 @@ import (
 	"gitea.com/wimwian/just-go/internal/loader"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/runner"
+	"gitea.com/wimwian/just-go/internal/settings"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
 // Options carries everything a load or a run depends on. Load reads
 // Justfile, SearchFrom and FS; Run reads the rest.
 type Options struct {
-	Justfile   string      // explicit path; empty means search from SearchFrom
-	SearchFrom string      // directory to search upward from; used when Justfile is empty
-	WorkDir    string      // working directory for recipes; empty means the justfile's directory
-	Env        []string    // exact environment, "KEY=VALUE"; nil means empty, never the process environment
-	Stdin      io.Reader   // nil means no input
-	Stdout     io.Writer   // nil discards
-	Stderr     io.Writer   // nil discards; receives echoed commands and failure messages
-	Recipes    []string    // recipes to run; empty means the first recipe in the file
-	Args       []string    // positional arguments for the single requested recipe
-	Calls      []Call      // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
-	Quiet      bool        // suppress command echo, as if `set quiet` held
-	FS         sys.FS      // nil uses the OS implementation from internal/sys
-	Exec       sys.Process // nil uses the OS implementation from internal/sys
+	Justfile   string // explicit path; empty means search from SearchFrom
+	SearchFrom string // directory to search upward from; used when Justfile is empty
+	WorkDir    string // working directory for recipes; empty means the justfile's directory
+	// InvocationDir is the directory the command was run from, where recipes
+	// run under set no-cd. Empty means WorkDir.
+	InvocationDir string
+	Env           []string  // exact environment, "KEY=VALUE"; nil means empty, never the process environment; env(), env_var() and which() read it too
+	Stdin         io.Reader // nil means no input; commands, and the commands of backticks, read it
+	Stdout        io.Writer // nil discards
+	Stderr        io.Writer // nil discards; receives echoed commands and failure messages
+	Recipes       []string  // recipes to run; empty means the first recipe in the file
+	Args          []string  // positional arguments for the single requested recipe
+	Calls         []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
+	Quiet         bool      // suppress command echo, as if `set quiet` held
+	// Yes answers yes to every `[confirm]` prompt without asking, as
+	// upstream's --yes does. Without it a prompt is written to Prompt and the
+	// answer is read, one line, from Stdin; no Stdin means no.
+	Yes bool
+	// Prompt receives the `[confirm]` prompts; nil means Stderr. A host that
+	// silences Stderr, as upstream's --quiet does, still shows the prompts by
+	// giving them a writer of their own.
+	Prompt io.Writer
+	// FS reads the justfile and the files it names, and is where script
+	// recipes write their scripts; nil uses the OS implementation from
+	// internal/sys.
+	FS   sys.FS
+	Exec sys.Process // nil uses the OS implementation from internal/sys
+	// Clock tells the time that a recipe with `[timestamp]` prints; nil uses
+	// the system clock.
+	Clock sys.Clock
 	// Shell and ShellArgs override the justfile's set shell for every recipe
 	// line of the run, as upstream's --shell and --shell-arg do. Shell alone
 	// runs Shell with the default arguments (-cu); ShellArgs alone runs the
@@ -52,6 +71,21 @@ type Options struct {
 	// shell gets no arguments before the command.
 	Shell     string
 	ShellArgs []string
+	// Platform answers the questions of os(), arch(), num_cpus(), just_pid()
+	// and just_executable(), and says which files `which` and `require` can
+	// run; nil uses the system the program runs on.
+	Platform sys.Platform
+	// Random is where choose() draws its characters from; nil uses the
+	// system's source of randomness.
+	Random sys.Random
+	// Jobs is what num_jobs() reports, the number of recipes allowed to run
+	// at once; zero means no limit was set.
+	Jobs int
+	// Unstable enables unstable features, as upstream's --unstable flag and
+	// JUST_UNSTABLE variable do. A justfile can enable them itself with
+	// `set unstable`. Load and Run refuse a justfile that uses one of them
+	// when neither does.
+	Unstable bool
 }
 
 // Call is one recipe to run with the positional arguments for its own
@@ -70,13 +104,22 @@ type Result struct {
 
 // RecipeInfo describes one recipe as data, for hosts to render as they like.
 type RecipeInfo struct {
-	Name   string
-	Doc    string   // the doc comment above the recipe, without the leading "# "; empty when absent
+	Name string
+	// Doc is the comment above the recipe, without the leading "# ", or the
+	// value of its `[doc]` attribute, trimmed; `[doc]` alone gives none.
+	// Empty when absent.
+	Doc    string
 	Params []string // parameter names in declaration order; never nil
 	// Defaults is parallel to Params: each default as written in the justfile,
 	// quotes included ("'x'", `"x"`, "(a + 'b')"), or "" for a parameter with
 	// none. Never nil.
 	Defaults []string
+	// Private is true for a recipe whose name starts with an underscore or
+	// that has `[private]`: listings and suggestions leave it out.
+	Private bool
+	// Groups are the values of its `[group]` attributes, in byte order. Never
+	// shared with the Justfile; nil for a recipe in no group.
+	Groups []string
 }
 
 // Justfile is a parsed and analyzed justfile, ready to inspect or run. It is
@@ -104,7 +147,11 @@ func Load(opts Options) (*Justfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Justfile{tree: tree, dir: filepath.Dir(path)}, nil
+	j := &Justfile{tree: tree, dir: filepath.Dir(path)}
+	if err := j.checkUnstable(opts.Unstable); err != nil {
+		return nil, err
+	}
+	return j, nil
 }
 
 // locate returns the path of the justfile opts names, searching for it when
@@ -121,7 +168,9 @@ func locate(fsys sys.FS, opts Options) (string, error) {
 
 // Parse parses and analyzes src as a justfile; name is used as the file name
 // in errors, and an error's Source quotes its line of src. A justfile parsed
-// from memory has no directory, so Run needs Options.WorkDir for it. Pure.
+// from memory has no directory, so Run needs Options.WorkDir for it. Parse
+// accepts a justfile that uses unstable features; Run refuses it unless they
+// are enabled. Pure.
 func Parse(name string, src []byte) (*Justfile, error) {
 	tree, err := parser.Parse(name, src)
 	if err != nil {
@@ -130,31 +179,74 @@ func Parse(name string, src []byte) (*Justfile, error) {
 	if err := analyzer.Analyze(tree); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
+	tree.Source = src
 	return &Justfile{tree: tree}, nil
 }
 
 // Recipes lists the justfile's recipes in declaration order. The result is
 // freshly allocated, so callers may modify it. Pure.
 func (j *Justfile) Recipes() []RecipeInfo {
-	infos := make([]RecipeInfo, len(j.tree.Recipes))
-	for i, r := range j.tree.Recipes {
+	recipes := j.tree.UniqueRecipes()
+	infos := make([]RecipeInfo, len(recipes))
+	for i, r := range recipes {
 		params := make([]string, len(r.Params))
 		defaults := make([]string, len(r.Params))
 		for k, p := range r.Params {
 			params[k], defaults[k] = p.Name, p.DefaultText
 		}
-		infos[i] = RecipeInfo{Name: r.Name, Doc: r.Doc, Params: params, Defaults: defaults}
+		infos[i] = RecipeInfo{
+			Name: r.Name, Doc: j.doc(&recipes[i]), Params: params, Defaults: defaults,
+			Private: r.Private(), Groups: r.Groups(),
+		}
 	}
 	return infos
 }
 
+// doc is the doc of r: its `[doc]` attribute, evaluated and trimmed, nothing
+// for `[doc]` alone, or else the comment above it. The analyzer has already
+// shown that the attribute's expression evaluates. Pure.
+func (j *Justfile) doc(r *ast.Recipe) string {
+	a := r.Attribute(ast.AttrDoc)
+	if a == nil {
+		return r.Doc
+	}
+	if len(a.Args) == 0 {
+		return ""
+	}
+	value, _ := settings.ConstValue(j.tree, a.Args[0])
+	return strings.TrimSpace(value)
+}
+
+// DefaultList reports whether the justfile asks, with set default-list, for
+// its recipes to be listed rather than its default recipe run when no recipe
+// is named. Pure.
+func (j *Justfile) DefaultList() bool {
+	return j.tree.Settings.DefaultList
+}
+
+// Fallback reports whether the justfile asks, with set fallback, for a
+// recipe it does not contain to be looked up in the justfile of the parent
+// directory. Pure.
+func (j *Justfile) Fallback() bool {
+	return j.tree.Settings.Fallback
+}
+
 // Run runs opts.Recipes, or the first recipe when none are named, with their
-// dependencies. The children see exactly opts.Env and run in opts.WorkDir,
+// dependencies. A backtick runs its command through opts.Exec, in the
+// shell of the justfile, when its expression is evaluated: the assignments
+// before any recipe, the rest as the recipe that holds them is reached. A
+// failing one is a *diag.Error whose ExitCode is the status the command line
+// ends with. A justfile that uses an unstable feature is refused, before
+// anything runs, unless opts.Unstable or `set unstable` enables them. The
+// children see exactly opts.Env and run in opts.WorkDir,
 // or in the justfile's directory when WorkDir is empty. A justfile from
 // Parse has no directory, so an empty WorkDir is a usage *diag.Error there.
 // Cancelling ctx kills the running child and Run returns ctx.Err(). Impure:
 // it runs processes through opts.Exec and writes to opts' streams.
 func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
+	if err := j.checkUnstable(opts.Unstable); err != nil {
+		return Result{}, err
+	}
 	dir := opts.WorkDir
 	if dir == "" {
 		dir = j.dir
@@ -163,21 +255,42 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, usage("no working directory: set Options.WorkDir for a justfile parsed from memory")
 	}
 	res, err := runner.Run(ctx, runner.Plan{
-		Justfile:  j.tree,
-		Recipes:   opts.Recipes,
-		Args:      opts.Args,
-		Calls:     runnerCalls(opts.Calls),
-		Env:       opts.Env,
-		WorkDir:   dir,
-		Stdin:     opts.Stdin,
-		Stdout:    opts.Stdout,
-		Stderr:    opts.Stderr,
-		Quiet:     opts.Quiet,
-		Exec:      opts.Exec,
-		Shell:     opts.Shell,
-		ShellArgs: opts.ShellArgs,
+		Justfile:      j.tree,
+		Recipes:       opts.Recipes,
+		Args:          opts.Args,
+		Calls:         runnerCalls(opts.Calls),
+		Env:           opts.Env,
+		WorkDir:       dir,
+		InvocationDir: opts.InvocationDir,
+		Stdin:         opts.Stdin,
+		Stdout:        opts.Stdout,
+		Stderr:        opts.Stderr,
+		Quiet:         opts.Quiet,
+		Yes:           opts.Yes,
+		Prompt:        opts.Prompt,
+		Exec:          opts.Exec,
+		FS:            opts.FS,
+		Clock:         opts.Clock,
+		Shell:         opts.Shell,
+		ShellArgs:     opts.ShellArgs,
+		Platform:      opts.Platform,
+		Random:        opts.Random,
+		Jobs:          opts.Jobs,
 	})
 	return Result{ExitCode: res.ExitCode}, err
+}
+
+// checkUnstable returns upstream's error for the first unstable feature the
+// justfile uses, unless enabled or the justfile says `set unstable`. Pure.
+func (j *Justfile) checkUnstable(enabled bool) error {
+	if enabled || j.tree.Settings.Unstable || len(j.tree.Unstable) == 0 {
+		return nil
+	}
+	return &diag.Error{
+		Kind: diag.KindRuntime,
+		Msg: j.tree.Unstable[0].String() + ", invoke `just` with `--unstable`, set the `JUST_UNSTABLE` " +
+			"environment variable, or add `set unstable` to your `justfile` to enable unstable features",
+	}
 }
 
 // usage returns a usage diagnostic about the options themselves, which have

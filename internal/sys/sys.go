@@ -6,12 +6,19 @@
 package sys
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"syscall"
+	"unicode"
+	"unicode/utf8"
 )
 
-// FS is read access to the filesystem.
+// FS is access to the filesystem: reading justfiles and the files they name,
+// and the directory and files that script recipes run from.
 type FS interface {
 	ReadFile(path string) ([]byte, error)
 	// IsFile reports whether path exists and is a regular file.
@@ -20,6 +27,24 @@ type FS interface {
 	// at path, sorted by name. An unreadable or missing directory is an
 	// error.
 	ReadDir(path string) ([]string, error)
+	// WriteFile writes data to the file at path, creating it with permission
+	// perm if it does not exist and replacing its content if it does.
+	WriteFile(path string, data []byte, perm fs.FileMode) error
+	// MkdirTemp creates a new, empty directory whose name starts with prefix,
+	// inside the directory dir, and returns its path. An empty dir means the
+	// place for temporary scripts: the system's runtime directory, where it
+	// has one, else the temporary directory.
+	MkdirTemp(dir, prefix string) (string, error)
+	// RemoveAll removes path and everything below it. A path that does not
+	// exist is no error.
+	RemoveAll(path string) error
+	// Exists reports whether a file or a directory is at path, following
+	// symbolic links. A path that cannot be examined does not exist.
+	Exists(path string) bool
+	// Canonicalize returns the absolute path of what path names, with every
+	// symbolic link resolved and every `.` and `..` gone. A path that does not
+	// exist is an error.
+	Canonicalize(path string) (string, error)
 }
 
 // Process runs external programs.
@@ -66,6 +91,28 @@ func SignalName(sig int) string {
 	return fmt.Sprintf("signal %d", sig)
 }
 
+// Numbers of the fatal signals `[continue]` can name, the same on every Unix
+// system.
+const (
+	SIGHUP  = 1
+	SIGINT  = 2
+	SIGQUIT = 3
+)
+
+// SignalNumber is the number of the signal upstream calls name, one of
+// SIGHUP, SIGINT and SIGQUIT, and whether it is one of them. Pure.
+func SignalNumber(name string) (int, bool) {
+	switch name {
+	case "SIGHUP":
+		return SIGHUP, true
+	case "SIGINT":
+		return SIGINT, true
+	case "SIGQUIT":
+		return SIGQUIT, true
+	}
+	return 0, false
+}
+
 // ProcessSpec describes one program invocation.
 type ProcessSpec struct {
 	// Argv[0] is the program. A bare name (no path separator) is searched
@@ -77,4 +124,128 @@ type ProcessSpec struct {
 	Stdin  io.Reader // nil means no input
 	Stdout io.Writer // nil discards
 	Stderr io.Writer // nil discards
+}
+
+// Time is an instant of wall-clock time, broken down so that pure code can
+// format it without importing the time package: the seconds since the Unix
+// epoch, the nanoseconds past the second, and the offset of the local time
+// zone from UTC at that instant.
+type Time struct {
+	// Unix is the whole seconds since 1970-01-01 00:00:00 UTC.
+	Unix int64
+	// Nano is the nanoseconds past the second, from 0 to 999999999.
+	Nano int
+	// Offset is the seconds the local time is east of UTC.
+	Offset int
+	// UTC is true when the time is expressed in UTC, whose zone name is
+	// "UTC"; otherwise the zone is named by its offset, as upstream's
+	// formatter names a local time zone.
+	UTC bool
+}
+
+// Clock reads the time of day.
+type Clock interface {
+	// Now returns the current time in the local time zone.
+	Now() Time
+}
+
+// Env is the environment a program reads its variables from. A host hands
+// one over, so that nothing reads the process's own environment unasked.
+type Env interface {
+	// LookupEnv returns the value of the variable called key, and whether
+	// there is one. A variable may be set to the empty string.
+	LookupEnv(key string) (value string, ok bool)
+}
+
+// EnvList is an Env made of "KEY=VALUE" entries, such as os.Environ returns.
+// When a key has several entries the last wins, as it does for a child
+// process, and a key is matched as the platform matches environment keys.
+type EnvList []string
+
+// LookupEnv returns the value of the last entry for key. An empty key names
+// no variable. Pure.
+func (e EnvList) LookupEnv(key string) (string, bool) {
+	if key == "" {
+		return "", false
+	}
+	return envValue(e, key)
+}
+
+// Platform is what a program learns about the machine it runs on and about
+// itself: the questions whose answers do not come from a file or from the
+// caller's environment.
+type Platform interface {
+	// OS names the operating system as runtime.GOOS does, such as "darwin".
+	OS() string
+	// Arch names the processor architecture as runtime.GOARCH does, such as
+	// "arm64".
+	Arch() string
+	// NumCPU is the number of logical processors the program can use.
+	NumCPU() int
+	// PID is the number of the running process.
+	PID() int
+	// Executable is the path of the program that is running.
+	Executable() (string, error)
+	// IsExecutable reports whether path is a file the system would run: a
+	// regular file with an execute permission, or, on Windows, one with an
+	// extension. A path that cannot be examined is not.
+	IsExecutable(path string) bool
+}
+
+// Random is a source of random bytes. A read fills p completely or fails.
+type Random interface {
+	Read(p []byte) (n int, err error)
+}
+
+// Captured is how a program that Capture ran ended, and what it wrote to its
+// standard output.
+type Captured struct {
+	// Stdout is everything the program wrote to its standard output.
+	Stdout []byte
+	// ExitCode is the program's exit status, or -1 when it ended without one.
+	ExitCode int
+	// Signal is the signal that terminated the program, or 0 when it exited.
+	Signal int
+	// Caught is a fatal signal the runner caught while the program ran, or 0.
+	Caught int
+}
+
+// Capture runs spec through p with its Stdout replaced by a buffer, and
+// returns what the program wrote and how it ended. A signal that ended the
+// program, or that the runner caught while it ran, is not an error but a
+// field of the result; an error is a failure to start the program or the end
+// of ctx. Impure: it runs a program through p.
+func Capture(ctx context.Context, p Process, spec ProcessSpec) (Captured, error) {
+	var out bytes.Buffer
+	spec.Stdout = &out
+	code, err := p.Run(ctx, spec)
+	got := Captured{Stdout: out.Bytes(), ExitCode: code}
+	var sig *SignalError
+	if errors.As(err, &sig) {
+		got.Signal, got.Caught = sig.Signal, sig.Caught
+		return got, nil
+	}
+	return got, err
+}
+
+// ErrorText words err as Rust's Display does for an io::Error: the operating
+// system's description of the failure, with its first letter in upper case,
+// then the system's error number, as "No such file or directory (os error 2)".
+// An error that carries no system error number is worded as one of the two
+// that a fake filesystem raises (a missing file, a refused permission), or as
+// it words itself. Pure.
+func ErrorText(err error) string {
+	var errno syscall.Errno
+	switch {
+	case errors.As(err, &errno):
+	case errors.Is(err, fs.ErrNotExist):
+		errno = syscall.ENOENT
+	case errors.Is(err, fs.ErrPermission):
+		errno = syscall.EACCES
+	default:
+		return err.Error()
+	}
+	text := errno.Error()
+	first, size := utf8.DecodeRuneInString(text)
+	return fmt.Sprintf("%s%s (os error %d)", string(unicode.ToUpper(first)), text[size:], int(errno))
 }

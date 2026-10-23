@@ -2,9 +2,13 @@ package sys
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -14,7 +18,12 @@ import (
 const killGrace = 2 * time.Second
 
 // OSFS is the FS backed by the real filesystem.
-type OSFS struct{}
+type OSFS struct {
+	// goos names the operating system that decides where MkdirTemp puts a
+	// directory it is given no place for, as runtime.GOOS does. It is empty for
+	// the system the program runs on, so only a test sets it.
+	goos string
+}
 
 // ReadFile reads the named file. Impure: it touches the real filesystem.
 func (OSFS) ReadFile(path string) ([]byte, error) {
@@ -46,6 +55,80 @@ func (OSFS) ReadDir(path string) ([]string, error) {
 		names[i] = e.Name()
 	}
 	return names, nil
+}
+
+// WriteFile writes the named file. Impure: it touches the real filesystem.
+func (OSFS) WriteFile(path string, data []byte, perm fs.FileMode) error {
+	return os.WriteFile(path, data, perm)
+}
+
+// MkdirTemp creates a directory in dir, or, for an empty dir, in the place
+// upstream makes its scripts: the directory called just in the Linux runtime
+// directory ($XDG_RUNTIME_DIR), made if need be, or else the system's
+// temporary directory. Impure: it touches the real filesystem and reads the
+// environment.
+func (o OSFS) MkdirTemp(dir, prefix string) (string, error) {
+	if dir == "" {
+		goos := o.goos
+		if goos == "" {
+			goos = runtime.GOOS
+		}
+		dir = os.TempDir()
+		if root := runtimeRoot(goos, os.Getenv("XDG_RUNTIME_DIR")); root != "" {
+			dir = root
+			if err := os.MkdirAll(root, 0o700); err != nil {
+				return "", err
+			}
+		}
+	}
+	return os.MkdirTemp(dir, prefix)
+}
+
+// runtimeRoot is the directory that holds the scripts of a system whose
+// runtime directory is xdg, the value of $XDG_RUNTIME_DIR: the directory called
+// just in it, on Linux when xdg is an absolute path. It is "" for a system that
+// has none. Pure.
+func runtimeRoot(goos, xdg string) string {
+	if goos != "linux" || !filepath.IsAbs(xdg) {
+		return ""
+	}
+	return filepath.Join(xdg, "just")
+}
+
+// RemoveAll removes path and what is below it. Impure: it touches the real
+// filesystem.
+func (OSFS) RemoveAll(path string) error {
+	return os.RemoveAll(path)
+}
+
+// Exists reports whether a file or a directory is at path, following symbolic
+// links, as Rust's Path::exists does: a path that cannot be examined does not
+// exist. Impure: it touches the real filesystem.
+func (OSFS) Exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// Canonicalize returns the absolute path of what path names, with every
+// symbolic link resolved, as Rust's fs::canonicalize does. Impure: it touches
+// the real filesystem.
+func (OSFS) Canonicalize(path string) (string, error) {
+	return canonicalize(os.Getwd, path)
+}
+
+// canonicalize resolves path, which is taken from the directory getwd names if
+// it is relative. The path is not cleaned first, because a `..` after a
+// symbolic link names the parent of what the link points to. Impure: it
+// touches the real filesystem.
+func canonicalize(getwd func() (string, error), path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		dir, err := getwd()
+		if err != nil {
+			return "", err
+		}
+		path = dir + string(filepath.Separator) + path
+	}
+	return filepath.EvalSymlinks(path)
 }
 
 // OSProcess is the Process backed by os/exec.
@@ -119,3 +202,59 @@ func exitCode(exitErr *exec.ExitError) (int, error) {
 	}
 	return exitErr.ExitCode(), nil
 }
+
+// OSClock is the Clock backed by the system clock and the local time zone.
+type OSClock struct{}
+
+// Now returns the current local time. Impure: it reads the system clock.
+func (OSClock) Now() Time {
+	return fromTime(time.Now())
+}
+
+// fromTime breaks t down into a Time in t's own zone. Pure.
+func fromTime(t time.Time) Time {
+	_, offset := t.Zone()
+	return Time{Unix: t.Unix(), Nano: t.Nanosecond(), Offset: offset}
+}
+
+// OSPlatform is the Platform of the system the program runs on.
+type OSPlatform struct {
+	// GOOS, when not empty, is the operating system OS reports, as
+	// runtime.GOOS names it, in place of the one the program runs on. It
+	// lets a host run a justfile as if it were on another system; the
+	// executable test still asks the real one.
+	GOOS string
+}
+
+// OS names the operating system: the override if there is one, else the system
+// the program was built for. Pure.
+func (p OSPlatform) OS() string {
+	if p.GOOS != "" {
+		return p.GOOS
+	}
+	return runtime.GOOS
+}
+
+// Arch names the processor architecture the program was built for. Pure.
+func (OSPlatform) Arch() string { return runtime.GOARCH }
+
+// NumCPU is the number of logical processors usable by the program. Impure:
+// it asks the system.
+func (OSPlatform) NumCPU() int { return runtime.NumCPU() }
+
+// PID is the number of the running process. Impure: it asks the system.
+func (OSPlatform) PID() int { return os.Getpid() }
+
+// Executable is the path of the running program. Impure: it asks the system.
+func (OSPlatform) Executable() (string, error) { return os.Executable() }
+
+// IsExecutable reports whether path is a file the system would run. Impure:
+// it touches the real filesystem.
+func (OSPlatform) IsExecutable(path string) bool { return isExecutable(path) }
+
+// OSRandom is the Random backed by the system's source of randomness.
+type OSRandom struct{}
+
+// Read fills p with random bytes. Impure: it reads the system's source of
+// randomness.
+func (OSRandom) Read(p []byte) (int, error) { return rand.Read(p) }

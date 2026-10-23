@@ -35,9 +35,8 @@ func strip(jf *ast.Justfile) *ast.Justfile {
 	for i := range jf.Recipes {
 		r := &jf.Recipes[i]
 		r.Col = 0
-		for k := range r.Deps {
-			r.Deps[k].Line, r.Deps[k].Col = 0, 0
-		}
+		stripDependencies(r.Deps)
+		stripDependencies(r.Subsequents)
 		for k := range r.Params {
 			p := &r.Params[k]
 			p.Line, p.Col, p.Default = 0, 0, stripExpr(p.Default)
@@ -53,12 +52,28 @@ func strip(jf *ast.Justfile) *ast.Justfile {
 	return jf
 }
 
+func stripDependencies(deps []ast.Dependency) {
+	for k := range deps {
+		d := &deps[k]
+		d.Line, d.Col = 0, 0
+		for n := range d.Args {
+			d.Args[n] = stripExpr(d.Args[n])
+		}
+	}
+}
+
 func stripExpr(e ast.Expr) ast.Expr {
 	switch x := e.(type) {
 	case ast.Var:
 		return ast.Var{Name: x.Name}
 	case ast.Concat:
 		return ast.Concat{Left: stripExpr(x.Left), Right: stripExpr(x.Right)}
+	case ast.Call:
+		call := ast.Call{Name: x.Name}
+		for _, a := range x.Args {
+			call.Args = append(call.Args, stripExpr(a))
+		}
+		return call
 	}
 	return e
 }
@@ -104,12 +119,13 @@ func TestParseRecipeWithParamsAndDeps(t *testing.T) {
 		Recipes: []ast.Recipe{{
 			Name:   "build",
 			Params: []ast.Param{{Name: "target", Default: lit("debug"), DefaultText: `"debug"`}},
-			Deps:   []ast.Dep{{Name: "test"}},
+			Deps:   []ast.Dependency{{Name: "test"}},
 			Lines: []ast.Line{{
 				Prefix: ast.PrefixNone,
 				Parts:  []ast.Expr{txt("cargo build "), ref("target")},
 				Line:   2,
 			}},
+			Raw:  []ast.RawLine{{Line: 2, Parts: []ast.Expr{txt("cargo build "), ref("target")}}},
 			Line: 1,
 		}},
 	}
@@ -169,6 +185,15 @@ func TestParseQuietRecipeTogglesLinePrefix(t *testing.T) {
 	}
 }
 
+// lits returns string literals for the given values.
+func lits(values ...string) []ast.Expr {
+	out := make([]ast.Expr, len(values))
+	for i, v := range values {
+		out[i] = lit(v)
+	}
+	return out
+}
+
 func TestParseSetShell(t *testing.T) {
 	for src, want := range map[string][]string{
 		`set shell := ["bash", "-cu"]`:    {"bash", "-cu"},
@@ -178,7 +203,7 @@ func TestParseSetShell(t *testing.T) {
 		"set shell := [\"bash\"]\r\n\r\n": {"bash"},
 	} {
 		jf := mustParse(t, src)
-		if !reflect.DeepEqual(jf.Settings.Shell, want) {
+		if !reflect.DeepEqual(jf.Settings.Shell, lits(want...)) {
 			t.Errorf("Parse(%q) Shell = %q, want %q", src, jf.Settings.Shell, want)
 		}
 		if jf.Settings.Quiet {
@@ -199,16 +224,34 @@ func TestParseSetQuiet(t *testing.T) {
 	}
 }
 
+// What upstream expects at each point of the grammar, as its error messages
+// list it. Every message in these tests was checked against the oracle.
+const (
+	value     = "backtick, '!', '[', identifier, '(', '/', or string"
+	afterWord = "'&&', '!=', '!~', '||', ']', ',', '==', '=~', '+', '++', or '/'"
+	afterName = "'&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '/'"
+	afterDeps = "'&&', '*', '::', comment, end of file, end of line, identifier, indent, or '('"
+	// afterSubsequents is what follows the dependencies after `&&`, which
+	// cannot be followed by another.
+	afterSubsequents = "'*', '::', comment, end of file, end of line, identifier, indent, or '('"
+	// startOfArgument is what upstream looks for after the name of a
+	// parenthesised dependency.
+	startOfArgument = "'*', backtick, '!', '[', '::', identifier, '(', ')', '/', or string"
+	item            = "'@', '[', comment, end of file, end of line, or identifier"
+)
+
 func TestParseSettingErrors(t *testing.T) {
 	wantError(t, "set nope\n", 1, 5, "unknown setting `nope`")
-	wantError(t, "set shell\n", 1, 10, "Expected ':=', but found end of line")
-	wantError(t, "set shell :=\n", 1, 13, "Expected '[', but found end of line")
-	wantError(t, "set shell := []\n", 1, 15, "Expected string, but found ']'")
-	wantError(t, "set shell := [,]\n", 1, 15, "Expected string, but found ','")
-	wantError(t, "set shell := \"a\"\n", 1, 14, "Expected '[', but found string")
-	wantError(t, "set shell := [\"a\" \"b\"]\n", 1, 19, "Expected string or ']', but found string")
-	wantError(t, "set shell := [\"a\"\n", 1, 18, "Expected string or ']', but found end of line")
-	wantError(t, "set quiet := true\n", 1, 11, "Expected end of line, but found ':='")
+	wantError(t, "set shell\n", 1, 10, "expected ':=', but found end of line")
+	wantError(t, "set shell :=\n", 1, 13, "expected '[', but found end of line")
+	wantError(t, "set shell := []\n", 1, 15, "expected "+value+", but found ']'")
+	wantError(t, "set shell := [,]\n", 1, 15, "expected "+value+", but found ','")
+	wantError(t, "set shell := \"a\"\n", 1, 14, "expected '[', but found string")
+	wantError(t, "set shell := [\"a\" \"b\"]\n", 1, 19, "expected "+afterWord+", but found string")
+	wantError(t, "set shell := [\"a\"\n", 1, 19, "expected "+afterWord+", but found end of file")
+	wantError(t, "set quiet := maybe\n", 1, 14, "expected keyword `true` or `false` but found identifier `maybe`")
+	wantError(t, "set quiet := \"true\"\n", 1, 14, "expected identifier, but found string")
+	wantError(t, "set quiet := true foo\n", 1, 19, "expected comment, end of file, or end of line, but found identifier")
 }
 
 func TestParseSetCanStillNameARecipeOrVariable(t *testing.T) {
@@ -229,6 +272,7 @@ func TestParseDocComment(t *testing.T) {
 	wantRecipe(t, "# build it\nbuild:\n  x", ast.Recipe{
 		Name: "build", Doc: "build it", Line: 2,
 		Lines: []ast.Line{{Parts: []ast.Expr{txt("x")}, Line: 3}},
+		Raw:   []ast.RawLine{{Line: 3, Parts: []ast.Expr{txt("x")}}},
 	})
 }
 
@@ -279,11 +323,11 @@ func TestParseSourceOrder(t *testing.T) {
 }
 
 func TestParseAssignmentErrors(t *testing.T) {
-	wantError(t, "x := \n", 1, 6, "Expected an expression, but found end of line")
-	wantError(t, "x := a +\n", 1, 9, "Expected an expression, but found end of line")
-	wantError(t, "x := (a\n", 1, 8, "Expected '+' or ')', but found end of line")
-	wantError(t, "x := (\n", 1, 7, "Expected an expression, but found end of line")
-	wantError(t, "x := a b\n", 1, 8, "Expected end of line, but found identifier")
+	wantError(t, "x := \n", 1, 6, "expected "+value+", but found end of line")
+	wantError(t, "x := a +\n", 1, 9, "expected "+value+", but found end of line")
+	wantError(t, "x := (a\n", 1, 9, "expected '&&', '!=', '!~', '||', '==', '=~', '(', ')', '+', '++', or '/', but found end of file")
+	wantError(t, "x := (\n", 1, 8, "expected "+value+", but found end of file")
+	wantError(t, "x := a b\n", 1, 8, "expected "+afterName+", but found identifier")
 }
 
 func TestParseParams(t *testing.T) {
@@ -299,23 +343,107 @@ func TestParseParams(t *testing.T) {
 }
 
 func TestParseRecipeHeaderErrors(t *testing.T) {
-	wantError(t, "@\n", 1, 2, "Expected a recipe name, but found end of line")
-	wantError(t, "r x\n", 1, 4, "Expected ':', ':=', or a parameter, but found end of line")
-	wantError(t, "r (x):\n", 1, 3, "Expected ':', ':=', or a parameter, but found '('")
-	wantError(t, "r x=:\n", 1, 5, "Expected an expression, but found ':'")
-	wantError(t, "r: a (b)\n", 1, 6, "Expected end of line, but found '('")
-	wantError(t, "r: a := b\n", 1, 6, "Expected end of line, but found ':='")
+	wantError(t, "@\n", 1, 2, "expected identifier, but found end of line")
+	wantError(t, "r x\n", 1, 4, "expected '*', ':', '$', '=', identifier, or '+', but found end of line")
+	wantError(t, "r 'x':\n", 1, 3, "expected '*', ':', '$', identifier, or '+', but found string")
+	wantError(t, "r x=:\n", 1, 5, "expected backtick, '!', '[', identifier, '(', or string, but found ':'")
+	// `r: a (b)` was an error before dependency arguments existed; it is a
+	// dependency with an argument list now (TestParseDependencyArguments). An
+	// empty argument list is still an error, and `r (x):` begins a function
+	// definition in upstream (oracle: "expected ':=', but found ':'" at 1:6),
+	// which the parser does not read yet; it stops at the '(' (1:3) instead, so
+	// that shape is left out rather than pinning the divergence.
+	wantError(t, "r: a ()\n", 1, 7, "expected identifier, but found ')'")
+	wantError(t, "r: a 'b'\n", 1, 6, "expected "+afterDeps+", but found string")
+	wantError(t, "r: a := b\n", 1, 6, "expected "+afterDeps+", but found ':='")
+}
+
+// TestParseDependencyArguments covers `(name arg...)` and `&&`: the
+// arguments are expressions, and the dependencies after `&&` are kept apart.
+func TestParseDependencyArguments(t *testing.T) {
+	call := ast.Call{Name: "f", Args: []ast.Expr{lit("q")}}
+	cases := []struct {
+		name, src string
+		deps, sub []ast.Dependency
+	}{
+		{"plain", "r: a b\n", []ast.Dependency{{Name: "a"}, {Name: "b"}}, nil},
+		{"string argument", "r: (a 'x')\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x")}}}, nil},
+		{"no arguments", "r: (a)\n", []ast.Dependency{{Name: "a"}}, nil},
+		{"several arguments", "r: (a 'x' y)\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x"), ref("y")}}}, nil},
+		{"concatenation is one argument", "r: (a 'x' + y 'z')\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{
+			ast.Concat{Left: lit("x"), Right: ref("y")}, lit("z")}}}, nil},
+		{"call argument", "r: (a f('q'))\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{call}}}, nil},
+		{"group argument", "r: (a ('x'))\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x")}}}, nil},
+		{"mixed", "r: p (a 'x') q\n", []ast.Dependency{{Name: "p"}, {Name: "a", Args: []ast.Expr{lit("x")}}, {Name: "q"}}, nil},
+		{"line breaks inside parentheses", "r: (\na 'x'\n)\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{lit("x")}}}, nil},
+		{"subsequents", "r: a && b (c 'x')\n", []ast.Dependency{{Name: "a"}},
+			[]ast.Dependency{{Name: "b"}, {Name: "c", Args: []ast.Expr{lit("x")}}}},
+		{"only subsequents", "r: && (c 'x')\n", nil, []ast.Dependency{{Name: "c", Args: []ast.Expr{lit("x")}}}},
+		{"string touching a name", "r: (a b'c')\n", []ast.Dependency{{Name: "a", Args: []ast.Expr{ref("b"), lit("c")}}}, nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := mustParse(t, c.src).Recipes[0]
+			if !reflect.DeepEqual(r.Deps, c.deps) || !reflect.DeepEqual(r.Subsequents, c.sub) {
+				t.Errorf("Parse(%q) Deps = %+v, Subsequents = %+v\nwant %+v, %+v", c.src, r.Deps, r.Subsequents, c.deps, c.sub)
+			}
+		})
+	}
+}
+
+// TestParseDependencyErrors pins the messages and locations of malformed
+// dependencies; each was produced by oracle/bin/just.
+func TestParseDependencyErrors(t *testing.T) {
+	wantError(t, "a: (", 1, 5, "expected identifier, but found end of file")
+	wantError(t, "a: ()", 1, 5, "expected identifier, but found ')'")
+	wantError(t, "a: (b", 1, 6, "expected "+startOfArgument+", but found end of file")
+	wantError(t, "b x:\na: (b ,)", 2, 7, "expected "+startOfArgument+", but found ','")
+	wantError(t, "b x:\na: && (b ,)", 2, 10, "expected "+startOfArgument+", but found ','")
+	wantError(t, "a: &&\n", 1, 6, "expected '*', identifier, or '(', but found end of line")
+	wantError(t, "a: b &&\n", 1, 8, "expected '*', identifier, or '(', but found end of line")
+	wantError(t, "a: && b &&\n", 1, 9, "expected "+afterSubsequents+", but found '&&'")
+	wantError(t, "a: && b c !\n", 1, 11, "expected "+afterSubsequents+", but found '!'")
+}
+
+// TestParseDependencyArgumentPositions checks that the arguments carry the
+// positions the analyzer reports errors at.
+func TestParseDependencyArgumentPositions(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("r: (d 'x' yy) && (e zz)\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := jf.Recipes[0]
+	if got, want := r.Deps[0].Args[1], (ast.Var{Name: "yy", Line: 1, Col: 11}); got != want {
+		t.Errorf("argument = %+v, want %+v", got, want)
+	}
+	if d := r.Subsequents[0]; d.Line != 1 || d.Col != 19 || d.Args[0] != (ast.Var{Name: "zz", Line: 1, Col: 21}) {
+		t.Errorf("subsequent = %+v", d)
+	}
+}
+
+// TestParseRecursionLimit pins the depth at which upstream stops parsing
+// nested parentheses, as oracle/bin/just does: 255 are accepted, and the
+// 256th is reported at the token after it.
+func TestParseRecursionLimit(t *testing.T) {
+	nested := func(n int) string {
+		return "foo: (x " + strings.Repeat("(", n) + "'a'" + strings.Repeat(")", n) + ")\n"
+	}
+	if _, err := parser.Parse("justfile", []byte(nested(255))); err != nil {
+		t.Errorf("255 levels: %v", err)
+	}
+	wantError(t, nested(256), 1, 265, "parsing recursion depth exceeded")
+	wantError(t, nested(300), 1, 265, "parsing recursion depth exceeded")
 }
 
 func TestParseTopLevelErrors(t *testing.T) {
-	wantError(t, ": x\n", 1, 1, "Expected a recipe, an assignment, or a setting, but found ':'")
-	wantError(t, "  x\n", 1, 1, "Expected a recipe, an assignment, or a setting, but found indentation")
-	wantError(t, "r:\n  x\n\"s\"\n", 3, 1, "Expected a recipe, an assignment, or a setting, but found string")
+	wantError(t, ": x\n", 1, 1, "expected "+item+", but found ':'")
+	wantError(t, "  x\n", 1, 1, "expected "+item+", but found indent")
+	wantError(t, "r:\n  x\n\"s\"\n", 3, 1, "expected "+item+", but found string")
 }
 
 func TestParseLexErrorsPassThrough(t *testing.T) {
 	wantError(t, "x := \"abc\n", 1, 6, "unterminated string")
-	wantError(t, "x := $\n", 1, 6, "unknown start of token '$'")
+	wantError(t, "x := %\n", 1, 6, "unknown start of token '%'")
 }
 
 func TestParseRecipeBodies(t *testing.T) {
@@ -342,7 +470,7 @@ func TestParseRecipeBodies(t *testing.T) {
 		{"tabs", "r:\n\ta\n\t\tb\n", []ast.Line{
 			{Parts: []ast.Expr{txt("a")}, Line: 2}, {Parts: []ast.Expr{txt("\tb")}, Line: 3}}},
 		{"comments in the body are text", "r:\n  # c\n  echo # d\n", []ast.Line{
-			{Parts: []ast.Expr{txt("# c")}, Line: 2}, {Parts: []ast.Expr{txt("echo # d")}, Line: 3}}},
+			{Parts: []ast.Expr{txt("# c")}, Line: 2, Comment: true}, {Parts: []ast.Expr{txt("echo # d")}, Line: 3}}},
 		{"CRLF", "r:\r\n  a\r\n  b\r\n", []ast.Line{
 			{Parts: []ast.Expr{txt("a")}, Line: 2}, {Parts: []ast.Expr{txt("b")}, Line: 3}}},
 		{"no final newline", "r:\n  a", []ast.Line{{Parts: []ast.Expr{txt("a")}, Line: 2}}},
@@ -377,8 +505,8 @@ func TestParseInterpolationErrors(t *testing.T) {
 	wantError(t, "r:\n  {{\n", 2, 3, "unterminated interpolation")
 	wantError(t, "r:\n  x {{ a\n", 2, 5, "unterminated interpolation")
 	wantError(t, "r:\n  x {{ a\n  echo $HOME\n", 2, 5, "unterminated interpolation")
-	wantError(t, "r:\n  {{ }}\n", 2, 6, "Expected an expression, but found '}}'")
-	wantError(t, "r:\n  {{ a b }}\n", 2, 8, "Expected '+' or '}}', but found identifier")
+	wantError(t, "r:\n  {{ }}\n", 2, 6, "expected "+value+", but found '}}'")
+	wantError(t, "r:\n  {{ a b }}\n", 2, 8, "expected '&&', '!=', '!~', '||', '==', '=~', '}}', '(', '+', '++', or '/', but found identifier")
 }
 
 func TestParseMixedIndentationIsError(t *testing.T) {
@@ -557,7 +685,7 @@ func TestParsePositionsOfRecipeNames(t *testing.T) {
 	if r.Line != 2 || r.Col != 2 {
 		t.Errorf("recipe at %d:%d, want 2:2", r.Line, r.Col)
 	}
-	if want := []ast.Dep{{Name: "d1", Line: 2, Col: 18}, {Name: "d2", Line: 2, Col: 22}}; !reflect.DeepEqual(r.Deps, want) {
+	if want := []ast.Dependency{{Name: "d1", Line: 2, Col: 18}, {Name: "d2", Line: 2, Col: 22}}; !reflect.DeepEqual(r.Deps, want) {
 		t.Errorf("Deps = %+v, want %+v", r.Deps, want)
 	}
 	if p, q := r.Params[0], r.Params[1]; p.Line != 2 || p.Col != 4 || q.Col != 6 ||
@@ -593,6 +721,7 @@ func TestParseErrorWidths(t *testing.T) {
 		{"r:\n  a\n\t\tb\n", 2},
 		{"x := \n", 1},
 		{"x :=", 0},
+		{"r:\n  {{ # hello\n  }}\n", 7}, // interpolation::comment_in_interopolation#1
 	}
 	for _, c := range cases {
 		_, err := parser.Parse("justfile", []byte(c.src))
@@ -601,4 +730,209 @@ func TestParseErrorWidths(t *testing.T) {
 			t.Errorf("Parse(%q) error = %+v, want width %d", c.src, de, c.width)
 		}
 	}
+}
+
+// String literals get their values from lexer.StringValue: indented strings
+// lose their common indentation, and cooked strings process escapes after
+// that (the string::indented_* and string::cooked_string_* corpus cases).
+func TestParseStringLiteralForms(t *testing.T) {
+	jf := mustParse(t, "a := \"\"\"\n  foo\\\n  bar\n\"\"\"\nb := '''\n  x\\n\n  y\n'''\nc := \"\\u{1f916}\\t\"\n"+
+		"set shell := [\"\\u{62}ash\", '\\c']\n")
+	want := []ast.Assignment{
+		{Name: "a", Value: lit("foobar\n"), Line: 1},
+		{Name: "b", Value: lit("x\\n\ny\n"), Line: 5},
+		{Name: "c", Value: lit("\U0001F916\t"), Line: 9},
+	}
+	if !reflect.DeepEqual(jf.Assignments, want) {
+		t.Errorf("Assignments =\n %+v\nwant\n %+v", jf.Assignments, want)
+	}
+	if shell := lits("bash", "\\c"); !reflect.DeepEqual(jf.Settings.Shell, shell) {
+		t.Errorf("Shell = %q, want %q", jf.Settings.Shell, shell)
+	}
+}
+
+// Upstream cooks a string when it parses it, after the whole file has lexed,
+// so a lex error later in the file and a parse error earlier in it both come
+// before a bad escape.
+func TestParseStringEscapeErrorsComeFromTheParser(t *testing.T) {
+	wantError(t, "x := \"\\q\"\n", 1, 6, "`\\q` is not a valid escape sequence")
+	wantError(t, "set shell := [\"a\", \"\\u{}\"]\n", 1, 20, "unicode escape sequences must not be empty")
+	wantError(t, "set shell := [\"\\u\"]\n", 1, 15, "unterminated unicode escape sequence")
+	wantError(t, "r:\n  {{ \"\\q\" }}\n", 2, 6, "`\\q` is not a valid escape sequence")
+	wantError(t, "x := \"\\q\"\ny := 'abc\n", 2, 6, "unterminated string")
+	wantError(t, "x := a b\ny := \"\\q\"\n", 1, 8, "expected "+afterName+", but found identifier")
+	_, err := parser.Parse("justfile", []byte("x := \"a\\q\" + 'b'\n"))
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Width != 5 {
+		t.Errorf("escape error = %+v, want width 5", de)
+	}
+}
+
+// misc::brace_escape and misc::brace_escape_extra: `{{{{` in a body is `{{`.
+func TestParseBodyBraceEscape(t *testing.T) {
+	wantRecipe(t, "foo:\n  echo '{{{{'\n  echo '{{{{{' {{{{{{x}}\n", ast.Recipe{
+		Name: "foo", Line: 1,
+		Lines: []ast.Line{
+			{Parts: []ast.Expr{txt("echo '{{'")}, Line: 2},
+			{Parts: []ast.Expr{txt("echo '{{{' {{"), ref("x")}, Line: 3},
+		},
+		Raw: []ast.RawLine{
+			{Line: 2, Parts: []ast.Expr{txt("echo '{{'")}},
+			{Line: 3, Parts: []ast.Expr{txt("echo '{{{' {{"), ref("x")}},
+		},
+	})
+}
+
+// Upstream underlines the source of a line with extra indentation, so an
+// escape there counts all four braces.
+func TestParseExtraIndentWidthCountsTheEscapeSource(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("r:\n  a\n    {{{{ x {{y}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := jf.Recipes[0].Lines[1].ExtraIndent, (ast.Span{Line: 3, Col: 3, Width: 9}); got != want {
+		t.Errorf("ExtraIndent = %+v, want %+v", got, want)
+	}
+}
+
+// TestParseCorpusErrors pins each parse-time case of the error_messages,
+// delimiters and parser corpus groups: the category, the location and the
+// message, which is copied from the corpus case named in each row.
+func TestParseCorpusErrors(t *testing.T) {
+	cases := []struct {
+		id, src   string
+		line, col int
+		msg       string
+	}{
+		{"error_messages::unexpected_character#1", "&~", 1, 2, "expected character `&`"},
+		{"error_messages::file_path_is_indented_if_justfile_is_long#1", strings.Repeat("\n", 19) + "foo", 20, 4,
+			"expected '*', ':', '$', identifier, or '+', but found end of file"},
+		{"delimiters::mismatched_delimiter#1", "(]", 1, 2,
+			"mismatched closing delimiter `]`, did you mean to close the `(` on line 1?"},
+		{"delimiters::unexpected_delimiter#1", "]", 1, 1, "unexpected closing delimiter `]`"},
+		{"parser::backslash_eof#1", "foo:\n\\", 2, 1, "expected escape sequence but found end-of-file"},
+	}
+	for _, c := range cases {
+		t.Run(c.id, func(t *testing.T) {
+			wantError(t, c.src, c.line, c.col, c.msg)
+		})
+	}
+}
+
+// TestParseDelimiterContinuation pins delimiters::paren_continuation#1 and
+// delimiters::bracket_continuation#1: a line break inside an open delimiter
+// is whitespace, and a shell list may end in a comma.
+func TestParseDelimiterContinuation(t *testing.T) {
+	jf := mustParse(t, "x := (\n      'a'\n          +\n  'b'\n)\n\nfoo:\n  echo {{x}}\n")
+	if want := (ast.Concat{Left: lit("a"), Right: lit("b")}); len(jf.Assignments) != 1 || jf.Assignments[0].Value != want {
+		t.Errorf("paren_continuation: Assignments = %+v, want x := %+v", jf.Assignments, want)
+	}
+	jf = mustParse(t, "set shell := [\n  'sh',\n  '-cu',\n]\n\nfoo:\n  echo foo\n")
+	if want := lits("sh", "-cu"); !reflect.DeepEqual(jf.Settings.Shell, want) {
+		t.Errorf("bracket_continuation: Shell = %q, want %q", jf.Settings.Shell, want)
+	}
+}
+
+// TestParseUnclosedDelimiterAtEOF pins the behaviour of a delimiter still open
+// when the file ends. Each row was compared with oracle/bin/just: the lexer
+// ends the file with an ordinary end of line, so the parser reports an
+// expected-token error at the file end (or at the next token), and an open
+// delimiter inside an interpolation is an unterminated interpolation.
+func TestParseUnclosedDelimiterAtEOF(t *testing.T) {
+	cases := []struct {
+		name, src string
+		line, col int
+		msg       string
+	}{
+		{"paren", "x := (\n", 1, 8, "expected " + value + ", but found end of file"},
+		{"paren then blank line", "x := (\n\n", 2, 2, "expected " + value + ", but found end of file"},
+		{"paren swallows next recipe", "x := (\ny:\n  echo\n", 2, 2,
+			"expected '&&', '!=', '!~', '||', '==', '=~', '(', ')', '+', '++', or '/', but found ':'"},
+		{"paren inside interpolation", "a:\n  echo {{(\n", 2, 8, "unterminated interpolation"},
+		{"dangling operator", "x := \"a\" +\n", 1, 11, "expected " + value + ", but found end of line"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			wantError(t, c.src, c.line, c.col, c.msg)
+		})
+	}
+}
+
+func call(name string, args ...ast.Expr) ast.Expr { return ast.Call{Name: name, Args: args} }
+
+// TestParseCall pins the call grammar of upstream's parse_value and
+// parse_sequence: a name directly followed by `(`, then comma-separated
+// expressions with an optional trailing comma, then `)`. A call is an operand
+// like any other value, in assignments, parameter defaults and interpolations.
+func TestParseCall(t *testing.T) {
+	cases := []struct {
+		name, src string
+		want      ast.Expr
+	}{
+		{"no arguments", "a := foo()\n", call("foo")},
+		{"one argument", "a := foo('x')\n", call("foo", lit("x"))},
+		{"variable argument", "a := foo(b)\n", call("foo", ref("b"))},
+		{"two arguments", "a := foo('x', b)\n", call("foo", lit("x"), ref("b"))},
+		{"trailing comma", "a := foo('x',)\n", call("foo", lit("x"))},
+		{"nested", "a := foo(bar(baz('x')), 'y')\n", call("foo", call("bar", call("baz", lit("x"))), lit("y"))},
+		{"concatenation in an argument", "a := foo('x' + b)\n", call("foo", ast.Concat{Left: lit("x"), Right: ref("b")})},
+		{"concatenated call", "a := foo() + 'x'\n", ast.Concat{Left: call("foo"), Right: lit("x")}},
+		{"grouped call", "a := (foo())\n", call("foo")},
+		{"arguments across lines", "a := foo(\n  'x',\n  'y'\n)\n", call("foo", lit("x"), lit("y"))},
+		{"space before the parenthesis", "a := foo ()\n", call("foo")},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			jf := mustParse(t, c.src)
+			if len(jf.Assignments) != 1 || !reflect.DeepEqual(jf.Assignments[0].Value, c.want) {
+				t.Errorf("Parse(%q) Assignments = %+v, want one with value %+v", c.src, jf.Assignments, c.want)
+			}
+		})
+	}
+	t.Run("parameter default", func(t *testing.T) {
+		jf := mustParse(t, "r x=foo('a'):\n")
+		if got := jf.Recipes[0].Params[0]; !reflect.DeepEqual(got.Default, call("foo", lit("a"))) || got.DefaultText != "foo('a')" {
+			t.Errorf("Params[0] = %+v, want default foo('a')", got)
+		}
+	})
+	t.Run("interpolation", func(t *testing.T) {
+		jf := mustParse(t, "r:\n  echo {{foo(b)}}\n")
+		want := []ast.Expr{txt("echo "), call("foo", ref("b"))}
+		if got := jf.Recipes[0].Lines[0].Parts; !reflect.DeepEqual(got, want) {
+			t.Errorf("Parts = %+v, want %+v", got, want)
+		}
+	})
+}
+
+// TestParseCallLocatesTheName pins that a call carries the position of its
+// name, which is where upstream reports an undefined function.
+func TestParseCallLocatesTheName(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("a := 'x' + foo()\nr:\n  echo {{ bar('q') }}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := jf.Assignments[0].Value.(ast.Concat).Right.(ast.Call); !ok || c.Line != 1 || c.Col != 12 {
+		t.Errorf("assignment call = %+v, want foo at 1:12", jf.Assignments[0].Value)
+	}
+	if c, ok := jf.Recipes[0].Lines[0].Parts[1].(ast.Call); !ok || c.Line != 3 || c.Col != 11 {
+		t.Errorf("interpolated call = %+v, want bar at 3:11", jf.Recipes[0].Lines[0].Parts[1])
+	}
+}
+
+// TestParseCallErrors pins the expected-token lists inside a call. Each row
+// was produced by oracle/bin/just on the same source.
+func TestParseCallErrors(t *testing.T) {
+	const argument = "backtick, '!', '[', identifier, '(', ')', '/', or string"
+	const afterArgument = "'&&', '!=', '!~', '||', ',', '==', '=~', ')', '+', '++', or '/'"
+	wantError(t, "a := foo(\n", 1, 11, "expected "+argument+", but found end of file")
+	wantError(t, "a := foo(,)\n", 1, 10, "expected "+argument+", but found ','")
+	wantError(t, "a := foo(,'x')\n", 1, 10, "expected "+argument+", but found ','")
+	wantError(t, "a := foo('x',,)\n", 1, 14, "expected "+argument+", but found ','")
+	wantError(t, "a := foo('x',\n", 1, 15, "expected "+argument+", but found end of file")
+	wantError(t, "a := foo('x' 'y')\n", 1, 14, "expected "+afterArgument+", but found string")
+	wantError(t, "a := foo('x'\n", 1, 14, "expected "+afterArgument+", but found end of file")
+	wantError(t, "r p=foo('a' 'b'):\n", 1, 13, "expected "+afterArgument+", but found string")
+	wantError(t, "a := foo('x') bar\n", 1, 15,
+		"expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '+', '++', or '/', but found identifier")
+	wantError(t, "r:\n  echo {{foo('x' }}\n", 2, 18, "mismatched closing delimiter `}`, did you mean to close the `(` on line 2?")
 }

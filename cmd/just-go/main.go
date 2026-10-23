@@ -66,23 +66,27 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		childOut, childErr = io.Discard, io.Discard
 	}
 	opts := just.Options{
-		Justfile:   resolve(workDir, cfg.justfile),
-		SearchFrom: workDir,
-		Env:        env,
-		Stdin:      stdin,
-		Stdout:     childOut,
-		Stderr:     childErr,
-		Quiet:      cfg.quiet,
-		Shell:      cfg.shell,
-		ShellArgs:  cfg.shellArgs,
-		FS:         fsys,
-		Exec:       exec,
+		Unstable:      cfg.isUnstable(env),
+		Justfile:      resolve(workDir, cfg.justfile),
+		SearchFrom:    workDir,
+		Env:           env,
+		InvocationDir: workDir,
+		Stdin:         stdin,
+		Stdout:        childOut,
+		Stderr:        childErr,
+		Quiet:         cfg.quiet,
+		Yes:           cfg.yes,
+		Prompt:        stderr,
+		Shell:         cfg.shell,
+		ShellArgs:     cfg.shellArgs,
+		FS:            fsys,
+		Exec:          exec,
 	}
 	jf, err := just.Load(opts)
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
-	if cfg.list {
+	if cfg.list || (len(cfg.words) == 0 && jf.DefaultList()) {
 		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
 		return 0
 	}
@@ -97,6 +101,30 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	return res.ExitCode
 }
 
+// isUnstable reports whether unstable features are enabled by --unstable or by
+// JUST_UNSTABLE in env. Pure.
+func (c config) isUnstable(env []string) bool {
+	return c.unstable || envEnabled(env, "JUST_UNSTABLE")
+}
+
+// envEnabled reports whether the variable name is set in env to a value that
+// switches a flag on, as upstream reads JUST_UNSTABLE: any value but the empty
+// string and the false-like n, no, f, false, off and 0, in any case. When env
+// sets it more than once the last wins. Pure.
+func envEnabled(env []string, name string) bool {
+	value := ""
+	for _, entry := range env {
+		if v, ok := strings.CutPrefix(entry, name+"="); ok {
+			value = v
+		}
+	}
+	switch strings.ToLower(value) {
+	case "", "0", "f", "false", "n", "no", "off":
+		return false
+	}
+	return true
+}
+
 // Exit statuses of run besides a recipe's own: exitFailure for an error in
 // the justfile or the request, exitUsage for an error in the command line.
 const (
@@ -104,11 +132,22 @@ const (
 	exitUsage   = 2
 )
 
-// fail reports err on stderr, unless quiet, and returns exitFailure. Impure:
-// it writes to stderr.
+// fail reports err on stderr, unless quiet, and returns the status the run
+// ends with: the one the error carries, such as the exit status of a backtick
+// that failed, else exitFailure. Impure: it writes to stderr.
 func fail(stderr io.Writer, quiet bool, err error) int {
 	if !quiet {
 		report(stderr, err)
+	}
+	return statusOf(err)
+}
+
+// statusOf is the status the run ends with for err: the exit code its
+// diagnostic carries, or exitFailure. Pure.
+func statusOf(err error) int {
+	var de *diag.Error
+	if errors.As(err, &de) && de.ExitCode != 0 {
+		return de.ExitCode
 	}
 	return exitFailure
 }
@@ -120,15 +159,18 @@ func report(stderr io.Writer, err error) {
 }
 
 // describe is the message of err. A diagnostic without a location, such as a
-// usage error, is its bare message. A located one is followed, as upstream
-// prints it, by the file name and position and by the source line with the
-// diagnostic underlined (see snippet). Pure.
+// usage error, is its bare message, and so is one with a line but no column,
+// such as a recipe line whose shell could not be started: upstream prints
+// those on one line. A located one is followed, as upstream prints it, by the
+// file name and position and by the source line with the diagnostic
+// underlined (see snippet). A located diagnostic on an empty line still
+// quotes it, as upstream does. Pure.
 func describe(err error) string {
 	var de *diag.Error
 	if !errors.As(err, &de) {
 		return err.Error()
 	}
-	if de.Line == 0 {
+	if de.Line == 0 || de.Col == 0 {
 		return de.Msg
 	}
 	return de.Msg + "\n" + snippet(de)
@@ -142,24 +184,26 @@ func describe(err error) string {
 //	  │         ^
 //
 // The file is named by its base name, which upstream shows for the root
-// justfile (a path relative to its directory). A tab shows as four spaces,
-// and the carets cover de.Width runes from de.Col, at least one. Pure.
+// justfile (a path relative to its directory). The column is upstream's (see
+// diag.Error.Column). A tab shows as four spaces, and the carets cover the
+// display width of de.Width runes from de.Col, at least one. Pure.
 func snippet(de *diag.Error) string {
 	number := strconv.Itoa(de.Line)
 	pad := strings.Repeat(" ", len(number))
 	text, column, width := underline(de.Source, de.Col-1, max(de.Width, 1))
 	return fmt.Sprintf("%s——▶ %s:%d:%d\n%s │\n%s │ %s\n%s │ %s%s",
-		pad, filepath.Base(de.File), de.Line, de.Col, pad, number, text, pad,
+		pad, filepath.Base(de.File), de.Line, de.Column(), pad, number, text, pad,
 		strings.Repeat(" ", column), strings.Repeat("^", max(width, 1)))
 }
 
 // underline returns line with each tab shown as four spaces, and the display
-// column and width of the width runes from rune index col. Pure.
+// column and width of the width runes from rune index col. A tab is four
+// columns wide; any other rune is as wide as diag.DisplayWidth says. Pure.
 func underline(line string, col, width int) (string, int, int) {
 	var b strings.Builder
 	column, span := 0, 0
 	for i, r := range []rune(line) {
-		w := 1
+		w := diag.DisplayWidth(r)
 		if r == '\t' {
 			b.WriteString("    ")
 			w = 4
@@ -195,6 +239,8 @@ type config struct {
 	justfile string   // -f/--justfile; empty means search
 	list     bool     // -l/--list
 	quiet    bool     // -q/--quiet
+	unstable bool     // --unstable
+	yes      bool     // --yes
 	words    []string // positional words: recipe names, then their arguments
 	// shell is --shell; shellGiven records that it appeared, since upstream
 	// rejects it a second time.
@@ -203,13 +249,14 @@ type config struct {
 	shellArgs  []string // --shell-arg, in order; it may repeat; nil when absent
 }
 
-// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --shell PATH,
-// --shell-arg ARG (which may repeat) and positional words. Flags come before
-// the words: as upstream's argument parser takes its trailing positional
-// arguments, the first word and everything after it are words, even when
-// they start with a dash, so `a -v` passes -v to recipe a. Before the first
-// word, "--" ends flag parsing and is dropped. A short flag may be clustered
-// (-lq) and a value may be attached (-fPATH, --justfile=PATH). Pure.
+// parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable,
+// --yes, --shell PATH, --shell-arg ARG (which may repeat) and positional
+// words. Flags come before the words: as upstream's argument parser takes its
+// trailing positional arguments, the first word and everything after it are
+// words, even when they start with a dash, so `a -v` passes -v to recipe a.
+// Before the first word, "--" ends flag parsing and is dropped. A short flag
+// may be clustered (-lq) and a value may be attached (-fPATH,
+// --justfile=PATH). Pure.
 func parseArgs(args []string) (config, error) {
 	var cfg config
 	for i := 0; i < len(args); i++ {
@@ -308,7 +355,7 @@ func valueName(long string) string {
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg":
+	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes":
 		return name, true
 	}
 	return "", false
@@ -344,6 +391,10 @@ func setSwitch(cfg *config, long string) {
 		cfg.list = true
 	case "quiet":
 		cfg.quiet = true
+	case "unstable":
+		cfg.unstable = true
+	case "yes":
+		cfg.yes = true
 	}
 }
 
@@ -382,7 +433,7 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 	for i := 0; i < len(words); {
 		n, ok := params[words[i]]
 		if !ok {
-			return nil, missingRecipe(words[i])
+			return nil, missingRecipe(words[i], infos)
 		}
 		take := min(n, len(words)-i-1)
 		calls = append(calls, just.Call{Recipe: words[i], Args: append([]string(nil), words[i+1:i+1+take]...)})
@@ -392,9 +443,57 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 }
 
 // missingRecipe is the error for a word that names no recipe, worded as
-// upstream's. Pure.
-func missingRecipe(name string) *diag.Error {
-	return usage("justfile does not contain recipe `%s`", name)
+// upstream's, with upstream's suggestion of a recipe it may have meant. Pure.
+func missingRecipe(name string, infos []just.RecipeInfo) *diag.Error {
+	msg := fmt.Sprintf("justfile does not contain recipe `%s`", name)
+	if suggestion, ok := suggest(name, infos); ok {
+		msg += fmt.Sprintf("\nDid you mean `%s`?", suggestion)
+	}
+	return usage("%s", msg)
+}
+
+// maxSuggestionDistance bounds a suggestion: upstream suggests a name only
+// when its edit distance from the word is below this.
+const maxSuggestionDistance = 3
+
+// suggest returns the public recipe whose name is closest to word by edit
+// distance, if one is closer than maxSuggestionDistance. On a tie the first
+// name in byte order wins, as upstream's search over its sorted recipes does.
+// A private recipe is never suggested. Pure.
+func suggest(word string, infos []just.RecipeInfo) (string, bool) {
+	best, bestDistance := "", maxSuggestionDistance
+	for _, info := range infos {
+		if info.Private {
+			continue
+		}
+		d := editDistance(word, info.Name)
+		if d < bestDistance || (d == bestDistance && d < maxSuggestionDistance && info.Name < best) {
+			best, bestDistance = info.Name, d
+		}
+	}
+	return best, best != ""
+}
+
+// editDistance is the Levenshtein distance between a and b, counted in runes
+// as upstream's strsim::levenshtein counts characters. Pure.
+func editDistance(a, b string) int {
+	x, y := []rune(a), []rune(b)
+	row := make([]int, len(y)+1)
+	for j := range row {
+		row[j] = j
+	}
+	for i := 1; i <= len(x); i++ {
+		diagonal := row[0]
+		row[0] = i
+		for j := 1; j <= len(y); j++ {
+			cost := 1
+			if x[i-1] == y[j-1] {
+				cost = 0
+			}
+			diagonal, row[j] = row[j], min(row[j]+1, row[j-1]+1, diagonal+cost)
+		}
+	}
+	return row[len(y)]
 }
 
 const (
@@ -408,21 +507,50 @@ type listEntry struct {
 	signature string // name and parameters, with their defaults
 	width     int    // display width of signature
 	doc       string
+	groups    []string
 }
 
-// formatList renders --list output in upstream's layout: a heading, then one
-// recipe per line sorted by name, indented four spaces. Names that start with
-// an underscore are private and left out. A doc comment follows the
-// signature as "# doc", with every "#" in one column; a signature wider than
-// 50 columns, or a multi-line doc, puts the doc on comment lines above it.
-// Pure.
+// listSection is the recipes of --list output under one heading: those in a
+// group, under its name, or those in none, under no heading.
+type listSection struct {
+	group   string
+	grouped bool
+	entries []listEntry
+}
+
+// anyGrouped reports whether any of entries is in a group. Pure.
+func anyGrouped(entries []listEntry) bool {
+	for _, e := range entries {
+		if len(e.groups) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// formatList renders --list output in upstream's layout: a heading, then the
+// recipes that are in no group, then a section for each group in byte order
+// under `[group]`, with a blank line between sections. A recipe is in the
+// section of each of its groups. Within a section the recipes are sorted by
+// name, one per line, indented four spaces, and private ones are left out. A
+// doc comment follows the signature as "# doc", with every "#" in one column
+// over all sections; a signature wider than 50 columns, or a multi-line doc,
+// puts the doc on comment lines above it. Pure.
 func formatList(infos []just.RecipeInfo) string {
 	entries := listEntries(infos)
 	column := alignWidth(entries)
 	var b strings.Builder
 	b.WriteString(listHeading)
-	for _, e := range entries {
-		writeEntry(&b, e, column)
+	for i, section := range listSections(entries) {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		if section.grouped {
+			b.WriteString(listIndent + "[" + section.group + "]\n")
+		}
+		for _, e := range section.entries {
+			writeEntry(&b, e, column)
+		}
 	}
 	return b.String()
 }
@@ -433,13 +561,48 @@ func listEntries(infos []just.RecipeInfo) []listEntry {
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 	entries := make([]listEntry, 0, len(sorted))
 	for _, info := range sorted {
-		if strings.HasPrefix(info.Name, "_") {
+		if info.Private {
 			continue
 		}
 		sig := signature(info)
-		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc})
+		entries = append(entries, listEntry{signature: sig, width: utf8.RuneCountInString(sig), doc: info.Doc, groups: info.Groups})
 	}
 	return entries
+}
+
+// listSections divides entries, which are in order, into the sections of the
+// listing: the entries in no group, if there are any, then one section for
+// each group in byte order. Pure.
+func listSections(entries []listEntry) []listSection {
+	if !anyGrouped(entries) {
+		if len(entries) == 0 {
+			return nil
+		}
+		return []listSection{{entries: entries}}
+	}
+	var sections []listSection
+	var ungrouped []listEntry
+	byGroup := make(map[string][]listEntry)
+	for _, e := range entries {
+		if len(e.groups) == 0 {
+			ungrouped = append(ungrouped, e)
+		}
+		for _, g := range e.groups {
+			byGroup[g] = append(byGroup[g], e)
+		}
+	}
+	if ungrouped != nil {
+		sections = append(sections, listSection{entries: ungrouped})
+	}
+	names := make([]string, 0, len(byGroup))
+	for g := range byGroup {
+		names = append(names, g)
+	}
+	sort.Strings(names)
+	for _, g := range names {
+		sections = append(sections, listSection{group: g, grouped: true, entries: byGroup[g]})
+	}
+	return sections
 }
 
 // signature is the recipe's name followed by its parameters, each with its

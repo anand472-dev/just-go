@@ -4,9 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"slices"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -19,6 +25,8 @@ var (
 	_ sys.FS      = (*sysfake.FakeFS)(nil)
 	_ sys.Process = sys.OSProcess{}
 	_ sys.Process = (*sysfake.FakeProcess)(nil)
+	_ sys.Clock   = sys.OSClock{}
+	_ sys.Clock   = sysfake.FakeClock{}
 )
 
 func wantIsFile(t *testing.T, fsys sys.FS, path string, want bool) {
@@ -152,6 +160,68 @@ func TestFakeProcessRecordsSpec(t *testing.T) {
 	}
 }
 
+func TestFakeProcessWritesScriptedOutput(t *testing.T) {
+	p := &sysfake.FakeProcess{Outputs: []string{"one\n", "two"}}
+	var out bytes.Buffer
+	wantRun(t, p, sys.ProcessSpec{Stdout: &out}, 0)
+	wantRun(t, p, sys.ProcessSpec{Stdout: &out}, 0)
+	wantRun(t, p, sys.ProcessSpec{Stdout: &out}, 0) // script exhausted: nothing
+	wantRun(t, p, sys.ProcessSpec{}, 0)             // no stream to write to
+	if out.String() != "one\ntwo" {
+		t.Errorf("output = %q, want %q", out.String(), "one\ntwo")
+	}
+}
+
+func TestCaptureCollectsStandardOutput(t *testing.T) {
+	p := &sysfake.FakeProcess{Outputs: []string{"hello\n"}, Codes: []int{3}}
+	var ignored bytes.Buffer
+	got, err := sys.Capture(context.Background(), p, sys.ProcessSpec{Argv: []string{"x"}, Stdout: &ignored})
+	if err != nil || string(got.Stdout) != "hello\n" || got.ExitCode != 3 || got.Signal != 0 || got.Caught != 0 {
+		t.Errorf("Capture = %+v, %v; want the output and status 3", got, err)
+	}
+	if ignored.Len() != 0 || p.Specs[0].Argv[0] != "x" {
+		t.Errorf("the caller's Stdout got %q, spec %+v; want it replaced and the rest kept", ignored.String(), p.Specs[0])
+	}
+}
+
+func TestCaptureReportsSignalsAsResults(t *testing.T) {
+	for _, sig := range []*sys.SignalError{{Signal: 9}, {Caught: 2}} {
+		p := &sysfake.FakeProcess{Err: sig}
+		got, err := sys.Capture(context.Background(), p, sys.ProcessSpec{})
+		if err != nil || got.Signal != sig.Signal || got.Caught != sig.Caught || got.ExitCode != -1 {
+			t.Errorf("Capture with %+v = %+v, %v", sig, got, err)
+		}
+	}
+}
+
+func TestCaptureReturnsOtherErrors(t *testing.T) {
+	boom := errors.New("boom")
+	if _, err := sys.Capture(context.Background(), &sysfake.FakeProcess{Err: boom}, sys.ProcessSpec{}); !errors.Is(err, boom) {
+		t.Errorf("Capture error = %v, want boom", err)
+	}
+}
+
+func TestCaptureRunsARealProgram(t *testing.T) {
+	got, err := sys.Capture(context.Background(), sys.OSProcess{}, sys.ProcessSpec{
+		Argv: []string{"sh", "-c", "printf out; exit 4"}, Env: []string{"PATH=/usr/bin:/bin"},
+	})
+	if err != nil || string(got.Stdout) != "out" || got.ExitCode != 4 {
+		t.Errorf("Capture = %+v, %v; want out and status 4", got, err)
+	}
+}
+
+func BenchmarkCapture(b *testing.B) {
+	p := &sysfake.FakeProcess{Outputs: []string{"some output\n"}}
+	spec := sys.ProcessSpec{Argv: []string{"x"}}
+	b.ReportAllocs()
+	for b.Loop() {
+		p.Specs = p.Specs[:0]
+		if _, err := sys.Capture(context.Background(), p, spec); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestFakeProcessReturnsScriptedError(t *testing.T) {
 	boom := errors.New("boom")
 	p := &sysfake.FakeProcess{Err: boom}
@@ -251,5 +321,256 @@ func BenchmarkOSProcessRun(b *testing.B) {
 		if _, err := (sys.OSProcess{}).Run(context.Background(), spec); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestOSClockReadsTheSystemClockInTheLocalZone(t *testing.T) {
+	before := time.Now()
+	got := (sys.OSClock{}).Now()
+	after := time.Now()
+	if got.Unix < before.Unix() || got.Unix > after.Unix() {
+		t.Errorf("Now().Unix = %d, want between %d and %d", got.Unix, before.Unix(), after.Unix())
+	}
+	if got.Nano < 0 || got.Nano >= 1_000_000_000 {
+		t.Errorf("Now().Nano = %d, want a fraction of a second", got.Nano)
+	}
+	if _, offset := time.Unix(got.Unix, 0).Zone(); got.Offset != offset || got.UTC {
+		t.Errorf("Now() = %+v, want the local offset %d and not UTC", got, offset)
+	}
+}
+
+func TestFakeClockReportsItsTime(t *testing.T) {
+	at := sys.Time{Unix: 994518299, Nano: 5, Offset: 34200}
+	if got := (sysfake.FakeClock{At: at}).Now(); got != at {
+		t.Errorf("Now() = %+v, want %+v", got, at)
+	}
+}
+
+func TestSignalNumberKnowsTheSignalsContinueNames(t *testing.T) {
+	for name, want := range map[string]int{"SIGHUP": sys.SIGHUP, "SIGINT": sys.SIGINT, "SIGQUIT": sys.SIGQUIT} {
+		if got, ok := sys.SignalNumber(name); !ok || got != want {
+			t.Errorf("SignalNumber(%q) = %d, %v; want %d, true", name, got, ok, want)
+		}
+		if sys.SignalName(want) != name {
+			t.Errorf("SignalName(%d) = %q, want %q", want, sys.SignalName(want), name)
+		}
+	}
+	for _, name := range []string{"", "SIGTERM", "sigint", "INT"} {
+		if got, ok := sys.SignalNumber(name); ok || got != 0 {
+			t.Errorf("SignalNumber(%q) = %d, %v; want 0, false", name, got, ok)
+		}
+	}
+}
+
+func BenchmarkOSClockNow(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		(sys.OSClock{}).Now()
+	}
+}
+
+func TestOSFSWritesAndRemovesAScriptDirectory(t *testing.T) {
+	fsys := sys.OSFS{}
+	root := t.TempDir()
+	dir, err := fsys.MkdirTemp(root, "just-")
+	if err != nil || filepath.Dir(dir) != root || !strings.HasPrefix(filepath.Base(dir), "just-") {
+		t.Fatalf("MkdirTemp = %q, %v; want a just-* directory of %s", dir, err, root)
+	}
+	path := filepath.Join(dir, "script")
+	if err := fsys.WriteFile(path, []byte("echo hi\n"), 0o700); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	wantFile(t, path, "echo hi\n")
+	if err := fsys.RemoveAll(dir); err != nil {
+		t.Fatalf("RemoveAll: %v", err)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("directory still there: %v", err)
+	}
+}
+
+// wantFile checks that the file at path holds want, and, where permissions
+// mean something, that it can be executed.
+func wantFile(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != want {
+		t.Fatalf("file = %q, %v; want %q", got, err, want)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
+		t.Fatalf("mode = %v, want an executable file", info.Mode())
+	}
+}
+
+func TestOSFSWriteFileReportsFailure(t *testing.T) {
+	err := (sys.OSFS{}).WriteFile(filepath.Join(t.TempDir(), "missing", "f"), nil, 0o600)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("err = %v, want ErrNotExist", err)
+	}
+}
+
+func TestOSFSMkdirTempReportsFailure(t *testing.T) {
+	_, err := (sys.OSFS{}).MkdirTemp(filepath.Join(t.TempDir(), "missing"), "just-")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("err = %v, want ErrNotExist", err)
+	}
+}
+
+func TestOSFSMkdirTempWithoutADirectoryUsesTheTemporaryDirectory(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("TMPDIR", root)
+	t.Setenv("TMP", root)
+	t.Setenv("TEMP", root)
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	dir, err := (sys.OSFS{}).MkdirTemp("", "just-")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	if rel, err := filepath.Rel(root, dir); err != nil || strings.HasPrefix(rel, "..") {
+		t.Fatalf("MkdirTemp = %q, want a directory of %s", dir, root)
+	}
+}
+
+func TestFakeFSWritesAScriptDirectory(t *testing.T) {
+	fsys := sysfake.FakeFS{"/keep": "k"}
+	dir, err := fsys.MkdirTemp("/work", "just-")
+	if err != nil || dir != "/work/just-fake" {
+		t.Fatalf("MkdirTemp = %q, %v; want /work/just-fake", dir, err)
+	}
+	if got, _ := fsys.MkdirTemp("", "just-"); got != "/tmp/just-fake" {
+		t.Fatalf("MkdirTemp(\"\") = %q; want /tmp/just-fake", got)
+	}
+	if err := fsys.WriteFile(dir+"/a", []byte("x"), 0o700); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if got, err := fsys.ReadFile(dir + "/a"); err != nil || string(got) != "x" {
+		t.Fatalf("ReadFile = %q, %v", got, err)
+	}
+	_ = fsys.WriteFile(dir+"/sub/b", nil, 0o600)
+	_ = fsys.WriteFile(dir+"-other/c", nil, 0o600)
+	if err := fsys.RemoveAll(dir); err != nil {
+		t.Fatalf("RemoveAll: %v", err)
+	}
+	if want := (sysfake.FakeFS{"/keep": "k", "/work/just-fake-other/c": ""}); !reflect.DeepEqual(fsys, want) {
+		t.Fatalf("after RemoveAll = %v; want %v", fsys, want)
+	}
+}
+
+func TestOSFSExistsFollowsLinksAndSeesDirectories(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "f")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(filepath.Join(dir, "missing"), link); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+	fsys := sys.OSFS{}
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"file", file, true}, {"directory", dir, true}, {"missing", filepath.Join(dir, "none"), false},
+		{"broken link", link, false}, {"through a file", filepath.Join(file, "x"), false},
+	} {
+		if got := fsys.Exists(tc.path); got != tc.want {
+			t.Errorf("Exists(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestOSFSCanonicalizeResolvesLinksAndDots(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "real"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(dir, "link")); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+	fsys := sys.OSFS{}
+	for _, in := range []string{
+		filepath.Join(dir, "link"), filepath.Join(dir, "real", "..", "link"), filepath.Join(dir, ".", "real"),
+	} {
+		got, err := fsys.Canonicalize(in)
+		if want := filepath.Join(dir, "real"); err != nil || got != want {
+			t.Errorf("Canonicalize(%s) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	if _, err := fsys.Canonicalize(filepath.Join(dir, "none")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("Canonicalize(missing) error = %v, want not exist", err)
+	}
+}
+
+func TestOSFSCanonicalizeMakesARelativePathAbsolute(t *testing.T) {
+	got, err := sys.OSFS{}.Canonicalize(".")
+	if want, _ := os.Getwd(); err != nil || !filepath.IsAbs(got) || filepath.Base(got) != filepath.Base(want) {
+		t.Errorf("Canonicalize(.) = %q, %v; want the absolute working directory %q", got, err, want)
+	}
+}
+
+func TestFakeFSExistsAndCanonicalizeSeeFilesAndTheirDirectories(t *testing.T) {
+	fsys := sysfake.FakeFS{"/w/a/f": "x", "/w/g": "y"}
+	for _, tc := range []struct {
+		path, canonical string
+		exists          bool
+	}{
+		{"/w/g", "/w/g", true}, {"/w/a", "/w/a", true}, {"/w/a/", "/w/a", true}, {"/w/./a/../g", "/w/g", true},
+		{"/w", "/w", true}, {"/", "/", true}, {"/w/none", "", false}, {"/w/a/f/x", "", false}, {"/ww", "", false},
+	} {
+		got, err := fsys.Canonicalize(tc.path)
+		if (err == nil) != tc.exists || got != tc.canonical {
+			t.Errorf("Canonicalize(%s) = %q, %v; want %q, exists %v", tc.path, got, err, tc.canonical, tc.exists)
+		}
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Canonicalize(%s) error %v does not wrap fs.ErrNotExist", tc.path, err)
+		}
+		if got := fsys.Exists(tc.path); got != tc.exists {
+			t.Errorf("Exists(%s) = %v, want %v", tc.path, got, tc.exists)
+		}
+	}
+}
+
+// The wording is Rust's Display of an io::Error, which the oracle printed for
+// read('bar'), read of a directory and canonicalize of a path through a file.
+func TestErrorTextWordsAnErrorAsRustDoes(t *testing.T) {
+	_, missing := os.ReadFile(filepath.Join(t.TempDir(), "bar"))
+	_, dir := os.ReadFile(t.TempDir())
+	_, through := os.Stat(filepath.Join(t.TempDir(), "x", "y"))
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"missing", missing, "No such file or directory (os error 2)"},
+		{"directory", dir, "Is a directory (os error 21)"},
+		{"missing in an existing directory", through, "No such file or directory (os error 2)"},
+		{"permission", syscall.EACCES, "Permission denied (os error 13)"},
+		{"a fake's missing file", fmt.Errorf("read x: %w", fs.ErrNotExist), "No such file or directory (os error 2)"},
+		{"a fake's refusal", fmt.Errorf("read x: %w", fs.ErrPermission), "Permission denied (os error 13)"},
+		{"no number", errors.New("boom"), "boom"},
+	} {
+		if runtime.GOOS == "windows" && tc.name != "no number" {
+			continue
+		}
+		if got := sys.ErrorText(tc.err); got != tc.want {
+			t.Errorf("%s: ErrorText = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func BenchmarkErrorText(b *testing.B) {
+	_, err := os.ReadFile(filepath.Join(b.TempDir(), "bar"))
+	for i := 0; i < b.N; i++ {
+		_ = sys.ErrorText(err)
 	}
 }

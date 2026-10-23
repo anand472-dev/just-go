@@ -3,6 +3,7 @@ package analyzer
 import (
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/eval/builtins"
 )
 
 // assignmentResolver walks the assignments depth first, as upstream does. Its
@@ -50,17 +51,46 @@ func (r *assignmentResolver) resolve(name string) *diag.Error {
 	return nil
 }
 
-// walk checks the variables in e, reading left to right. A nil expression
-// has no variables. It is pure.
+// walk checks the calls and variables in e in upstream's order. A nil
+// expression has none. It is pure.
 func (r *assignmentResolver) walk(e ast.Expr) *diag.Error {
+	return references(e, func(ref ast.Expr) *diag.Error {
+		if c, ok := ref.(ast.Call); ok {
+			return checkCall(r.jf, c)
+		}
+		return r.variable(ref.(ast.Var))
+	})
+}
+
+// references calls visit on each call and each variable in e, in upstream's
+// order: a call before its arguments, and the operands of a concatenation
+// left to right, and the parts of a comparison, a conditional and an assert as
+// they are written. It stops at the first error visit returns. A nil
+// expression has none. It is pure.
+func references(e ast.Expr, visit func(ast.Expr) *diag.Error) *diag.Error {
 	switch e := e.(type) {
 	case ast.Var:
-		return r.variable(e)
-	case ast.Concat:
-		if err := r.walk(e.Left); err != nil {
+		return visit(e)
+	case ast.Call:
+		if err := visit(e); err != nil {
 			return err
 		}
-		return r.walk(e.Right)
+		return referencesAll(e.Args, visit)
+	case ast.Concat:
+		return referencesAll([]ast.Expr{e.Left, e.Right}, visit)
+	case ast.List:
+		return referencesAll(e.Elements, visit)
+	}
+	return referencesAll(ast.Operands(e), visit)
+}
+
+// referencesAll is references for each of es in turn, stopping at the first
+// error. It is pure.
+func referencesAll(es []ast.Expr, visit func(ast.Expr) *diag.Error) *diag.Error {
+	for _, e := range es {
+		if err := references(e, visit); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -72,6 +102,9 @@ func (r *assignmentResolver) variable(v ast.Var) *diag.Error {
 	}
 	a, ok := r.byName[v.Name]
 	if !ok {
+		if builtins.IsConstant(v.Name) {
+			return nil
+		}
 		return fail(r.jf, name(v.Line, v.Col, v.Name), "variable `%s` not defined", v.Name)
 	}
 	if contains(r.stack, v.Name) {
@@ -91,48 +124,82 @@ func (r *assignmentResolver) circular(a ast.Assignment) *diag.Error {
 	return fail(r.jf, at, "variable `%s` depends on its own value: `%s`", a.Name, circle(cycle))
 }
 
-// undefinedInRecipe checks one recipe's parameter defaults and body against
-// the globals. A parameter default sees the globals and the parameters
-// before it. A body line sees the globals and every parameter. Each is
-// reported at the variable. It is pure.
-func undefinedInRecipe(jf *ast.Justfile, r ast.Recipe, globals map[string]struct{}) *diag.Error {
+// undefinedInRecipe checks one recipe's parameter defaults, the arguments of
+// its dependencies, its attributes and its body against the globals. A
+// parameter default sees the globals and the parameters before it. A dependency argument and a body
+// line see the globals and every parameter. A call of an
+// unknown function, or with the wrong number of arguments, and a variable
+// that is not defined are each reported at the name concerned. It is pure.
+func undefinedInRecipe(jf *ast.Justfile, r *ast.Recipe, globals map[string]struct{}) *diag.Error {
 	params := make(map[string]struct{}, len(r.Params))
+	check := func(ref ast.Expr) *diag.Error { return checkReference(jf, ref, globals, params) }
 	for _, p := range r.Params {
-		if v, ok := undefinedIn(p.Default, globals, params); ok {
-			return undefinedVar(jf, v)
+		if err := references(p.Default, check); err != nil {
+			return err
 		}
 		params[p.Name] = struct{}{}
 	}
+	if err := dependencyArguments(r, check); err != nil {
+		return err
+	}
+	if err := attributeExpressions(jf, r, globals, params); err != nil {
+		return err
+	}
+	return bodyReferences(jf, r, check)
+}
+
+// bodyReferences checks the calls and variables in the interpolations of the
+// lines of r with check, skipping the comments that set ignore-comments
+// ignores. A script has no comments to ignore: it is evaluated whole. It is
+// pure.
+func bodyReferences(jf *ast.Justfile, r *ast.Recipe, check func(ast.Expr) *diag.Error) *diag.Error {
+	skipComments := jf.Settings.IgnoreComments && !r.IsScript(jf.Settings)
 	for _, l := range r.Lines {
+		if skipComments && l.Comment {
+			continue
+		}
 		for _, part := range l.Parts {
-			if v, ok := undefinedIn(part, globals, params); ok {
-				return undefinedVar(jf, v)
+			if err := references(part, check); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
+// dependencyArguments checks the calls and variables in the arguments of the
+// dependencies of r, those before the body first, with check. It is pure.
+func dependencyArguments(r *ast.Recipe, check func(ast.Expr) *diag.Error) *diag.Error {
+	for _, deps := range dependencyLists(r) {
+		for _, d := range deps {
+			for _, arg := range d.Args {
+				if err := references(arg, check); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// checkReference checks one call or variable of a recipe: a call must name a
+// function that takes that many arguments, and a variable must be in globals
+// or locals. It is pure.
+func checkReference(jf *ast.Justfile, ref ast.Expr, globals, locals map[string]struct{}) *diag.Error {
+	if c, ok := ref.(ast.Call); ok {
+		return checkCall(jf, c)
+	}
+	v := ref.(ast.Var)
+	_, inGlobals := globals[v.Name]
+	_, inLocals := locals[v.Name]
+	if inGlobals || inLocals || builtins.IsConstant(v.Name) {
+		return nil
+	}
+	return undefinedVar(jf, v)
+}
+
 // undefinedVar is the error for a reference to a name that is not defined.
 // It is pure.
 func undefinedVar(jf *ast.Justfile, v ast.Var) *diag.Error {
 	return fail(jf, name(v.Line, v.Col, v.Name), "variable `%s` not defined", v.Name)
-}
-
-// undefinedIn returns the first variable in e, reading left to right, whose
-// name is in neither globals nor locals. A nil expression has none. It is
-// pure.
-func undefinedIn(e ast.Expr, globals, locals map[string]struct{}) (ast.Var, bool) {
-	switch e := e.(type) {
-	case ast.Var:
-		_, inGlobals := globals[e.Name]
-		_, inLocals := locals[e.Name]
-		return e, !inGlobals && !inLocals
-	case ast.Concat:
-		if v, ok := undefinedIn(e.Left, globals, locals); ok {
-			return v, true
-		}
-		return undefinedIn(e.Right, globals, locals)
-	}
-	return ast.Var{}, false
 }

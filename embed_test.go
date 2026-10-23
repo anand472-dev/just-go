@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -42,6 +43,29 @@ func TestEmbedCapturesStdoutWithoutOSStdout(t *testing.T) {
 	}
 	if got := stderr.String(); got != "" {
 		t.Errorf("stderr = %q, want empty", got)
+	}
+}
+
+// A backtick runs through the Exec of the options, and a failing one is an
+// error that carries the exit status and quotes the line of the justfile.
+func TestEmbedBacktickFailureCarriesItsStatusAndLine(t *testing.T) {
+	j := mustParse(t, "foo:\n echo {{`exit 9`}}\n")
+	proc := &sysfake.FakeProcess{Codes: []int{9}}
+	_, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc})
+	var de *diag.Error
+	if !errors.As(err, &de) || de.ExitCode != 9 || de.Source != " echo {{`exit 9`}}" || de.Msg != "backtick failed with exit code 9" {
+		t.Errorf("Run error = %+v, want a failed backtick with status 9 that quotes its line", err)
+	}
+}
+
+func TestEmbedBacktickValueIsItsOutput(t *testing.T) {
+	j := mustParse(t, "x := `who`\nfoo:\n @echo {{x}}\n")
+	proc := &sysfake.FakeProcess{Outputs: []string{"me\n"}}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc}); err != nil {
+		t.Fatal(err)
+	}
+	if got := proc.Specs[1].Argv[2]; got != "echo me" {
+		t.Errorf("command = %q, want %q", got, "echo me")
 	}
 }
 
@@ -411,5 +435,191 @@ func TestRunShellArgsOverrideSetShell(t *testing.T) {
 				t.Errorf("argv = %q; want %q", proc.Specs[0].Argv, tc.want)
 			}
 		})
+	}
+}
+
+// The attributes of a recipe reach the host as data.
+func TestRecipesReportsPrivateGroupsAndDoc(t *testing.T) {
+	src := "# comment\n[group('b'), group('a')]\nfoo:\n" +
+		"_bar:\n" +
+		"# hidden\n[private]\nbaz:\n" +
+		"# suppressed\n[doc]\nqux:\n" +
+		"prefix := 'hello '\n[doc(prefix + 'world ')]\nquux:\n" +
+		"# comment\n[doc('   ')]\nblank:\n"
+	var got []RecipeInfo
+	for _, r := range mustParse(t, src).Recipes() {
+		got = append(got, RecipeInfo{Name: r.Name, Doc: r.Doc, Private: r.Private, Groups: r.Groups})
+	}
+	want := []RecipeInfo{
+		{Name: "foo", Doc: "comment", Groups: []string{"a", "b"}},
+		{Name: "_bar", Private: true},
+		{Name: "baz", Doc: "hidden", Private: true},
+		{Name: "qux"},
+		{Name: "quux", Doc: "hello world"},
+		{Name: "blank"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Recipes =\n %+v\nwant\n %+v", got, want)
+	}
+}
+
+func TestRecipesGroupsAreFresh(t *testing.T) {
+	j := mustParse(t, "[group('a')]\nr:\n")
+	j.Recipes()[0].Groups[0] = "changed"
+	if got := j.Recipes()[0].Groups[0]; got != "a" {
+		t.Errorf("Groups[0] = %q after caller mutation, want a", got)
+	}
+}
+
+func TestRunDefaultAttributeIsTheDefaultRecipe(t *testing.T) {
+	j := mustParse(t, "foo:\n\techo foo\n[default]\nbar:\n\techo bar\n")
+	proc := &sysfake.FakeProcess{}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc}); err != nil {
+		t.Fatal(err)
+	}
+	if got := proc.Specs[0].Argv[len(proc.Specs[0].Argv)-1]; got != "echo bar" {
+		t.Errorf("ran %q, want echo bar", got)
+	}
+}
+
+func TestRunConfirmReadsOptionsStdinAndYesSkipsIt(t *testing.T) {
+	j := mustParse(t, "[confirm('Sure?')]\nfoo:\n\techo foo\n")
+	for _, tc := range []struct {
+		name  string
+		opts  Options
+		ran   int
+		stdin string
+		err   string
+	}{
+		{"yes on stdin", Options{Stdin: strings.NewReader("yes\n")}, 1, "Sure? ", ""},
+		{"no on stdin", Options{Stdin: strings.NewReader("no\n")}, 0, "Sure? ", "recipe `foo` was not confirmed"},
+		{"no stdin", Options{}, 0, "Sure? ", "recipe `foo` was not confirmed"},
+		{"the yes option", Options{Yes: true}, 1, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proc := &sysfake.FakeProcess{}
+			var stderr bytes.Buffer
+			tc.opts.WorkDir, tc.opts.Exec, tc.opts.Stderr = "/w", proc, &stderr
+			_, err := j.Run(context.Background(), tc.opts)
+			var d *diag.Error
+			switch {
+			case tc.err == "" && err != nil, tc.err != "" && (!errors.As(err, &d) || d.Msg != tc.err):
+				t.Errorf("err = %v, want %q", err, tc.err)
+			}
+			if len(proc.Specs) != tc.ran || !strings.HasPrefix(stderr.String(), tc.stdin) {
+				t.Errorf("ran %d, stderr %q; want %d, prefix %q", len(proc.Specs), &stderr, tc.ran, tc.stdin)
+			}
+		})
+	}
+}
+
+func TestRunConfirmPromptGoesToThePromptOption(t *testing.T) {
+	j := mustParse(t, "[confirm('Sure?')]\nfoo:\n\techo foo\n")
+	var stderr, prompt bytes.Buffer
+	opts := Options{WorkDir: "/w", Exec: &sysfake.FakeProcess{}, Stderr: &stderr, Prompt: &prompt, Stdin: strings.NewReader("y\n")}
+	if _, err := j.Run(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if prompt.String() != "Sure? " || strings.Contains(stderr.String(), "Sure?") {
+		t.Errorf("prompt %q, stderr %q", &prompt, &stderr)
+	}
+}
+
+func TestParseReportsAttributeErrors(t *testing.T) {
+	for src, msg := range map[string]string{
+		"[private('x')]\nfoo:\n":                    "attribute `private` got 1 argument but takes 0 arguments",
+		"[doc(nope)]\nfoo:\n":                       "variable `nope` not defined",
+		"[default]\nfoo:\n[default]\nbar:\n":        "recipe `bar` has duplicate `[default]` attribute, which may only appear once per module",
+		"[no-cd]\n[working-directory('x')]\nfoo:\n": "recipe `foo` has both `[no-cd]` and `[working-directory]` attributes",
+	} {
+		_, err := Parse("justfile", []byte(src))
+		var d *diag.Error
+		if !errors.As(err, &d) || d.Msg != msg || d.Source == "" {
+			t.Errorf("Parse(%q) = %+v, want %q with its source line", src, err, msg)
+		}
+	}
+}
+
+func TestParseReportsGroupBAttributeErrors(t *testing.T) {
+	for src, msg := range map[string]string{
+		"[env('A')]\nfoo:\n":                       "attribute `env` got 1 argument but takes 2 arguments",
+		"[env(x, 'a')]\nfoo x:\n":                  "variable `x` not defined",
+		"[continue('SIGTERM')]\nfoo:\n":            "invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+		"[script, shell]\nfoo:\n":                  "recipe `foo` has both `[script]` and `[shell]` attributes",
+		"[extension: '.txt']\nfoo:\n":              "shell recipe `foo` has script recipe attribute `extension`",
+		"[metadata]\nfoo:\n":                       "attribute `metadata` got 0 arguments but takes at least 1 argument",
+		"[timestamp(nope)]\nfoo:\n":                "variable `nope` not defined",
+		"[parallel, parallel]\nfoo:\n":             "attribute `parallel` first used on line 1 is duplicated on line 1",
+		"[linux]\n[windows]\nset nonsense\nfoo:\n": "unknown setting `nonsense`",
+	} {
+		_, err := Parse("justfile", []byte(src))
+		var d *diag.Error
+		if !errors.As(err, &d) || d.Msg != msg || d.Source == "" {
+			t.Errorf("Parse(%q) = %+v, want %q with its source line", src, err, msg)
+		}
+	}
+}
+
+func TestRunTimestampUsesOptionsClock(t *testing.T) {
+	j := mustParse(t, "[timestamp('%Y-%m-%d %H:%M:%S')]\nr:\n\techo hi\n")
+	proc := &sysfake.FakeProcess{}
+	var stderr bytes.Buffer
+	opts := Options{
+		WorkDir: "/w", Stderr: &stderr, Exec: proc,
+		Clock: sysfake.FakeClock{At: sys.Time{Unix: 994518299, UTC: true}},
+	}
+	if _, err := j.Run(context.Background(), opts); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if want := "[2001-07-07 15:04:59] echo hi\n"; stderr.String() != want {
+		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestRunEnvAttributeReachesTheCommand(t *testing.T) {
+	j := mustParse(t, "name := 'world'\n[env('GREETING', 'hello ' + name)]\nr:\n\t@echo $GREETING\n")
+	proc := &sysfake.FakeProcess{}
+	if _, err := j.Run(context.Background(), Options{WorkDir: "/w", Exec: proc, Env: []string{"K=V"}}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if want := []string{"K=V", "GREETING=hello world"}; !reflect.DeepEqual(proc.Specs[0].Env, want) {
+		t.Errorf("environment = %q, want %q", proc.Specs[0].Env, want)
+	}
+}
+
+func TestParseKeepsTheRecipesOfTheHostSystem(t *testing.T) {
+	j := mustParse(t, "[windows]\nw:\n\n[unix]\nu:\n")
+	var names []string
+	for _, r := range j.Recipes() {
+		names = append(names, r.Name)
+	}
+	want := []string{"u"}
+	if runtime.GOOS == "windows" {
+		want = []string{"w"}
+	}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("recipes on %s = %v, want %v", runtime.GOOS, names, want)
+	}
+}
+
+// The environment functions read the Env of the options, and the system
+// functions the Platform, Random and Jobs of the options, and nothing of the
+// process that embeds the library.
+func TestEmbedFunctionsAskTheHostNotTheProcess(t *testing.T) {
+	t.Setenv("JUST_GO_EMBED_PROBE", "from the process")
+	j := mustParse(t, "set unstable\nset lists\nfoo:\n  @echo {{env_var_or_default('JUST_GO_EMBED_PROBE', 'none')}} {{env_var('X')}} {{os()}} {{arch()}} "+
+		"{{num_cpus()}} {{just_pid()}} {{choose('3', 'ab')}} [{{num_jobs()}}] {{just_version()}}\n")
+	proc := &sysfake.FakeProcess{}
+	_, err := j.Run(context.Background(), Options{
+		WorkDir: "/w", Exec: proc, Env: []string{"X=x"}, Jobs: 4,
+		Platform: sysfake.FakePlatform{GOOS: "linux", GOARCH: "amd64", CPUs: 3, Process: 77},
+		Random:   &sysfake.FakeRandom{Bytes: []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "echo none x linux x86_64 3 77 bab [4] 1.59.0"
+	if len(proc.Specs) != 1 || proc.Specs[0].Argv[len(proc.Specs[0].Argv)-1] != want {
+		t.Errorf("ran %+v, want %q", proc.Specs, want)
 	}
 }

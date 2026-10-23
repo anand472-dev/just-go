@@ -302,7 +302,7 @@ func BenchmarkAnalyze(b *testing.B) {
 	var sb strings.Builder
 	sb.WriteString("base := 'x'\n")
 	for i := 0; i < 200; i++ {
-		fmt.Fprintf(&sb, "r%d p=base:\n  echo {{p}} {{base + 'y'}}\n", i)
+		fmt.Fprintf(&sb, "r%d p=base:\n  echo {{p}} {{base + 'y'}} {{uppercase(p)}}\n", i)
 	}
 	sb.WriteString("all: r0 r199\n")
 	jf := mustParse(b, sb.String())
@@ -312,5 +312,243 @@ func BenchmarkAnalyze(b *testing.B) {
 		if err := analyzer.Analyze(jf); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// wantAt analyzes src and checks the error's line, column, width and message.
+func wantAt(t *testing.T, src string, line, col, width int, msg string) {
+	t.Helper()
+	got := analyze(t, src)
+	want := diag.Error{Kind: diag.KindAnalysis, File: "justfile", Line: line, Col: col, Width: width, Msg: msg}
+	if got != want {
+		t.Errorf("Analyze(%q) error =\n %+v\nwant\n %+v", src, got, want)
+	}
+}
+
+// TestAnalyzeCircularDependencyMatchesUpstream pins the category, the
+// location and the cycle text of each circular-dependency case of the misc
+// corpus group. The cycle is reported at the dependency that closes it, in the
+// recipe that names it. The subsequents group's self-dependency is pinned in
+// TestAnalyzeCorpusDiagnostics.
+func TestAnalyzeCircularDependencyMatchesUpstream(t *testing.T) {
+	cases := []struct {
+		id, src          string
+		line, col, width int
+		msg              string
+	}{
+		{"misc::self_dependency#1", "a: a", 1, 4, 1, "recipe `a` depends on itself"},
+		{"misc::circular_recipe_dependency_entered_from_outside#1", "a: b\nb: c\nc: b\n", 3, 4, 1,
+			"recipe `c` has circular dependency `b -> c -> b`"},
+		{"misc::long_circular_recipe_dependency#1", "a: b\nb: c\nc: d\nd: a", 4, 4, 1,
+			"recipe `d` has circular dependency `a -> b -> c -> d -> a`"},
+		{"misc::variable_self_dependency#1", "z := z\na:", 1, 1, 1, "variable `z` is defined in terms of itself"},
+		// A cycle through a recipe that other recipes depend on is reported
+		// once, from the first recipe by name.
+		{"by name", "b: c\nc: b\na: b\n", 2, 4, 1, "recipe `c` has circular dependency `b -> c -> b`"},
+		// A cycle among variables, entered from a variable outside it.
+		{"variables", "a := b\nb := c + 'x'\nc := b\n", 2, 1, 1, "variable `b` depends on its own value: `b -> c -> b`"},
+	}
+	for _, c := range cases {
+		t.Run(c.id, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
+	}
+}
+
+// TestAnalyzeDuplicateParameter pins misc::duplicate_parameter#1 and the
+// position rule: the error is at the second use of the name, and a duplicate
+// is found before a required parameter after a default.
+func TestAnalyzeDuplicateParameter(t *testing.T) {
+	wantAt(t, "a foo foo:", 1, 7, 3, "recipe `a` has duplicate parameter `foo`")
+	wantAt(t, "a b c b:", 1, 7, 1, "recipe `a` has duplicate parameter `b`")
+	wantAt(t, "a x:\nb y y:\nc z z:", 2, 5, 1, "recipe `b` has duplicate parameter `y`")
+	// A duplicate parameter is found before a duplicate assignment, a
+	// duplicate recipe, an undefined function and an unknown dependency.
+	wantAt(t, "x := foo()\nx := 'a'\na b b: nope\n", 3, 5, 1, "recipe `a` has duplicate parameter `b`")
+}
+
+// TestAnalyzeUndefinedVariableInDefault pins misc::unknown_variable_in_default#1
+// and the scope of a default: the globals and the parameters before it.
+func TestAnalyzeUndefinedVariableInDefault(t *testing.T) {
+	wantAt(t, "foo x=bar:\n", 1, 7, 3, "variable `bar` not defined")
+	wantAt(t, "foo x=x:\n", 1, 7, 1, "variable `x` not defined")
+	wantAt(t, "foo x='a' y=z:\n", 1, 13, 1, "variable `z` not defined")
+	wantAt(t, "foo x=uppercase(q):\n", 1, 17, 1, "variable `q` not defined")
+	if err := analyzer.Analyze(mustParse(t, "g := 'a'\nfoo x=g y=x:\n")); err != nil {
+		t.Errorf("Analyze = %v, want nil", err)
+	}
+}
+
+// TestAnalyzeCorpusDiagnostics pins the analysis errors of the misc,
+// function_definitions and subsequents corpus groups that the analyzer
+// reports with no other feature: the id names the case, and the location and
+// message are the corpus's.
+func TestAnalyzeCorpusDiagnostics(t *testing.T) {
+	cases := []struct {
+		id, src          string
+		line, col, width int
+		msg              string
+	}{
+		{"misc::duplicate_recipe#1", "b:\nb:", 2, 1, 1, "recipe `b` first defined on line 1 is redefined on line 2"},
+		{"misc::duplicate_variable#1", "a := 'hello'\na := 'hello'\nfoo:", 2, 1, 1, "variable `a` has multiple definitions"},
+		{"misc::missing_second_dependency#1", "x:\n\na: x y\n", 3, 6, 1, "recipe `a` has unknown dependency `y`"},
+		{"misc::unknown_dependency#1", "bar:\nhello:\nfoo: bar baaaaaaaz hello", 3, 10, 9,
+			"recipe `foo` has unknown dependency `baaaaaaaz`"},
+		{"misc::required_after_default#1", "bar:\nhello baz arg='foo' bar:", 2, 21, 3,
+			"non-default parameter `bar` follows default parameter"},
+		{"misc::dependency_takes_arguments_exact#1", "a FOO:\nb: a\n", 2, 4, 1,
+			"dependency `a` got 0 arguments but takes 1 argument"},
+		{"misc::dependency_takes_arguments_at_least#1", "a FOO LUZ='hello':\nb: a\n", 2, 4, 1,
+			"dependency `a` got 0 arguments but takes at least 1 argument"},
+		{"misc::undefined_function_in_assignment#1", "foo := foo() + 'hello'\nbar:", 1, 8, 3,
+			"call to undefined function `foo`"},
+		{"misc::undefined_function_in_default#1", "foo x=bar():\n", 1, 7, 3, "call to undefined function `bar`"},
+		{"function_definitions::undefined_in_assignment#1", "a := foo()", 1, 6, 3, "call to undefined function `foo`"},
+		{"function_definitions::undefined_in_interpolation#1", "bar:\n  echo {{foo()}}\n", 2, 10, 3,
+			"call to undefined function `foo`"},
+		{"function_definitions::undefined_in_recipe_parameter_default#1", "bar x=foo():", 1, 7, 3,
+			"call to undefined function `foo`"},
+		{"function_definitions::undefined_in_dependency_argument#1", "bar x:\nfoo: (bar baz())\n", 2, 11, 3,
+			"call to undefined function `baz`"},
+		{"misc::dependency_takes_arguments_at_most#1", "a FOO LUZ='hello':\nb: (a '0' '1' '2')\n", 2, 5, 1,
+			"dependency `a` got 3 arguments but takes at most 2 arguments"},
+		{"subsequents::circular_dependency#1", "foo: && foo\n", 1, 9, 3, "recipe `foo` depends on itself"},
+		{"subsequents::unknown#1", "foo: && bar\n", 1, 9, 3, "recipe `foo` has unknown dependency `bar`"},
+		{"subsequents::unknown_argument#1", "bar x:\n\nfoo: && (bar y)\n", 3, 14, 1, "variable `y` not defined"},
+	}
+	for _, c := range cases {
+		t.Run(c.id, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
+	}
+}
+
+// TestAnalyzeUndefinedFunction pins the order and the location of a call to
+// a function that does not exist. Each row was produced by oracle/bin/just on
+// the same source.
+func TestAnalyzeUndefinedFunction(t *testing.T) {
+	cases := []struct {
+		src              string
+		line, col, width int
+		msg              string
+	}{
+		// The call is checked before its arguments.
+		{"a := foo(nope)", 1, 6, 3, "call to undefined function `foo`"},
+		{"a := uppercase(nope())", 1, 16, 4, "call to undefined function `nope`"},
+		// Names are case sensitive.
+		{"a := uuid() + UUID()", 1, 15, 4, "call to undefined function `UUID`"},
+		// The `_dir` spelling is accepted for `_directory`, but the native
+		// spelling only for the functions that have one.
+		{"a := cache_dir_native()", 1, 6, 16, "call to undefined function `cache_dir_native`"},
+		{"a := cache_directory_native()", 1, 6, 22, "call to undefined function `cache_directory_native`"},
+		// A call in an interpolation or a default is found in its place in
+		// the walk: the defaults, then the body.
+		{"x y=nope():\n  echo {{foo()}}", 1, 5, 4, "call to undefined function `nope`"},
+		{"x y='a':\n  echo {{foo()}}", 2, 10, 3, "call to undefined function `foo`"},
+		// Assignments are checked before recipes, whatever the source order.
+		{"x: a\n  echo\na := nope()", 3, 6, 4, "call to undefined function `nope`"},
+		{"r:\n  echo {{foo()}}\nz := nope()", 3, 6, 4, "call to undefined function `nope`"},
+		// And an undefined function in an assignment before a duplicate recipe.
+		{"x := foo()\nr:\nr:", 1, 6, 3, "call to undefined function `foo`"},
+		// A call found while resolving a dependency comes before the
+		// recipe that depends on it.
+		{"b: a\na:\n  echo {{foo()}}\nc: nope", 3, 10, 3, "call to undefined function `foo`"},
+	}
+	for _, c := range cases {
+		t.Run(c.src, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
+	}
+}
+
+// TestAnalyzeFunctionArgumentCount pins upstream's arity check: the message,
+// the range wording, and the order against undefined variables in the
+// arguments.
+func TestAnalyzeFunctionArgumentCount(t *testing.T) {
+	cases := []struct {
+		src              string
+		line, col, width int
+		msg              string
+	}{
+		{"a := arch('x')", 1, 6, 4, "function `arch` called with 1 argument but takes 0"},
+		{"a := uppercase()", 1, 6, 9, "function `uppercase` called with 0 arguments but takes 1"},
+		{"a := uppercase('x', 'y')", 1, 6, 9, "function `uppercase` called with 2 arguments but takes 1"},
+		{"a := env('a', 'b', 'c')", 1, 6, 3, "function `env` called with 3 arguments but takes 1 to 2"},
+		{"a := style()", 1, 6, 5, "function `style` called with 0 arguments but takes 1 to 2"},
+		{"a := join('x')", 1, 6, 4, "function `join` called with 1 argument but takes 2 or more"},
+		{"a := shell()", 1, 6, 5, "function `shell` called with 0 arguments but takes 1 or more"},
+		{"a := replace('x')", 1, 6, 7, "function `replace` called with 1 argument but takes 3"},
+		{"a := cache_dir('x')", 1, 6, 9, "function `cache_dir` called with 1 argument but takes 0"},
+		// The count is checked before the arguments are.
+		{"a := uppercase(nope, 'y')", 1, 6, 9, "function `uppercase` called with 2 arguments but takes 1"},
+		{"x y=uppercase('a', z):\n  echo {{foo()}}", 1, 5, 9, "function `uppercase` called with 2 arguments but takes 1"},
+		{"x := env('a') + uppercase()", 1, 17, 9, "function `uppercase` called with 0 arguments but takes 1"},
+		// The arguments are checked after the call, in order.
+		{"a := uppercase(nope)", 1, 16, 4, "variable `nope` not defined"},
+		{"x:\n  echo {{uppercase(y)}} {{foo()}}", 2, 20, 1, "variable `y` not defined"},
+		{"x y=uppercase(z):", 1, 15, 1, "variable `z` not defined"},
+	}
+	for _, c := range cases {
+		t.Run(c.src, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
+	}
+}
+
+// TestAnalyzeAcceptsKnownFunctions checks that a call of every spelling the
+// table knows passes, with the argument counts upstream accepts.
+func TestAnalyzeAcceptsKnownFunctions(t *testing.T) {
+	src := "a := uppercase('x') + arch() + env('A') + env('A', 'b') + join('a', 'b') + join('a', 'b', 'c')\n" +
+		"b := cache_dir() + invocation_dir_native() + style('error') + shell('x') + shell('x', 'y')\n" +
+		"r x=lowercase(a):\n  echo {{replace(x, 'a', b)}} {{trim(uppercase(a))}}\n"
+	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+		t.Errorf("Analyze = %v, want nil", err)
+	}
+}
+
+// TestAnalyzeDependencyArguments pins the checks of the arguments of a
+// dependency and their order, each row produced by oracle/bin/just on the
+// same source. A dependency is resolved first, then the defaults, then the
+// arguments of every dependency (priors, then subsequents), then the body,
+// then the argument counts.
+func TestAnalyzeDependencyArguments(t *testing.T) {
+	cases := []struct {
+		name, src        string
+		line, col, width int
+		msg              string
+	}{
+		{"undefined variable", "a: (c nope)\nc y:\n", 1, 7, 4, "variable `nope` not defined"},
+		{"undefined variable in a subsequent", "a: && (c nope)\nc y:\n", 1, 10, 4, "variable `nope` not defined"},
+		{"undefined function", "a: (c baz('x'))\nc y:\n", 1, 7, 3, "call to undefined function `baz`"},
+		{"too many", "a: (c 'x' 'y')\nc y:\n", 1, 5, 1, "dependency `c` got 2 arguments but takes 1 argument"},
+		{"too few", "a: (c)\nc y z='1':\n", 1, 5, 1, "dependency `c` got 0 arguments but takes at least 1 argument"},
+		{"too few in a subsequent", "a: && (c)\nc y z:\n", 1, 8, 1, "dependency `c` got 0 arguments but takes 2 arguments"},
+		{"defaults come first", "a x=nope3: (c nope)\nc y:\n", 1, 5, 5, "variable `nope3` not defined"},
+		{"arguments come before the body", "a: (c nope)\n  echo {{nope2}}\nc y:\n", 1, 7, 4, "variable `nope` not defined"},
+		{"dependencies come before arguments", "a: (c nope) d\nc y:\n", 1, 13, 1, "recipe `a` has unknown dependency `d`"},
+		{"arguments come before counts", "a: (c 'x' 'y') && (c nope)\nc y:\n", 1, 22, 4, "variable `nope` not defined"},
+		{"recipes in name order", "a: (c nope2)\nb: (c 'x' 'y')\nc y:\n", 1, 7, 5, "variable `nope2` not defined"},
+		{"cycle through arguments", "a x: (a x)\n", 1, 7, 1, "recipe `a` depends on itself"},
+		{"cycle through a subsequent", "a x: && (a '1')\n", 1, 10, 1, "recipe `a` depends on itself"},
+		{"cycle between recipes", "a: (b 'x')\nb y: && (a)\n", 2, 10, 1, "recipe `b` has circular dependency `a -> b -> a`"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { wantAt(t, c.src, c.line, c.col, c.width, c.msg) })
+	}
+}
+
+// TestAnalyzeAcceptsDependencyArguments checks that arguments see the
+// globals and every parameter of the recipe that names the dependency, and
+// that a defaulted parameter may be left out.
+func TestAnalyzeAcceptsDependencyArguments(t *testing.T) {
+	src := "g := 'a'\nr p q='1': (d g p + q + 'x') && (d q)\n  echo\nd x y='-':\n  echo {{x}}\n"
+	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+		t.Errorf("Analyze = %v, want nil", err)
+	}
+}
+
+// A builtin constant is defined everywhere without an assignment, and a justfile
+// may still assign its name: the assignment wins (constants::constants_*).
+func TestAnalyzeAcceptsBuiltinConstantsAsDefined(t *testing.T) {
+	src := "x := HEX\n" +
+		"HEX2 := BOLD\n\n" +
+		"foo y=PATH_SEP:\n  echo {{ NORMAL }}{{ y }}\n"
+	if err := analyzer.Analyze(mustParse(t, src)); err != nil {
+		t.Errorf("Analyze = %v; want no error", err)
+	}
+	if err := analyzer.Analyze(mustParse(t, "HEX := 'foo'\n\nfoo:\n  echo {{ HEX }}\n")); err != nil {
+		t.Errorf("Analyze with HEX assigned = %v; want no error", err)
 	}
 }
