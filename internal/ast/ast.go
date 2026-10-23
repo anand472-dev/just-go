@@ -503,6 +503,22 @@ const (
 	PrefixAtDash        // both `@` and `-`, in either order
 )
 
+// ToggleQuiet is p with the recipe's leading `@` applied to it: upstream toggles
+// the `@` of each line of a recipe that has one, so an unmarked line becomes
+// quiet and a marked line is echoed again. Applying it twice gives p back. It is
+// pure.
+func ToggleQuiet(p Prefix) Prefix {
+	switch p {
+	case PrefixNone:
+		return PrefixAt
+	case PrefixAt:
+		return PrefixNone
+	case PrefixDash:
+		return PrefixAtDash
+	}
+	return PrefixDash
+}
+
 // Span is a stretch of source text: where it starts and its width in runes.
 // The zero Span means none.
 type Span struct {

@@ -978,20 +978,8 @@ func defaultText(toks []lexer.Token) string {
 // line becomes quiet, and a line marked `@` is echoed again.
 func silence(lines []ast.Line) {
 	for i := range lines {
-		lines[i].Prefix = quietPrefix(lines[i].Prefix)
+		lines[i].Prefix = ast.ToggleQuiet(lines[i].Prefix)
 	}
-}
-
-func quietPrefix(p ast.Prefix) ast.Prefix {
-	switch p {
-	case ast.PrefixNone:
-		return ast.PrefixAt
-	case ast.PrefixAt:
-		return ast.PrefixNone
-	case ast.PrefixDash:
-		return ast.PrefixAtDash
-	}
-	return ast.PrefixDash
 }
 
 // skipBlankLines moves past line breaks, but only when a body line follows.

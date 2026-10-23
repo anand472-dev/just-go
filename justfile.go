@@ -23,6 +23,7 @@ import (
 	"gitea.com/wimwian/just-go/internal/analyzer"
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/dump"
 	"gitea.com/wimwian/just-go/internal/loader"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/runner"
@@ -253,6 +254,12 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 	}
 	res, err := runner.Run(ctx, plan)
 	return Result{ExitCode: res.ExitCode}, err
+}
+
+// Dump returns the source text of the justfile, as --dump prints it, with each
+// recipe body indented by indent. See internal/dump for what it writes.
+func (j *Justfile) Dump(indent string) string {
+	return dump.Justfile(j.tree, indent)
 }
 
 // Binding is an assignment and its value, as Evaluate returns it.

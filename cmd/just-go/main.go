@@ -86,8 +86,8 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
-	if cfg.evaluate {
-		return evaluate(cfg, jf, opts, stdout, stderr)
+	if status, done := inspect(cfg, env, jf, opts, stdout, stderr); done {
+		return status
 	}
 	if cfg.list || (len(cfg.words) == 0 && jf.DefaultList()) {
 		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
@@ -102,6 +102,33 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		return fail(stderr, cfg.quiet, err)
 	}
 	return res.ExitCode
+}
+
+// inspect prints what --dump or --evaluate asks for, instead of running
+// recipes. done is false when neither was asked for. Impure: it writes to
+// stdout and runs an --evaluate's backticks through opts.Exec.
+func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) (status int, done bool) {
+	switch {
+	case cfg.evaluate:
+		return evaluate(cfg, jf, opts, stdout, stderr), true
+	case cfg.dump:
+		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
+		return 0, true
+	}
+	return 0, false
+}
+
+// indentation is the indent that a dump writes recipe bodies with: the
+// --indentation value if one was given, else JUST_INDENTATION if it is set, else
+// four spaces. Pure.
+func indentation(cfg config, env []string) string {
+	if cfg.indentationGiven {
+		return cfg.indentation
+	}
+	if v, ok := envValue(env, "JUST_INDENTATION"); ok {
+		return v
+	}
+	return "    "
 }
 
 // evaluate prints what --evaluate asks for: the value of the one name it was
@@ -140,17 +167,24 @@ func (c config) isUnstable(env []string) bool {
 	return c.unstable || envEnabled(env, "JUST_UNSTABLE")
 }
 
+// envValue is the value of the variable name in env, and whether env sets it.
+// When env sets it more than once the last wins. Pure.
+func envValue(env []string, name string) (string, bool) {
+	value, set := "", false
+	for _, entry := range env {
+		if v, ok := strings.CutPrefix(entry, name+"="); ok {
+			value, set = v, true
+		}
+	}
+	return value, set
+}
+
 // envEnabled reports whether the variable name is set in env to a value that
 // switches a flag on, as upstream reads JUST_UNSTABLE: any value but the empty
 // string and the false-like n, no, f, false, off and 0, in any case. When env
 // sets it more than once the last wins. Pure.
 func envEnabled(env []string, name string) bool {
-	value := ""
-	for _, entry := range env {
-		if v, ok := strings.CutPrefix(entry, name+"="); ok {
-			value = v
-		}
-	}
+	value, _ := envValue(env, name)
 	switch strings.ToLower(value) {
 	case "", "0", "f", "false", "n", "no", "off":
 		return false
@@ -283,6 +317,11 @@ type config struct {
 	// allowOutside is --allow-outside-project-paths, which lifts the strict path
 	// rule for imports, modules and dotenv files.
 	allowOutside bool
+	// dump is --dump, and indentation the --indentation value, which
+	// indentationGiven records as present.
+	dump             bool
+	indentation      string
+	indentationGiven bool
 	// evaluate is --evaluate, and evaluateName the name it was given, if any:
 	// the value is optional, so it may be attached or the next argument.
 	evaluate     bool
@@ -414,7 +453,7 @@ func valueName(long string) string {
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes", "allow-outside-project-paths", "evaluate":
+	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes", "allow-outside-project-paths", "evaluate", "dump", "indentation":
 		return name, true
 	}
 	return "", false
@@ -436,7 +475,7 @@ func shortFlagName(letter string) (string, bool) {
 // takesValue reports whether the flag with this long name has a value. Pure.
 func takesValue(long string) bool {
 	switch long {
-	case "justfile", "shell", "shell-arg":
+	case "justfile", "shell", "shell-arg", "indentation":
 		return true
 	}
 	return false
@@ -456,6 +495,8 @@ func setSwitch(cfg *config, long string) {
 		cfg.yes = true
 	case "allow-outside-project-paths":
 		cfg.allowOutside = true
+	case "dump":
+		cfg.dump = true
 	}
 }
 
@@ -473,6 +514,8 @@ func setFlag(cfg *config, long, value string) error {
 		cfg.shell, cfg.shellGiven = value, true
 	case "shell-arg":
 		cfg.shellArgs = append(cfg.shellArgs, value)
+	case "indentation":
+		cfg.indentation, cfg.indentationGiven = value, true
 	}
 	return nil
 }
