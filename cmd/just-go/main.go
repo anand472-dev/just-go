@@ -82,7 +82,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Unstable:          cfg.isUnstable(env),
 		Justfile:          resolve(workDir, cfg.justfile),
 		SearchFrom:        workDir,
-		Ceiling:           resolve(workDir, cfg.ceiling),
+		Ceiling:           resolve(workDir, ceilingOf(cfg, env)),
 		JustfileNames:     cfg.justfileNames,
 		Dotenv:            dotenvOf(cfg),
 		NoDeps:            cfg.noDeps,
@@ -110,10 +110,21 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if status, done := inspect(cfg, env, jf, opts, stdout, stderr); done {
 		return status
 	}
-	opts.Calls, err = chooseCalls(cfg, jf)
+	return runChosen(cfg, jf, opts, stderr)
+}
+
+// runChosen runs the recipes the command line names and returns the status. When
+// --allow-missing skipped every recipe named, it runs nothing, rather than the
+// default recipe. Impure: it runs recipes.
+func runChosen(cfg config, jf *just.Justfile, opts just.Options, stderr io.Writer) int {
+	calls, err := chooseCalls(cfg, jf)
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
+	if len(calls) == 0 && len(cfg.words) > 0 {
+		return 0
+	}
+	opts.Calls = calls
 	res, err := jf.Run(context.Background(), opts)
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
@@ -448,6 +459,16 @@ func usage(format string, args ...any) *diag.Error {
 
 // resolve returns path joined onto dir when path is relative, and path itself
 // when it is absolute or empty. Pure.
+// ceilingOf is the directory the search does not go above: --ceiling, or else
+// JUST_CEILING when the flag is not given. Pure.
+func ceilingOf(cfg config, env []string) string {
+	if cfg.ceiling != "" {
+		return cfg.ceiling
+	}
+	v, _ := envValue(env, "JUST_CEILING")
+	return v
+}
+
 func resolve(dir, path string) string {
 	if path == "" || filepath.IsAbs(path) {
 		return path
@@ -500,6 +521,12 @@ type config struct {
 	// command runs and starts its search, and the directory it does not search above.
 	workingDirectory string
 	ceiling          string
+	// version, man, changelog and allowMissing are the switches of the same names.
+	// request is the --request JSON, and requestGiven records that it was given.
+	version, man, changelog, allowMissing bool
+	request                               string
+	requestGiven                          bool
+
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
 	// command is the argument list --command runs, which is everything after it;
@@ -680,7 +707,7 @@ func chooseCalls(cfg config, jf *just.Justfile) ([]just.Call, error) {
 	if err := jf.CheckOverrides(cfg.set); err != nil {
 		return nil, err
 	}
-	calls, err := selectRecipes(jf.Recipes(), cfg.words)
+	calls, err := selectRecipesWith(jf.Recipes(), cfg.words, cfg.allowMissing)
 	if err != nil {
 		return nil, err
 	}
@@ -771,7 +798,12 @@ type flagSpec struct {
 // flags is every long flag the command accepts. The parser reads it, and
 // completions offer its names, so a flag added here is parsed and completed.
 var flags = []flagSpec{
+	{"allow-missing", switchFlag},
 	{"allow-outside-project-paths", switchFlag},
+	{"changelog", switchFlag},
+	{"man", switchFlag},
+	{"request", valueFlag},
+	{"version", switchFlag},
 	{"ceiling", valueFlag},
 	{"dotenv-command", valueFlag},
 	{"dotenv-filename", valueFlag},
@@ -867,6 +899,10 @@ var switches = map[string]func(*config){
 	"default-list":                func(c *config) { c.defaultList = true },
 	"dump":                        func(c *config) { c.dump = true },
 	"no-deps":                     func(c *config) { c.noDeps = true },
+	"allow-missing":               func(c *config) { c.allowMissing = true },
+	"changelog":                   func(c *config) { c.changelog = true },
+	"man":                         func(c *config) { c.man = true },
+	"version":                     func(c *config) { c.version = true },
 	"one":                         func(c *config) { c.one = true },
 	"verbose":                     func(c *config) { c.verbose = true },
 	"no-dotenv":                   func(c *config) { c.noDotenv = true },
@@ -915,6 +951,7 @@ var setters = map[string]func(*config, string) error{
 	"shell":        setShell,
 	"shell-arg":    func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
 	"show":         func(c *config, v string) error { c.show = v; return nil },
+	"request":      func(c *config, v string) error { c.request, c.requestGiven = v, true; return nil },
 	"usage":        func(c *config, v string) error { c.usage = v; return nil },
 }
 
@@ -958,7 +995,15 @@ func setFlag(cfg *config, long, value string) error {
 // error, reported before anything runs. Too few arguments for a recipe is
 // left to the library, which words it as upstream does. With no words it
 // selects nothing and the library runs the first recipe. Pure.
+// selectRecipes is selectRecipesWith without --allow-missing.
 func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error) {
+	return selectRecipesWith(infos, words, false)
+}
+
+// selectRecipesWith is the recipes the words name, each with the words after it
+// up to its argument count. With allowMissing, a word that names no recipe is
+// skipped, as --allow-missing asks; else it is an error.
+func selectRecipesWith(infos []just.RecipeInfo, words []string, allowMissing bool) ([]just.Call, error) {
 	params := make(map[string]int, len(infos))
 	for _, info := range infos {
 		params[info.Name] = argCount(info)
@@ -967,6 +1012,10 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 	for i := 0; i < len(words); {
 		n, ok := wordParams(words[i], params, infos)
 		if !ok {
+			if allowMissing {
+				i++
+				continue
+			}
 			if err := submoduleError(words[i], params); err != nil {
 				return nil, err
 			}
@@ -1018,7 +1067,21 @@ func submoduleError(word string, params map[string]int) error {
 			return usage("expected submodule at `%s` but found recipe", prefix)
 		}
 	}
+	if len(parts) > 1 && ast.ValidPath(word) && !hasModule(params, parts[0]) {
+		return usage("justfile does not contain submodule `%s`", parts[0])
+	}
 	return nil
+}
+
+// hasModule reports whether a recipe of params is in the module name: a recipe
+// whose name begins with `name::`. It is pure.
+func hasModule(params map[string]int, name string) bool {
+	for recipe := range params {
+		if strings.HasPrefix(recipe, name+"::") {
+			return true
+		}
+	}
+	return false
 }
 
 // hasRecipe reports whether params names a recipe. It is pure.

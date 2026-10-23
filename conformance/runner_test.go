@@ -157,6 +157,7 @@ var exceptionCategories = map[string]bool{
 	"fifo":              true,
 	"strict-path":       true,
 	"unsupported-shell": true,
+	"cli-identity":      true,
 }
 
 // oracleCategories are the categories whose cases the oracle passes: the
@@ -164,6 +165,7 @@ var exceptionCategories = map[string]bool{
 var oracleCategories = map[string]bool{
 	"strict-path":       true,
 	"unsupported-shell": true,
+	"cli-identity":      true,
 }
 
 // parseExceptions maps case id to reason. Each entry line is an id, white

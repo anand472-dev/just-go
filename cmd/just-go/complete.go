@@ -16,6 +16,9 @@ import (
 // --completions. done is false when neither applies. Impure: it reads the file
 // system and writes to the streams.
 func early(cfg config, env []string, workDir string, fsys sys.FS, exec sys.Process, stdin io.Reader, stdout, stderr io.Writer) (status int, done bool) {
+	if status, done := answer(cfg, env, stdout, stderr); done {
+		return status, true
+	}
 	if cfg.command != nil {
 		return runCommandLine(cfg, env, workDir, fsys, exec, stdin, stdout, stderr), true
 	}

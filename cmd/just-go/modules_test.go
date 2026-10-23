@@ -28,12 +28,22 @@ func TestSelectRecipesPathThroughARecipeIsSubmoduleError(t *testing.T) {
 	}
 }
 
-// A path through a name that is neither a module nor a recipe is the unknown
-// recipe error, as before.
-func TestSelectRecipesPathThroughNothingIsUnknown(t *testing.T) {
+// A well-formed path through a name that is neither a module nor a recipe names
+// a missing submodule, as upstream says.
+func TestSelectRecipesPathThroughNothingIsAMissingSubmodule(t *testing.T) {
 	_, err := selectRecipes([]just.RecipeInfo{{Name: "a"}}, []string{"zz::q"})
-	if err == nil || !strings.Contains(err.Error(), "does not contain recipe `zz::q`") {
+	if err == nil || !strings.Contains(err.Error(), "does not contain submodule `zz`") {
 		t.Errorf("error = %v", err)
+	}
+}
+
+// A path that is not well formed is the unknown recipe error, whole.
+func TestSelectRecipesMalformedPathIsAnUnknownRecipe(t *testing.T) {
+	for _, word := range []string{":foo::foo", "foo:::foo", "foo::foo:"} {
+		_, err := selectRecipes([]just.RecipeInfo{{Name: "a"}}, []string{word})
+		if err == nil || !strings.Contains(err.Error(), "does not contain recipe `"+word+"`") {
+			t.Errorf("selectRecipes(%q) error = %v", word, err)
+		}
 	}
 }
 
@@ -51,5 +61,14 @@ func TestAllowOutsideProjectPathsIsASwitch(t *testing.T) {
 	}
 	if cfg, _ := parseArgs([]string{"a"}); cfg.allowOutside {
 		t.Error("the switch is set without the flag")
+	}
+}
+
+// A path through a module that exists, to a recipe it lacks, is the unknown
+// recipe error: the module is there, so it is not a missing submodule.
+func TestSelectRecipesMissingRecipeInAModuleIsUnknown(t *testing.T) {
+	_, err := selectRecipes([]just.RecipeInfo{{Name: "m::r"}}, []string{"m::zz"})
+	if err == nil || !strings.Contains(err.Error(), "does not contain recipe `m::zz`") {
+		t.Errorf("error = %v", err)
 	}
 }

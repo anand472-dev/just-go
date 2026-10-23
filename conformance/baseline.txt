@@ -1,7 +1,13 @@
 allow_duplicate_recipes::allow_duplicate_recipes#1
 allow_duplicate_recipes::allow_duplicate_recipes_with_args#1
 allow_duplicate_variables::allow_duplicate_variables#1
+allow_missing::allow_missing_does_not_apply_to_compilation_errors#1
+allow_missing::allow_missing_does_not_apply_to_other_subcommands#1
+allow_missing::allow_missing_ignores_absent_optional_module#1
+allow_missing::allow_missing_modules_in_run_invocation#1
+allow_missing::allow_missing_modules_in_run_invocation#2
 allow_missing::allow_missing_recipes_in_run_invocation#1
+allow_missing::allow_missing_recipes_in_run_invocation#2
 assertions::assert_empty_string_without_lists#1
 assertions::assert_fail#1
 assertions::assert_message_may_be_omitted#1
@@ -56,8 +62,10 @@ booleans::path_exists_without_lists_returns_string#1
 byte_order_mark::dont_mention_byte_order_mark_in_errors#1
 byte_order_mark::ignore_leading_byte_order_mark#1
 byte_order_mark::non_leading_byte_order_mark_produces_error#1
+ceiling::ceiling_can_be_passed_as_environment_variable#1
 ceiling::justfile_init_search_stops_at_ceiling_dir#1
 ceiling::justfile_run_search_stops_at_ceiling_dir#1
+changelog::print_changelog#1
 choose::chooser#1
 choose::chooser_selections_are_processed_separately#1
 choose::chooser_signal_exit_code_is_propagated#1
@@ -141,6 +149,7 @@ confirm::recipe_with_confirm_recipe_dependency_arg#1
 constants::constants_are_defined#1
 constants::constants_are_defined_in_recipe_bodies#1
 constants::constants_are_defined_in_recipe_parameters#1
+constants::constants_are_not_exported#1
 constants::constants_can_be_redefined#1
 constants::constants_can_have_different_values_on_windows#1
 constants::constants_can_have_different_values_on_windows#2
@@ -714,6 +723,7 @@ modules::show_recipe_in_absent_optional_module_is_error#1
 modules::submodule_assignments_are_not_shadowed_by_parent_variables#1
 modules::submodule_dotenv_load_false_skips_own_but_inherits_parent#1
 modules::submodule_inherits_root_dotenv_even_with_dotenv_load_false#1
+modules::submodule_recipe_not_found_error_message#1
 modules::submodule_shebang_recipes_run_in_submodule_directory#1
 modules::submodule_shell_recipes_run_in_submodule_directory#1
 modules::trailing_separator_runs_default_recipe#1
@@ -825,6 +835,8 @@ regexes::bad_regex_fails_at_runtime#1
 regexes::match_fails_evaluates_to_second_branch#1
 regexes::match_succeeds_evaluates_to_first_branch#1
 regexes::mismatch#1
+request::environment_variable_missing#1
+request::environment_variable_set#1
 resolve::command_on_custom_path#1
 resolve::shell_on_custom_path#1
 run::dont_run_duplicate_recipes#1

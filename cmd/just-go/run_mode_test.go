@@ -41,3 +41,12 @@ func TestRunOneAllowsOnlyOneRecipe(t *testing.T) {
 		t.Errorf("run --one a = %d, ran %d; want 0 and one run", one.code, len(one.proc.Specs))
 	}
 }
+
+// --allow-missing with only absent recipes runs nothing and succeeds, rather
+// than running the default recipe of a justfile that has none.
+func TestRunAllowMissingWithOnlyAbsentRecipesSucceeds(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": ""}, nil, "--allow-missing", "foo")
+	if got.code != 0 || got.stderr != "" || len(got.proc.Specs) != 0 {
+		t.Errorf("run = %d, stderr %q, ran %d; want 0, silent, nothing run", got.code, got.stderr, len(got.proc.Specs))
+	}
+}

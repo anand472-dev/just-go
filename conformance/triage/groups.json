@@ -1,15 +1,14 @@
 {
   "counts": {
-    "pass": 1090,
-    "fail": 898,
-    "skip": 23,
+    "pass": 1102,
+    "fail": 885,
+    "skip": 24,
     "total": 2011
   },
   "group_sizes": {
     "attribute": 112,
     "cli:alias-style": 3,
-    "cli:allow-missing": 5,
-    "cli:ceiling": 7,
+    "cli:ceiling": 6,
     "cli:check": 2,
     "cli:choose": 3,
     "cli:clean": 1,
@@ -29,9 +28,7 @@
     "cli:justfile-name": 1,
     "cli:list": 7,
     "cli:list-submodules": 8,
-    "cli:man": 1,
     "cli:no-aliases": 1,
-    "cli:request": 3,
     "cli:search-directory": 2,
     "cli:set": 7,
     "cli:shell-command": 1,
@@ -47,11 +44,11 @@
     "completions": 12,
     "dotenv": 1,
     "grammar": 51,
-    "module": 85,
+    "module": 83,
     "setting:fallback": 6,
     "shebang": 1,
     "unstable:cached-recipes": 85,
-    "unstable:lists": 239,
+    "unstable:lists": 238,
     "unstable:user-defined-functions": 32
   },
   "groups": {
@@ -174,15 +171,7 @@
       "alias_style::right#1": "passes --alias-style",
       "alias_style::separate#1": "passes --alias-style"
     },
-    "cli:allow-missing": {
-      "allow_missing::allow_missing_does_not_apply_to_compilation_errors#1": "passes --allow-missing",
-      "allow_missing::allow_missing_does_not_apply_to_other_subcommands#1": "passes --allow-missing",
-      "allow_missing::allow_missing_ignores_absent_optional_module#1": "passes --allow-missing",
-      "allow_missing::allow_missing_modules_in_run_invocation#2": "passes --allow-missing",
-      "allow_missing::allow_missing_recipes_in_run_invocation#2": "passes --allow-missing"
-    },
     "cli:ceiling": {
-      "ceiling::ceiling_can_be_passed_as_environment_variable#1": "sets JUST_CEILING",
       "global_fallback_justfile::can_be_passed_as_environment_variable#1": "passes --ceiling",
       "global_fallback_justfile::ignored_with_justfile#1": "passes --ceiling",
       "global_fallback_justfile::used_at_most_once#1": "passes --ceiling",
@@ -438,16 +427,8 @@
       "modules::group_attribute_on_module_list_submodule#1": "passes --list-submodules",
       "modules::group_attribute_on_module_list_submodule_unsorted#1": "passes --list-submodules"
     },
-    "cli:man": {
-      "man::output#1": "passes --man"
-    },
     "cli:no-aliases": {
       "no_aliases::skip_alias#1": "passes --no-aliases"
-    },
-    "cli:request": {
-      "constants::constants_are_not_exported#1": "runs just with --request",
-      "request::environment_variable_missing#1": "runs just with --request",
-      "request::environment_variable_set#1": "runs just with --request"
     },
     "cli:search-directory": {
       "fallback::fallback_from_subdir_message#1": "names a recipe by a directory path",
@@ -593,7 +574,6 @@
       "alias::alias_to_absent_optional_module_is_disabled#1": "uses mod or import",
       "alias::module_alias#1": "uses mod or import",
       "alias::unknown_nested_alias#1": "uses mod or import",
-      "allow_missing::allow_missing_modules_in_run_invocation#1": "names a module path on the command line",
       "dependencies::dependency_not_in_submodule#1": "uses mod or import",
       "dependencies::recipe_dependency_on_module_fails#1": "uses mod or import",
       "error_messages::file_paths_are_relative#1": "uses mod or import",
@@ -653,7 +633,6 @@
       "modules::submodule_dotenv_overrides_root#1": "uses mod or import",
       "modules::submodule_loads_own_dotenv#1": "uses mod or import",
       "modules::submodule_recipe_not_found_colon_separated_error_message#1": "uses mod or import",
-      "modules::submodule_recipe_not_found_error_message#1": "names a module path on the command line",
       "modules::submodule_recipe_not_found_spaced_error_message#1": "uses mod or import",
       "modules::submodules_do_not_inherit_no_cd_setting#1": "uses mod or import",
       "modules::sugest_similarly_named_submodules#1": "uses mod or import",
@@ -822,7 +801,6 @@
       "booleans::semver_matches_false_falls_through_or#1": "uses `set lists`",
       "booleans::semver_matches_true_is_truthy#1": "uses `set lists`",
       "booleans::which_missing_falls_through_or#1": "uses `set lists`",
-      "changelog::print_changelog#1": "expects the unstable gate: require `set lists`",
       "comparison::and_short_circuits_on_false_comparison#1": "uses `set lists`",
       "comparison::combined_with_and#1": "uses `set lists`",
       "comparison::empty_list_does_not_equal_empty_string#1": "uses `set lists`",

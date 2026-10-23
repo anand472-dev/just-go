@@ -21,6 +21,9 @@
 #   unsupported-shell  a completion script for a shell the spec does not target
 #                (elvish, nushell); just-go refuses to generate it
 #                (the documented divergence; the oracle passes these cases)
+#   cli-identity  output that names the program: just-go prints its own name, so
+#                a case that expects "just" (the man page header) differs only in the
+#                name (the documented divergence; the oracle passes these cases)
 # Empty directories, symbolic links, and file modes are recorded (R8) and the
 # harness materializes them, so they are never a reason here.
 
@@ -47,3 +50,4 @@ dotenv::dotenv_path_does_not_override_dotenv_file#1 strict-path: dotenv-path '.'
 error_messages::file_paths_not_in_subdir_are_absolute#1 strict-path: foo/justfile imports ../bar.just, outside the project directory foo/, which upstream allows
 completions::completion_scripts#2 unsupported-shell: the spec's completion shells are bash, zsh, fish and PowerShell; elvish is not one, so just-go generates no script for it (ruling, Phase 5 Task 31)
 completions::completion_scripts#4 unsupported-shell: the spec's completion shells are bash, zsh, fish and PowerShell; nushell is not one, so just-go generates no script for it (ruling, Phase 5 Task 31)
+man::output#1 cli-identity: the man page names just-go, not just, in its header, name and synopsis; the content is upstream's, with the name changed
