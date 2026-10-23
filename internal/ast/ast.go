@@ -31,6 +31,23 @@ type Justfile struct {
 	// ListUses lists, in the order the parser met them, the places that use a
 	// feature of `set lists`. Without that setting the first is an error.
 	ListUses []ListUse
+	// Imports are the `import` statements of this file, in source order. The
+	// loader merges what they name into the justfile that holds them.
+	Imports []Import
+	// Unit is the file this tree was parsed from, when it is an imported file
+	// and so not the root. It is nil for the root, and it is what a recipe or
+	// assignment that came from an import points at for its error location.
+	Unit *Justfile
+}
+
+// Import is an `import` or `import?` statement. Path is the string as written,
+// and Line, Col and Width locate the string, quotes included.
+type Import struct {
+	Path     string
+	Optional bool
+	Line     int
+	Col      int
+	Width    int
 }
 
 // UnstableFeature is a feature upstream refuses to run unless unstable
@@ -210,6 +227,8 @@ type Assignment struct {
 	Private bool
 	Line    int
 	Col     int
+	// Unit is the file the assignment came from, nil for the root file.
+	Unit *Justfile
 }
 
 // Recipe is a named recipe. A leading `@` on the recipe name is folded into
@@ -240,6 +259,8 @@ type Recipe struct {
 	Quiet bool
 	Line  int
 	Col   int
+	// Unit is the file the recipe came from, nil for the root file.
+	Unit *Justfile
 }
 
 // RawLine is one physical line of a recipe's body, as a script has it.

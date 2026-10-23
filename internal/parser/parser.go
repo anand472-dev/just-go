@@ -320,8 +320,48 @@ func (p *parser) statement(jf *ast.Justfile, attrs attributeSet) error {
 	case p.isKeywordAssignment():
 		p.next()
 		return p.assignment(jf, attrs, t.Text)
+	case p.isImport():
+		return p.importItem(jf)
 	}
 	return p.recipe(jf, attrs)
+}
+
+// isImport reports whether the current `import` is the keyword, which upstream
+// reads when a string or a `?` follows it, rather than a recipe or a name.
+func (p *parser) isImport() bool {
+	if p.peek().Kind != lexer.Ident || p.peek().Text != "import" {
+		return false
+	}
+	switch p.peekAt(1).Kind {
+	case lexer.QuestionMark, lexer.String:
+		return true
+	case lexer.Ident:
+		return p.peekAt(2).Kind == lexer.String
+	}
+	return false
+}
+
+// importItem parses `import 'path'` or `import? 'path'`. The path must be a
+// string; any other token is upstream's error for the keyword `x` it wanted.
+func (p *parser) importItem(jf *ast.Justfile) error {
+	p.next()
+	optional := p.accept(lexer.QuestionMark)
+	t := p.peek()
+	if t.Kind != lexer.String {
+		what := found(t)
+		if t.Kind == lexer.Ident {
+			what = fmt.Sprintf("identifier `%s`", t.Text)
+		}
+		return p.errAt(t, "expected keyword `x` but found "+what)
+	}
+	path, err := p.stringValue()
+	if err != nil {
+		return err
+	}
+	jf.Imports = append(jf.Imports, ast.Import{
+		Path: path, Optional: optional, Line: t.Line, Col: t.Col, Width: tokenWidth(t),
+	})
+	return p.endLine()
 }
 
 // isKeywordAssignment reports whether the current token is the `export` or

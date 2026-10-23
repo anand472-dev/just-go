@@ -175,6 +175,13 @@ func findIn(fsys sys.FS, dir string) (string, error) {
 // the line it is on. The tree keeps the text it was read from, so that a
 // failure while a recipe runs can quote its line. Impure: it reads fsys.
 func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
+	return LoadHome(fsys, path, "")
+}
+
+// LoadHome is Load with home, the directory that an import beginning with `~/`
+// starts from. The library never reads the environment, so the caller passes
+// the home directory it has; with home empty, such an import is not found.
+func LoadHome(fsys sys.FS, path, home string) (*ast.Justfile, error) {
 	src, err := fsys.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read justfile: %w", err)
@@ -183,9 +190,178 @@ func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
 	if err != nil {
 		return nil, diag.WithSource(err, src)
 	}
+	if err := expandImports(fsys, jf, src, home); err != nil {
+		return nil, err
+	}
 	if err := analyzer.Analyze(jf); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
 	jf.Source = src
 	return jf, nil
+}
+
+// pendingImport is an imported file that is waiting to be merged: the file, its
+// text, its tree, and the files that import it, from the root down.
+type pendingImport struct {
+	file   string
+	src    []byte
+	jf     *ast.Justfile
+	parent []string
+}
+
+// expandImports merges the files that root imports into root, which is the file
+// at src's text. It follows upstream's order: the root's own items come first,
+// then each import is taken from a stack, so the last one an item names is
+// merged first and the imports of an import come before its siblings. A file
+// is merged once. An import that names a file which imports it back, directly
+// or through others, is a circular import. An optional import that is missing
+// is skipped; a required one that is missing is an error at its string.
+func expandImports(fsys sys.FS, root *ast.Justfile, src []byte, home string) error {
+	seen := map[string]bool{}
+	stack := []pendingImport{{file: root.File, src: src, jf: root}}
+	for len(stack) > 0 {
+		cur := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if cur.jf != root {
+			mergeUnit(root, cur.jf)
+		}
+		for _, imp := range cur.jf.Imports {
+			next, found, err := nextImport(fsys, seen, cur, imp, home)
+			if err != nil {
+				return err
+			}
+			if found {
+				stack = append(stack, next)
+			}
+		}
+	}
+	return nil
+}
+
+// nextImport checks one import of cur and returns the file it names, ready to
+// merge, when it is a file that is not merged yet. found is false for an
+// optional import that is missing and for a file already merged.
+func nextImport(fsys sys.FS, seen map[string]bool, cur pendingImport, imp ast.Import, home string) (pendingImport, bool, error) {
+	path := importPath(cur.file, imp.Path, home)
+	ok, err := fsys.IsFile(path)
+	if err != nil {
+		return pendingImport{}, false, fmt.Errorf("import %s: %w", path, err)
+	}
+	if !ok {
+		if imp.Optional {
+			return pendingImport{}, false, nil
+		}
+		return pendingImport{}, false, diag.WithSource(missingImport(cur.file, imp), cur.src)
+	}
+	chain := append(append([]string(nil), cur.parent...), cur.file)
+	if contains(chain, path) {
+		return pendingImport{}, false, diag.WithSource(circularImport(cur.file, path), cur.src)
+	}
+	if seen[path] {
+		return pendingImport{}, false, nil
+	}
+	seen[path] = true
+	next, err := readImport(fsys, path)
+	if err != nil {
+		return pendingImport{}, false, err
+	}
+	next.parent = chain
+	return next, true, nil
+}
+
+// importPath is the file an import names: relative to the directory of the
+// importing file, or, when it begins with `~/`, to the home directory. It is
+// pure.
+func importPath(importer, name, home string) string {
+	if rest, ok := strings.CutPrefix(name, "~/"); ok {
+		return filepath.Join(home, rest)
+	}
+	if filepath.IsAbs(name) {
+		return filepath.Clean(name)
+	}
+	return filepath.Join(filepath.Dir(importer), name)
+}
+
+// readImport reads and parses the imported file at path.
+func readImport(fsys sys.FS, path string) (pendingImport, error) {
+	src, err := fsys.ReadFile(path)
+	if err != nil {
+		return pendingImport{}, fmt.Errorf("read import: %w", err)
+	}
+	jf, err := parser.Parse(path, src)
+	if err != nil {
+		return pendingImport{}, diag.WithSource(err, src)
+	}
+	return pendingImport{file: path, src: src, jf: jf}, nil
+}
+
+// mergeUnit appends the items of an imported file to root, marking each with
+// the file it came from. Settings and unstable features are merged as well.
+func mergeUnit(root, unit *ast.Justfile) {
+	for _, a := range unit.Assignments {
+		if root.Settings.AllowDuplicateVariables && hasAssignment(root, a.Name) {
+			continue
+		}
+		a.Unit = unit
+		root.Assignments = append(root.Assignments, a)
+	}
+	for _, r := range unit.Recipes {
+		if root.Settings.AllowDuplicateRecipes && hasRecipe(root, r.Name) {
+			continue
+		}
+		r.Unit = unit
+		root.Recipes = append(root.Recipes, r)
+	}
+	root.Unstable = append(root.Unstable, unit.Unstable...)
+	root.ListUses = append(root.ListUses, unit.ListUses...)
+}
+
+// hasAssignment reports whether root holds an assignment named name. It is
+// pure.
+func hasAssignment(root *ast.Justfile, name string) bool {
+	for _, a := range root.Assignments {
+		if a.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// hasRecipe reports whether root holds a recipe named name. It is pure.
+func hasRecipe(root *ast.Justfile, name string) bool {
+	for _, r := range root.Recipes {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// missingImport is the error for a required import whose file is not there, at
+// the string that names it.
+func missingImport(file string, imp ast.Import) *diag.Error {
+	return &diag.Error{
+		Kind: diag.KindAnalysis, File: file, Line: imp.Line, Col: imp.Col, Width: imp.Width,
+		Msg: "could not find source file for import",
+	}
+}
+
+// circularImport is the error for an import of a file that is already being
+// merged, which upstream words with the file that imports it. Upstream gives
+// it no location, so it has none.
+func circularImport(file, path string) *diag.Error {
+	return &diag.Error{
+		Kind: diag.KindAnalysis,
+		Msg:  fmt.Sprintf("import `%s` in `%s` is circular", path, file),
+	}
+}
+
+// contains reports whether s is one of list.
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

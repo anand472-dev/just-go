@@ -256,6 +256,9 @@ func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 			return nil, usage("justfile contains no recipes")
 		}
 		r := defaultRecipe(recipes)
+		if r == nil {
+			return nil, usage("justfile contains no default recipe")
+		}
 		if min := requiredParams(r); min > 0 && len(args) == 0 {
 			return nil, usage("recipe `%s` cannot be used as default recipe since it requires at least %s",
 				r.Name, count(min, "argument"))
@@ -274,14 +277,21 @@ func legacyCalls(jf *ast.Justfile, names, args []string) ([]Call, error) {
 }
 
 // defaultRecipe is the recipe that runs when none is named: the one with
-// `[default]`, else the first. recipes is not empty. It is pure.
+// `[default]`, else the first recipe of the root file, since a recipe from an
+// import is never the default. It is nil when the root has no recipe to run.
+// It is pure.
 func defaultRecipe(recipes []ast.Recipe) *ast.Recipe {
 	for i := range recipes {
 		if recipes[i].Attribute(ast.AttrDefault) != nil {
 			return &recipes[i]
 		}
 	}
-	return &recipes[0]
+	for i := range recipes {
+		if recipes[i].Unit == nil {
+			return &recipes[i]
+		}
+	}
+	return nil
 }
 
 // findRecipe returns the recipe of jf named name, or nil. Of recipes that

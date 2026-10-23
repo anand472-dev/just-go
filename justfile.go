@@ -143,7 +143,7 @@ func Load(opts Options) (*Justfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	tree, err := loader.Load(fsys, path)
+	tree, err := loader.LoadHome(fsys, path, homeOf(opts.Env))
 	if err != nil {
 		return nil, err
 	}
@@ -306,4 +306,15 @@ func runnerCalls(calls []Call) []runner.Call {
 		out[i] = runner.Call{Recipe: c.Recipe, Args: c.Args}
 	}
 	return out
+}
+
+// homeOf is the value of HOME in env, the last entry for it, or "". It is pure.
+func homeOf(env []string) string {
+	home := ""
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "HOME="); ok {
+			home = v
+		}
+	}
+	return home
 }
