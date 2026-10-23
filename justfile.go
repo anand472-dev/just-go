@@ -247,17 +247,43 @@ func (j *Justfile) Fallback() bool {
 // Cancelling ctx kills the running child and Run returns ctx.Err(). Impure:
 // it runs processes through opts.Exec and writes to opts' streams.
 func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
-	if err := j.checkUnstable(opts.Unstable); err != nil {
+	plan, err := j.plan(opts)
+	if err != nil {
 		return Result{}, err
+	}
+	res, err := runner.Run(ctx, plan)
+	return Result{ExitCode: res.ExitCode}, err
+}
+
+// Binding is an assignment and its value, as Evaluate returns it.
+type Binding = runner.Binding
+
+// Evaluate returns the values of the assignments named, sorted by name, or of
+// every assignment that is not private when no name is given. A name is
+// evaluated with the assignments it uses, and backticks run, as for a run.
+func (j *Justfile) Evaluate(ctx context.Context, opts Options, names []string) ([]Binding, error) {
+	plan, err := j.plan(opts)
+	if err != nil {
+		return nil, err
+	}
+	return runner.Evaluate(ctx, plan, names)
+}
+
+// plan is the runner's plan for opts: the justfile, the environment, and the
+// working directory, which is opts.WorkDir or the justfile's directory. The
+// unstable check is made here, as for a run.
+func (j *Justfile) plan(opts Options) (runner.Plan, error) {
+	if err := j.checkUnstable(opts.Unstable); err != nil {
+		return runner.Plan{}, err
 	}
 	dir := opts.WorkDir
 	if dir == "" {
 		dir = j.dir
 	}
 	if dir == "" {
-		return Result{}, usage("no working directory: set Options.WorkDir for a justfile parsed from memory")
+		return runner.Plan{}, usage("no working directory: set Options.WorkDir for a justfile parsed from memory")
 	}
-	res, err := runner.Run(ctx, runner.Plan{
+	return runner.Plan{
 		Justfile:          j.tree,
 		Recipes:           opts.Recipes,
 		AllowOutsidePaths: opts.AllowOutsidePaths,
@@ -280,8 +306,7 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		Platform:          opts.Platform,
 		Random:            opts.Random,
 		Jobs:              opts.Jobs,
-	})
-	return Result{ExitCode: res.ExitCode}, err
+	}, nil
 }
 
 // checkUnstable returns upstream's error for the first unstable feature the

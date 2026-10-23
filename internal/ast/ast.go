@@ -258,8 +258,8 @@ type Assignment struct {
 	// value`, which `set lazy` evaluates even when nothing uses it.
 	Exported bool
 	Eager    bool
-	// Private is true for `[private] name := value`, which keeps the variable
-	// out of the listing of variables.
+	// Private is true for `[private] name := value`, and for any name that starts
+	// with an underscore. It keeps the variable out of the listing of variables.
 	Private bool
 	Line    int
 	Col     int

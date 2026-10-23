@@ -439,7 +439,8 @@ func (p *parser) endLine() error {
 
 // assignment parses `name := value`, through its line break. keyword is the
 // `export` or `eager` that came before the name, already consumed, or "". The
-// only attribute an assignment can have is `[private]`.
+// only attribute an assignment can have is `[private]`; a name that starts with
+// an underscore is private too, as upstream has it.
 func (p *parser) assignment(jf *ast.Justfile, attrs attributeSet, keyword string) error {
 	name := p.next()
 	p.next() // :=
@@ -453,7 +454,7 @@ func (p *parser) assignment(jf *ast.Justfile, attrs attributeSet, keyword string
 	if ast.Enabled(attrs.attrs, p.goos) {
 		jf.Assignments = append(jf.Assignments, ast.Assignment{
 			Name: name.Text, Value: value, Exported: keyword == "export", Eager: keyword == "eager",
-			Private: attrs.find(ast.AttrPrivate) != nil, Line: name.Line, Col: name.Col,
+			Private: attrs.find(ast.AttrPrivate) != nil || strings.HasPrefix(name.Text, "_"), Line: name.Line, Col: name.Col,
 		})
 	}
 	return p.endLine()

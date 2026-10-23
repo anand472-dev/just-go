@@ -21,6 +21,8 @@ import (
 
 	just "gitea.com/wimwian/just-go"
 	"gitea.com/wimwian/just-go/internal/diag"
+	"gitea.com/wimwian/just-go/internal/output"
+	"gitea.com/wimwian/just-go/internal/suggest"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
@@ -61,10 +63,7 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		report(stderr, err)
 		return exitUsage
 	}
-	childOut, childErr := stdout, stderr
-	if cfg.quiet {
-		childOut, childErr = io.Discard, io.Discard
-	}
+	childOut, childErr := childStreams(cfg.quiet, stdout, stderr)
 	opts := just.Options{
 		Unstable:          cfg.isUnstable(env),
 		Justfile:          resolve(workDir, cfg.justfile),
@@ -87,6 +86,9 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if err != nil {
 		return fail(stderr, cfg.quiet, err)
 	}
+	if cfg.evaluate {
+		return evaluate(cfg, jf, opts, stdout, stderr)
+	}
 	if cfg.list || (len(cfg.words) == 0 && jf.DefaultList()) {
 		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
 		return 0
@@ -100,6 +102,36 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		return fail(stderr, cfg.quiet, err)
 	}
 	return res.ExitCode
+}
+
+// evaluate prints what --evaluate asks for: the value of the one name it was
+// given, or else every public assignment (see output.Evaluate). It takes at
+// most one name; a further word is a usage error, as upstream's. Impure: it
+// runs the justfile's backticks through opts.Exec.
+func evaluate(cfg config, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) int {
+	if len(cfg.words) > 0 {
+		return fail(stderr, cfg.quiet, usage("`--evaluate` used with unexpected argument: `%s`", cfg.words[0]))
+	}
+	var names []string
+	if cfg.evaluateName != "" {
+		names = []string{cfg.evaluateName}
+	}
+	bindings, err := jf.Evaluate(context.Background(), opts, names)
+	if err != nil {
+		return fail(stderr, cfg.quiet, err)
+	}
+	_, _ = io.WriteString(stdout, output.Evaluate(bindings, cfg.evaluateName))
+	return 0
+}
+
+// childStreams are the streams the recipes write to: the command's own, or
+// nothing when quiet, as upstream's --quiet discards the recipes' output too.
+// Pure.
+func childStreams(quiet bool, stdout, stderr io.Writer) (io.Writer, io.Writer) {
+	if quiet {
+		return io.Discard, io.Discard
+	}
+	return stdout, stderr
 }
 
 // isUnstable reports whether unstable features are enabled by --unstable or by
@@ -251,6 +283,10 @@ type config struct {
 	// allowOutside is --allow-outside-project-paths, which lifts the strict path
 	// rule for imports, modules and dotenv files.
 	allowOutside bool
+	// evaluate is --evaluate, and evaluateName the name it was given, if any:
+	// the value is optional, so it may be attached or the next argument.
+	evaluate     bool
+	evaluateName string
 }
 
 // parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable,
@@ -296,6 +332,9 @@ func parseLong(cfg *config, arg string, rest []string) (int, error) {
 	if !ok {
 		return 0, usage("unexpected argument '%s' found", arg)
 	}
+	if long == "evaluate" {
+		return parseEvaluate(cfg, value, attached, rest)
+	}
 	if !takesValue(long) {
 		if attached {
 			return 0, usage("unexpected value for '--%s'", long)
@@ -311,6 +350,22 @@ func parseLong(cfg *config, arg string, rest []string) (int, error) {
 		value, used = rest[0], 1
 	}
 	return used, setFlag(cfg, long, value)
+}
+
+// parseEvaluate applies --evaluate, whose name is optional: attached as
+// --evaluate=NAME, else the next argument when that is not a flag. The result
+// is how many of rest it consumed. Pure apart from updating cfg.
+func parseEvaluate(cfg *config, value string, attached bool, rest []string) (int, error) {
+	cfg.evaluate = true
+	switch {
+	case attached:
+		cfg.evaluateName = value
+		return 0, nil
+	case len(rest) > 0 && !strings.HasPrefix(rest[0], "-"):
+		cfg.evaluateName = rest[0]
+		return 1, nil
+	}
+	return 0, nil
 }
 
 // parseShort applies the short flags in arg ("-l", "-lq", "-fPATH"). A flag
@@ -359,7 +414,7 @@ func valueName(long string) string {
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes", "allow-outside-project-paths":
+	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes", "allow-outside-project-paths", "evaluate":
 		return name, true
 	}
 	return "", false
@@ -491,54 +546,23 @@ func hasRecipe(params map[string]int, name string) bool {
 // upstream's, with upstream's suggestion of a recipe it may have meant. Pure.
 func missingRecipe(name string, infos []just.RecipeInfo) *diag.Error {
 	msg := fmt.Sprintf("justfile does not contain recipe `%s`", name)
-	if suggestion, ok := suggest(name, infos); ok {
+	if suggestion, ok := suggestRecipe(name, infos); ok {
 		msg += fmt.Sprintf("\nDid you mean `%s`?", suggestion)
 	}
 	return usage("%s", msg)
 }
 
-// maxSuggestionDistance bounds a suggestion: upstream suggests a name only
-// when its edit distance from the word is below this.
-const maxSuggestionDistance = 3
-
-// suggest returns the public recipe whose name is closest to word by edit
-// distance, if one is closer than maxSuggestionDistance. On a tie the first
-// name in byte order wins, as upstream's search over its sorted recipes does.
-// A private recipe is never suggested. Pure.
-func suggest(word string, infos []just.RecipeInfo) (string, bool) {
-	best, bestDistance := "", maxSuggestionDistance
+// suggestRecipe returns the public recipe whose name is closest to word, if
+// one is close enough to suggest (see suggest.Closest). A private recipe is
+// never suggested, as upstream's. Pure.
+func suggestRecipe(word string, infos []just.RecipeInfo) (string, bool) {
+	var names []string
 	for _, info := range infos {
-		if info.Private {
-			continue
-		}
-		d := editDistance(word, info.Name)
-		if d < bestDistance || (d == bestDistance && d < maxSuggestionDistance && info.Name < best) {
-			best, bestDistance = info.Name, d
+		if !info.Private {
+			names = append(names, info.Name)
 		}
 	}
-	return best, best != ""
-}
-
-// editDistance is the Levenshtein distance between a and b, counted in runes
-// as upstream's strsim::levenshtein counts characters. Pure.
-func editDistance(a, b string) int {
-	x, y := []rune(a), []rune(b)
-	row := make([]int, len(y)+1)
-	for j := range row {
-		row[j] = j
-	}
-	for i := 1; i <= len(x); i++ {
-		diagonal := row[0]
-		row[0] = i
-		for j := 1; j <= len(y); j++ {
-			cost := 1
-			if x[i-1] == y[j-1] {
-				cost = 0
-			}
-			diagonal, row[j] = row[j], min(row[j]+1, row[j-1]+1, diagonal+cost)
-		}
-	}
-	return row[len(y)]
+	return suggest.Closest(word, names)
 }
 
 const (
