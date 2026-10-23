@@ -601,3 +601,25 @@ func TestParseKeepsTheRecipesOfTheHostSystem(t *testing.T) {
 		t.Errorf("recipes on %s = %v, want %v", runtime.GOOS, names, want)
 	}
 }
+
+// The environment functions read the Env of the options, and the system
+// functions the Platform, Random and Jobs of the options, and nothing of the
+// process that embeds the library.
+func TestEmbedFunctionsAskTheHostNotTheProcess(t *testing.T) {
+	t.Setenv("JUST_GO_EMBED_PROBE", "from the process")
+	j := mustParse(t, "set unstable\nset lists\nfoo:\n  @echo {{env_var_or_default('JUST_GO_EMBED_PROBE', 'none')}} {{env_var('X')}} {{os()}} {{arch()}} "+
+		"{{num_cpus()}} {{just_pid()}} {{choose('3', 'ab')}} [{{num_jobs()}}] {{just_version()}}\n")
+	proc := &sysfake.FakeProcess{}
+	_, err := j.Run(context.Background(), Options{
+		WorkDir: "/w", Exec: proc, Env: []string{"X=x"}, Jobs: 4,
+		Platform: sysfake.FakePlatform{GOOS: "linux", GOARCH: "amd64", CPUs: 3, Process: 77},
+		Random:   &sysfake.FakeRandom{Bytes: []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "echo none x linux x86_64 3 77 bab [4] 1.59.0"
+	if len(proc.Specs) != 1 || proc.Specs[0].Argv[len(proc.Specs[0].Argv)-1] != want {
+		t.Errorf("ran %+v, want %q", proc.Specs, want)
+	}
+}

@@ -156,3 +156,70 @@ type FakeClock struct {
 func (c FakeClock) Now() sys.Time {
 	return c.At
 }
+
+// FakeEnv is an in-memory sys.Env mapping variable name to value.
+type FakeEnv map[string]string
+
+// LookupEnv returns the value of key and whether the map has it. Pure: it
+// reads only the in-memory map.
+func (e FakeEnv) LookupEnv(key string) (string, bool) {
+	value, ok := e[key]
+	return value, ok
+}
+
+// FakePlatform is a sys.Platform whose answers are its fields, so that a test
+// can pose as any system.
+type FakePlatform struct {
+	// GOOS and GOARCH are what OS and Arch report.
+	GOOS, GOARCH string
+	// CPUs and Process are what NumCPU and PID report.
+	CPUs, Process int
+	// Path is what Executable reports, and ExecutableErr the error it
+	// returns, if any.
+	Path          string
+	ExecutableErr error
+	// Executables are the paths IsExecutable accepts.
+	Executables map[string]bool
+}
+
+// OS reports GOOS. Pure.
+func (p FakePlatform) OS() string { return p.GOOS }
+
+// Arch reports GOARCH. Pure.
+func (p FakePlatform) Arch() string { return p.GOARCH }
+
+// NumCPU reports CPUs. Pure.
+func (p FakePlatform) NumCPU() int { return p.CPUs }
+
+// PID reports Process. Pure.
+func (p FakePlatform) PID() int { return p.Process }
+
+// Executable reports Path, or ExecutableErr when it is set. Pure.
+func (p FakePlatform) Executable() (string, error) { return p.Path, p.ExecutableErr }
+
+// IsExecutable reports whether path is one of Executables. Pure: it reads only
+// the in-memory map.
+func (p FakePlatform) IsExecutable(path string) bool { return p.Executables[path] }
+
+// FakeRandom is a sys.Random that returns the bytes it holds, in order, and
+// then fails with io.EOF, so that a test can pin what is drawn from it.
+type FakeRandom struct {
+	// Bytes are what the next reads return.
+	Bytes []byte
+	// Err, when set, is returned by every read instead.
+	Err error
+}
+
+// Read copies the next bytes into p. It is a failure to read more than are
+// left. Pure: it mutates only the fake's own bytes.
+func (r *FakeRandom) Read(p []byte) (int, error) {
+	if r.Err != nil {
+		return 0, r.Err
+	}
+	if len(r.Bytes) < len(p) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.Bytes)
+	r.Bytes = r.Bytes[n:]
+	return n, nil
+}

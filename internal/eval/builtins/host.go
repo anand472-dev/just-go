@@ -27,6 +27,32 @@ type Host struct {
 	// Unix translates the path of a file to the form a Unix shell reads, as
 	// `cygpath --unix` does on Windows. It is nil where paths already are.
 	Unix func(path string) string
+	// Env holds the variables that env, env_var and env_var_or_default read,
+	// and the PATH and PATHEXT that which and require search. It is what the
+	// caller passed in, never the process's own environment.
+	Env sys.Env
+	// Platform answers for the machine: os, arch, num_cpus, just_pid,
+	// just_executable, and whether a file found on PATH can be run.
+	Platform sys.Platform
+	// Random is where choose draws its characters from.
+	Random sys.Random
+	// Recipe is the name of the recipe the expression is part of, as it is
+	// written, which is not the name an alias gave. It is empty outside a
+	// recipe, such as in an assignment.
+	Recipe string
+	// IsDependency is true when that recipe runs as a dependency of another.
+	IsDependency bool
+	// Version is the version of upstream just whose behavior is followed,
+	// which is what just_version reports.
+	Version string
+	// Jobs is the number of recipes allowed to run at once, which num_jobs
+	// reports; zero means no limit was set.
+	Jobs int
+	// Shell runs command through the shell of the justfile, with args as the
+	// arguments of the command, and returns what it wrote to its standard
+	// output without the last line break. A failure is an error whose text is
+	// upstream's, without a location.
+	Shell func(command string, args []string) (string, error)
 }
 
 // HostFunc is a builtin that reads its Host. A failure is an error whose text

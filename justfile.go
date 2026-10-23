@@ -39,7 +39,7 @@ type Options struct {
 	// InvocationDir is the directory the command was run from, where recipes
 	// run under set no-cd. Empty means WorkDir.
 	InvocationDir string
-	Env           []string  // exact environment, "KEY=VALUE"; nil means empty, never the process environment
+	Env           []string  // exact environment, "KEY=VALUE"; nil means empty, never the process environment; env(), env_var() and which() read it too
 	Stdin         io.Reader // nil means no input; commands, and the commands of backticks, read it
 	Stdout        io.Writer // nil discards
 	Stderr        io.Writer // nil discards; receives echoed commands and failure messages
@@ -71,6 +71,16 @@ type Options struct {
 	// shell gets no arguments before the command.
 	Shell     string
 	ShellArgs []string
+	// Platform answers the questions of os(), arch(), num_cpus(), just_pid()
+	// and just_executable(), and says which files `which` and `require` can
+	// run; nil uses the system the program runs on.
+	Platform sys.Platform
+	// Random is where choose() draws its characters from; nil uses the
+	// system's source of randomness.
+	Random sys.Random
+	// Jobs is what num_jobs() reports, the number of recipes allowed to run
+	// at once; zero means no limit was set.
+	Jobs int
 	// Unstable enables unstable features, as upstream's --unstable flag and
 	// JUST_UNSTABLE variable do. A justfile can enable them itself with
 	// `set unstable`. Load and Run refuse a justfile that uses one of them
@@ -263,6 +273,9 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		Clock:         opts.Clock,
 		Shell:         opts.Shell,
 		ShellArgs:     opts.ShellArgs,
+		Platform:      opts.Platform,
+		Random:        opts.Random,
+		Jobs:          opts.Jobs,
 	})
 	return Result{ExitCode: res.ExitCode}, err
 }

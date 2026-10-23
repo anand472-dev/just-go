@@ -2,6 +2,7 @@ package sys
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"io/fs"
 	"os"
@@ -215,3 +216,45 @@ func fromTime(t time.Time) Time {
 	_, offset := t.Zone()
 	return Time{Unix: t.Unix(), Nano: t.Nanosecond(), Offset: offset}
 }
+
+// OSPlatform is the Platform of the system the program runs on.
+type OSPlatform struct {
+	// GOOS, when not empty, is the operating system OS reports, as
+	// runtime.GOOS names it, in place of the one the program runs on. It
+	// lets a host run a justfile as if it were on another system; the
+	// executable test still asks the real one.
+	GOOS string
+}
+
+// OS names the operating system: the override if there is one, else the system
+// the program was built for. Pure.
+func (p OSPlatform) OS() string {
+	if p.GOOS != "" {
+		return p.GOOS
+	}
+	return runtime.GOOS
+}
+
+// Arch names the processor architecture the program was built for. Pure.
+func (OSPlatform) Arch() string { return runtime.GOARCH }
+
+// NumCPU is the number of logical processors usable by the program. Impure:
+// it asks the system.
+func (OSPlatform) NumCPU() int { return runtime.NumCPU() }
+
+// PID is the number of the running process. Impure: it asks the system.
+func (OSPlatform) PID() int { return os.Getpid() }
+
+// Executable is the path of the running program. Impure: it asks the system.
+func (OSPlatform) Executable() (string, error) { return os.Executable() }
+
+// IsExecutable reports whether path is a file the system would run. Impure:
+// it touches the real filesystem.
+func (OSPlatform) IsExecutable(path string) bool { return isExecutable(path) }
+
+// OSRandom is the Random backed by the system's source of randomness.
+type OSRandom struct{}
+
+// Read fills p with random bytes. Impure: it reads the system's source of
+// randomness.
+func (OSRandom) Read(p []byte) (int, error) { return rand.Read(p) }

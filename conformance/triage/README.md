@@ -43,30 +43,30 @@ unstable case that also passes `--evaluate` is `unstable:lists`, not
 |---|---|
 | `unstable:<family>` | Uses an unstable feature (`cached-recipes`, `lists`, `user-defined-functions`) or expects its gate error. Logical operators, `!`, `++`, a comparison outside an `if` or `assert` condition, an `if` without `else`, and `which()` need `set lists`, so they are `lists`. The gate errors for a comparison outside a condition, an `if` without `else` and a condition that is not a comparison pass (Task 12); logical operators, `!` and `++` are not implemented. Out of scope (ruling R15). |
 | `completions` | Passes `--completions` or sets `JUST_COMPLETE`. |
-| `cli:<flag>` | Passes a flag the command does not implement, sets the `JUST_*` variable of one, or uses a command-line form the command does not implement: `cli:set` for `NAME=VALUE`, `cli:search-directory` for `dir/recipe`, `cli:justfile` for `--justfile -`, and `cli:list` for `--list <module>`. |
+| `cli:<flag>` | Passes a flag the command does not implement, has a recipe run the program `just_executable()` names with one, sets the `JUST_*` variable of one, or uses a command-line form the command does not implement: `cli:set` for `NAME=VALUE`, `cli:search-directory` for `dir/recipe`, `cli:justfile` for `--justfile -`, and `cli:list` for `--list <module>`. |
 | `module` | Uses `mod` or `import`, or names a `module::recipe` path. |
 | `dotenv` | Has a `.env` file or a `dotenv-*` setting. The settings are parsed and validated; the cases that remain need a file loaded or a command run (Phase 3). |
 | `setting:<name>` | Sets a setting that has no effect yet: `fallback` (needs the search of parent justfiles, Phase 3). |
 | `attribute` | Uses an attribute the parser does not implement yet: `[arg]`, which no task owns yet, or `[cache]`, which is unstable (Tasks 8 and 9 implemented the rest). A case that uses only the others is sorted by what else it uses. |
 | `shebang` | Has a shebang recipe or a `[script]` recipe. Task 11 implemented them, so the cases left here fail for what else they use: a variadic parameter (no task owns it yet) and `unexport`. |
-| `builtin:<family>` | Calls a builtin function that is not implemented yet (Task 14 implemented the string and case families, and the path functions that work on a string; Task 15 implemented the rest of the path family and the functions that name the justfile, the module and the invocation directory), or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
+| `builtin:<family>` | Calls a builtin function that is not implemented yet (Task 14 implemented the string and case families, and the path functions that work on a string; Task 15 implemented the rest of the path family and the functions that name the justfile, the module and the invocation directory; Task 16 implemented the environment, system, runtime, error, shell, which, require and choose functions), or uses a builtin constant (`builtin:constants`). Families: case, constants, datetime, directories, env, error, external, hash, invocation, path, random, semver, string, style, system. |
 | `grammar` | Uses other syntax outside the implemented subset (`alias`, `unexport`), or gets a parse error from just-go that upstream does not report or words differently (the reason quotes it), or gets a compile error that just-go words differently. |
 | `core-defect` | Uses only the implemented subset and still fails. Must be empty. |
 | `other` | Fails for a reason no rule above explains. |
 
 ## Current counts
 
-From the run recorded in `groups.json`: 515 pass, 1480 fail, 16 skip, of
+From the run recorded in `groups.json`: 533 pass, 1459 fail, 19 skip, of
 2011 cases.
 
 | Family | Cases |
 |---|---|
-| `cli:*` | 655 |
-| `unstable:*` | 379 |
+| `cli:*` | 659 |
+| `unstable:*` | 378 |
 | `attribute` | 112 |
 | `module` | 157 |
-| `grammar` | 75 |
-| `builtin:*` | 33 |
+| `grammar` | 76 |
+| `builtin:*` | 8 |
 | `completions` | 40 |
 | `dotenv` | 21 |
 | `setting:*` | 6 |

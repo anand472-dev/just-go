@@ -13,7 +13,8 @@
 # The categories are closed (ledger ruling R9):
 #   path-hash    a .justcache file named after the recorder's temporary path,
 #                which differs on every machine and run
-#   machine-env  a variable inherited from the recording machine, such as USER
+#   machine-env  a variable inherited from the recording machine, such as USER,
+#                or a fact about that machine, such as its architecture
 #   fifo         a named pipe fed by a thread in the upstream test, which the
 #                corpus cannot record
 # Empty directories, symbolic links, and file modes are recorded (R8) and the
@@ -35,3 +36,6 @@ cache::symlink_to_file_is_followed#2 path-hash: files hold a .justcache entry na
 cache::unexported_variable_does_not_invalidate_cache#2 path-hash: files hold a .justcache entry named by a hash of the recorder's temporary path, so the cache hit upstream expects cannot happen here
 dotenv::fifo#1 fifo: `.env` is a FIFO fed by a thread in the upstream test; the corpus cannot record it
 functions::env_var_functions_unix#1 machine-env: expects the recording user's USER (`pancha`) inherited from the recorder's environment
+functions::test_os_arch_functions_in_default#1 machine-env: expects the recording machine's architecture, operating system and processor count (aarch64, macos, 10), which the oracle prints on any other machine differently
+functions::test_os_arch_functions_in_expression#1 machine-env: expects the recording machine's architecture, operating system and processor count (aarch64, macos, 10), which the oracle prints on any other machine differently
+functions::test_os_arch_functions_in_interpolation#1 machine-env: expects the recording machine's architecture, operating system and processor count (aarch64, macos, 10), which the oracle prints on any other machine differently

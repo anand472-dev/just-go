@@ -1,6 +1,8 @@
 package eval
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -11,7 +13,8 @@ import (
 // evaluateCall evaluates the arguments of c, left to right, and then the
 // builtin it names. The error of an argument is returned as it is. The error
 // of the builtin is located at the name of the function, without a file, which
-// the caller fills in. A function that has no implementation yet, and a call
+// the caller fills in, except for the end of the run, which is passed on as it
+// is. A function that has no implementation yet, and a call
 // the analyzer would have refused (an unknown function, or a count of
 // arguments it does not take), are errors located the same way. It is pure
 // apart from what cmd does.
@@ -30,10 +33,19 @@ func evaluateCall(c ast.Call, scope Scope, cmd Commander) (string, error) {
 		return "", err
 	}
 	out, err := callBuiltin(c.Name, b, args, cmd)
-	if err != nil {
+	switch {
+	case ended(err):
+		return "", err
+	case err != nil:
 		return "", locateCall(fail("%s", err), c)
 	}
 	return out, nil
+}
+
+// ended reports whether err is the end of the run, which a builtin that ran a
+// command passes on as it is, and not a failure of the builtin. It is pure.
+func ended(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // Hosted is implemented by a Commander that can say where the justfile it

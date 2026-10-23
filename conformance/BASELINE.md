@@ -48,11 +48,21 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 13: Phase 1 gate (no new cases; ratchet adds 0) | 485 | 485 | 1510 | 16 |
 | Compat Task 14: string builtins | 505 | 505 | 1490 | 16 |
 | Compat Task 15: path builtins | 515 | 515 | 1480 | 16 |
+| Compat Task 16: environment, system, and runtime builtins | 533 | 533 | 1459 | 19 |
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the
 quoted line and carets), so a case that reports an error can match stderr
 byte for byte when its message matches.
+
+Task 16 added 18 baseline cases and 3 oracle exceptions. Of the 21 cases that
+pass, `functions::test_os_arch_functions_in_default#1`, `..._in_expression#1` and
+`..._in_interpolation#1` expect `aarch64 macos unix 10`: the architecture, the
+operating system and the number of processors of the machine that recorded the
+corpus. They pass only on that machine, so they are `machine-env` exceptions
+(skipped, not ratcheted) and not baseline cases. The functions that give those
+answers are tested with fakes, and `conformance/differential/cases-builtins-system.json`
+compares them with the oracle on the machine that runs the check.
 
 ## Platform-dependent baseline entries
 
@@ -66,8 +76,8 @@ recipe runs and the case fails. The other `os_attributes` baseline cases
 gate, and give the same output on any Unix. A scan of the other baseline
 cases for gates, `os()`, `arch()`, `windows-shell`, and backslash or path
 dependence found no other host-dependent case between macOS and Linux: the
-`arch()` cases fail to parse or to evaluate before `arch()` returns, and the
-`windows` cases do not select a shell. The shebang and `[script]` cases added
+three `arch()` cases that Task 16 made pass are oracle exceptions and not
+baseline cases (see above), and the `windows` cases do not select a shell. The shebang and `[script]` cases added
 since Task 11 (`attributes::extension#1` and `tempdir::setting#1` among them)
 print temporary-directory file names, but the corpus masks those with a regex
 or a glob, so they give the same result on any Unix. `signal_exit_message_*`

@@ -21,9 +21,11 @@ attributes::duplicate_attributes_are_disallowed#1
 attributes::duplicate_non_repeatable_attributes_are_forbidden#1
 attributes::env_attribute_duplicate_last_wins#1
 attributes::env_attribute_in_recipe_params#1
+attributes::env_attribute_is_visible_to_shell_function#1
 attributes::env_attribute_multiple#1
 attributes::env_attribute_name_cannot_reference_parameter#1
 attributes::env_attribute_name_with_expression#1
+attributes::env_attribute_not_in_env_function#1
 attributes::env_attribute_overrides_export#1
 attributes::env_attribute_overrides_export_in_script#1
 attributes::env_attribute_single#1
@@ -63,6 +65,8 @@ conditional::undefined_otherwise#1
 conditional::undefined_rhs#1
 conditional::undefined_then#1
 conditional::unexpected_op#1
+confirm::confirm_expression_is_dependency_is_false_for_direct_invocation#1
+confirm::confirm_expression_is_dependency_is_true_for_dependency_invocation#1
 confirm::confirm_recipe#1
 confirm::confirm_recipe_arg#1
 confirm::confirm_recipe_with_prompt#1
@@ -132,8 +136,11 @@ functions::broken_without_extension_function#1
 functions::capitalize#1
 functions::clean#1
 functions::dir_abbreviations_are_accepted#1
+functions::env_var_failure#1
 functions::invalid_replace_regex#1
 functions::invocation_dir_native_abbreviation_is_accepted#1
+functions::is_dependency#1
+functions::is_dependency#2
 functions::kebabcase#1
 functions::lowercamelcase#1
 functions::lowercase#1
@@ -141,11 +148,15 @@ functions::num_jobs_requires_lists#1
 functions::parent_directory_of_bare_filename#1
 functions::path_functions#1
 functions::path_functions2#1
+functions::recipe_name#1
+functions::recipe_name_in_dependency_argument#1
+functions::recipe_name_in_parameter_default#1
 functions::replace#1
 functions::replace_regex#1
 functions::shoutykebabcase#1
 functions::shoutysnakecase#1
 functions::snakecase#1
+functions::test_just_executable_function#1
 functions::titlecase#1
 functions::trim#1
 functions::uppercamelcase#1
@@ -201,6 +212,7 @@ list::doc_above_wide_signature#1
 list::empty_doc_attributes_are_ignored#1
 list::empty_doc_comments_are_ignored#1
 list_literals::list_literals_requires_lists_setting#1
+lists::env_single_missing_key_keeps_singular_message#1
 lists::lists_setting_is_unstable#1
 markdown::no_code_blocks#1
 minimum_version::minimum_version_invalid#1
@@ -248,6 +260,7 @@ misc::default_string#1
 misc::default_variable#1
 misc::dependency_argument_assignment#1
 misc::dependency_argument_backtick#1
+misc::dependency_argument_function#1
 misc::dependency_argument_parameter#1
 misc::dependency_argument_string#1
 misc::dependency_takes_arguments_at_least#1
@@ -258,6 +271,10 @@ misc::duplicate_dependency_no_args#1
 misc::duplicate_parameter#1
 misc::duplicate_recipe#1
 misc::duplicate_variable#1
+misc::env_function_as_env_var#1
+misc::env_function_as_env_var_or_default#1
+misc::env_function_as_env_var_or_default_with_existing_env_var#1
+misc::env_function_as_env_var_with_existing_env_var#1
 misc::exclude_non_cycle_prefix_from_circular_variable_dependency_error#1
 misc::extra_leading_whitespace#1
 misc::inconsistent_leading_whitespace#1
@@ -512,4 +529,5 @@ working_directory::no_cd_overrides_setting#1
 working_directory::setting#1
 working_directory::setting_and_attribute#1
 working_directory::working_dir_applies_to_backticks#1
+working_directory::working_dir_applies_to_shell_function#1
 working_directory::working_directory_setting_conflicts_with_no_cd_setting#1

@@ -3,10 +3,13 @@
 (Task 6 in cases.json, Task 7 in cases-unstable.json, Task 8 in
 cases-attributes.json, Task 9 in cases-attributes-b.json, Task 10 in
 cases-backticks.json, Task 12 in cases-conditionals.json, Task 14 in
-cases-builtins-string.json, Task 15 in cases-builtins-path.json) against the oracle
+cases-builtins-string.json, Task 15 in cases-builtins-path.json, Task 16 in
+cases-builtins-system.json) against the oracle
 and against bin/just-go, and compares exit status, stdout and stderr (the
 temporary directory is masked as $D). A case may set "env", added to the
-environment of both, "cwd", the directory under the temporary one to run in,
+environment of both (a value null removes the variable, and `$D` in a value is
+the temporary directory), "modes", a file mode (octal text) for each file that
+is not the default, "cwd", the directory under the temporary one to run in,
 "stdin", the input of both, and "mask_time", which masks the times that
 `[timestamp]` prints (`[12:34:56]`, with any fraction) as `[T]`.
 
@@ -33,6 +36,17 @@ CASES = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__))
 TIME = re.compile(r"\[\d\d:\d\d:\d\d(\.\d+)?\]")
 
 
+def environment(case, d):
+    """The environment of a run in the temporary directory d."""
+    env = {"PATH": "/usr/bin:/bin", "HOME": d}
+    for key, value in case.get("env", {}).items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value.replace("$D", d)
+    return env
+
+
 def run(binary, case):
     with tempfile.TemporaryDirectory() as d:
         for name, text in case["files"].items():
@@ -40,12 +54,14 @@ def run(binary, case):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w") as f:
                 f.write(text)
+            if name in case.get("modes", {}):
+                os.chmod(path, int(case["modes"][name], 8))
         wd = os.path.join(d, case.get("cwd", ""))
         os.makedirs(wd, exist_ok=True)
         r = subprocess.run(
             [binary, "--shell", "bash"] + case.get("args", []),
             cwd=wd, capture_output=True, text=True, input=case.get("stdin", ""),
-            env={"PATH": "/usr/bin:/bin", "HOME": d, **case.get("env", {})},
+            env=environment(case, d),
         )
         stderr = r.stderr.replace(d, "$D")
         if case.get("mask_time"):

@@ -149,6 +149,54 @@ type Clock interface {
 	Now() Time
 }
 
+// Env is the environment a program reads its variables from. A host hands
+// one over, so that nothing reads the process's own environment unasked.
+type Env interface {
+	// LookupEnv returns the value of the variable called key, and whether
+	// there is one. A variable may be set to the empty string.
+	LookupEnv(key string) (value string, ok bool)
+}
+
+// EnvList is an Env made of "KEY=VALUE" entries, such as os.Environ returns.
+// When a key has several entries the last wins, as it does for a child
+// process, and a key is matched as the platform matches environment keys.
+type EnvList []string
+
+// LookupEnv returns the value of the last entry for key. An empty key names
+// no variable. Pure.
+func (e EnvList) LookupEnv(key string) (string, bool) {
+	if key == "" {
+		return "", false
+	}
+	return envValue(e, key)
+}
+
+// Platform is what a program learns about the machine it runs on and about
+// itself: the questions whose answers do not come from a file or from the
+// caller's environment.
+type Platform interface {
+	// OS names the operating system as runtime.GOOS does, such as "darwin".
+	OS() string
+	// Arch names the processor architecture as runtime.GOARCH does, such as
+	// "arm64".
+	Arch() string
+	// NumCPU is the number of logical processors the program can use.
+	NumCPU() int
+	// PID is the number of the running process.
+	PID() int
+	// Executable is the path of the program that is running.
+	Executable() (string, error)
+	// IsExecutable reports whether path is a file the system would run: a
+	// regular file with an execute permission, or, on Windows, one with an
+	// extension. A path that cannot be examined is not.
+	IsExecutable(path string) bool
+}
+
+// Random is a source of random bytes. A read fills p completely or fails.
+type Random interface {
+	Read(p []byte) (n int, err error)
+}
+
 // Captured is how a program that Capture ran ended, and what it wrote to its
 // standard output.
 type Captured struct {

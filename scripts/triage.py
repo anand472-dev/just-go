@@ -14,7 +14,8 @@ The groups, in the order the rules are tried (the first that matches wins):
   unstable:<family>  uses a feature upstream gates behind --unstable
   completions        shell completion scripts or dynamic completion
   cli:<flag>         passes a command-line flag (or JUST_* variable, or a
-                     NAME=VALUE override) the command does not implement
+                     NAME=VALUE override) the command does not implement, or
+                     has a recipe run just_executable() with one
   module             `mod` or `import`
   dotenv             .env loading and the dotenv settings (which are parsed
                      and validated, but nothing loads a file yet)
@@ -132,15 +133,17 @@ BUILTINS = {name: family for family, names in BUILTIN_FAMILIES.items()
 # with an implementation). A call of one of these does not put a case in a
 # builtin group; the case is sorted by what else it uses.
 IMPLEMENTED_BUILTINS = set("""
-absolute_path append canonicalize capitalize clean encode_uri_component
-extension file_name file_stem invocation_directory
-invocation_directory_native join justfile justfile_directory kebabcase len
-lowercamelcase lowercase module_directory module_file module_path
-parent_directory path_exists prepend quote read replace replace_regex
-shoutykebabcase shoutysnakecase snakecase source_directory source_file
-titlecase trim trim_end trim_end_match trim_end_matches trim_start
-trim_start_match trim_start_matches uppercamelcase uppercase
-without_extension
+absolute_path append arch canonicalize capitalize choose clean
+encode_uri_component env env_var env_var_or_default error extension
+file_name file_stem invocation_directory invocation_directory_native
+is_dependency join just_executable just_pid just_version justfile
+justfile_directory kebabcase len lowercamelcase lowercase module_directory
+module_file module_path num_cpus num_jobs os os_family parent_directory
+path_exists prepend quote read recipe_name replace replace_regex require
+shell shoutykebabcase shoutysnakecase snakecase source_directory
+source_file titlecase trim trim_end trim_end_match trim_end_matches
+trim_start trim_start_match trim_start_matches uppercamelcase uppercase
+which without_extension
 """.split())
 
 IDENT = r"[A-Za-z_][A-Za-z0-9_-]*"
@@ -257,6 +260,26 @@ def cli_group(case):
         return "cli:justfile", "reads the justfile from standard input"
     if words and listing(case["args"]):
         return "cli:list", "lists a submodule"
+    return None
+
+
+NESTED = re.compile(r"just_executable\(\)\s*\}\}'?\s*(.*)$")
+
+
+def nested_cli_group(sources):
+    """The cli group for the command line that a line of a recipe body hands
+    to the program just_executable() names, or None. Pure."""
+    for source in sources:
+        for line in source.splitlines():
+            found = NESTED.search(line)
+            args = [w.strip("'\"") for w in found.group(1).split()] if found else []
+            flag = unsupported_flag(args)
+            if flag:
+                return "cli:" + flag, "runs just with --" + flag
+            words = positionals(args)
+            if words and "/" in words[0]:
+                return ("cli:search-directory",
+                        "runs just with a recipe named by a directory path")
     return None
 
 
@@ -419,7 +442,8 @@ def classify(case, actual):
         return "unstable:" + family[0], family[1]
     if "--completions" in case["args"] or "JUST_COMPLETE" in case["env"]:
         return "completions", "generates or runs completions"
-    for rule in (lambda: cli_group(case), lambda: module_group(case, sources),
+    for rule in (lambda: cli_group(case), lambda: nested_cli_group(sources),
+                 lambda: module_group(case, sources),
                  lambda: dotenv_group(case), lambda: setting_group(sources),
                  lambda: syntax_group(sources)):
         found = rule()

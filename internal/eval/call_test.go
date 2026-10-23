@@ -1,7 +1,9 @@
 package eval
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"gitea.com/wimwian/just-go/internal/ast"
@@ -154,6 +156,27 @@ func TestEvaluateRefusesAHostBuiltinWithoutAHost(t *testing.T) {
 		if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("path_exists") {
 			t.Errorf("location = %+v; want line 2, column 7, width 11", de)
 		}
+	}
+}
+
+// A builtin that ran a command and was stopped by the end of the run returns
+// that end as it is, and not as an error of the call; any other failure is
+// located at the name of the function.
+func TestEvaluatePassesOnTheEndOfTheRun(t *testing.T) {
+	for _, end := range []error{context.Canceled, context.DeadlineExceeded, fmt.Errorf("wrapped: %w", context.Canceled)} {
+		cmd := &hosted{host: builtins.Host{Shell: func(string, []string) (string, error) { return "", end }}}
+		if _, err := EvaluateWith(call("shell", lit("c")), nil, cmd); err != end {
+			t.Errorf("EvaluateWith error = %v, want %v as it is", err, end)
+		}
+	}
+	cmd := &hosted{host: builtins.Host{Shell: func(string, []string) (string, error) {
+		return "", errors.New("shell command failed: boom")
+	}}}
+	_, err := EvaluateWith(call("shell", lit("c")), nil, cmd)
+	requireRuntime(t, err, "shell command failed: boom")
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Line != 2 || de.Col != 7 || de.Width != len("shell") {
+		t.Errorf("location = %+v; want line 2, column 7, width 5", de)
 	}
 }
 

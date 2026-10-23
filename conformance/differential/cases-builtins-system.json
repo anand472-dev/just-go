@@ -1,0 +1,3606 @@
+[
+ {
+  "name": "env_var('X') with {\"X\": \"z\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('X') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "z"
+  }
+ },
+ {
+  "name": "env_var('X') with {\"X\": \"\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('X') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": ""
+  }
+ },
+ {
+  "name": "env_var('X') with {\"X\": \" a  b \"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('X') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": " a  b "
+  }
+ },
+ {
+  "name": "env_var('X') with {\"X\": \"\\u00e9\\u65e5\\u672c\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('X') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "é日本"
+  }
+ },
+ {
+  "name": "env_var('NOPE') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('NOPE') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var('') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var('A=B') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('A=B') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var('x') with {\"X\": \"upper\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "upper"
+  }
+ },
+ {
+  "name": "env_var_or_default('X','d') with {\"X\": \"z\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('X','d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "z"
+  }
+ },
+ {
+  "name": "env_var_or_default('X','d') with {\"X\": \"\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('X','d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": ""
+  }
+ },
+ {
+  "name": "env_var_or_default('NOPE','d') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('NOPE','d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var_or_default('','d') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('','d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var_or_default('NOPE','') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('NOPE','') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var_or_default('NOPE',env_var('X')) with {\"X\": \"nested\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('NOPE',env_var('X')) }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "nested"
+  }
+ },
+ {
+  "name": "env('X') with {\"X\": \"z\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env('X') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "z"
+  }
+ },
+ {
+  "name": "env('NOPE') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env('NOPE') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env('X','d') with {\"X\": \"z\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env('X','d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "z"
+  }
+ },
+ {
+  "name": "env('NOPE','d') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env('NOPE','d') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env('NOPE',env('X','inner')) with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env('NOPE',env('X','inner')) }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var('PATH') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('PATH') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var('HOME') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('HOME') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var_or_default('USER','nobody') with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var_or_default('USER','nobody') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "uppercase(env_var('X')) with {\"X\": \"abc\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ uppercase(env_var('X')) }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "abc"
+  }
+ },
+ {
+  "name": "env_dir() with {}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_dir() }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "env_var('X') + env_var('Y') with {\"X\": \"1\", \"Y\": \"2\"}",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ env_var('X') + env_var('Y') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "1",
+   "Y": "2"
+  }
+ },
+ {
+  "name": "env in an assignment",
+  "files": {
+   "justfile": "a := env_var('X')\nfoo:\n  @echo {{a}}\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "asg"
+  }
+ },
+ {
+  "name": "env in an unused assignment",
+  "files": {
+   "justfile": "a := env_var('MISSING')\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "env in a parameter default",
+  "files": {
+   "justfile": "foo x=env_var('X'):\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "dflt"
+  }
+ },
+ {
+  "name": "env in a dependency argument",
+  "files": {
+   "justfile": "foo: (bar env_var('X'))\nbar a:\n  @echo {{a}}\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "dep"
+  }
+ },
+ {
+  "name": "env in a dependency argument, missing",
+  "files": {
+   "justfile": "foo: (bar env_var('X'))\nbar a:\n  @echo {{a}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "env attribute is not seen by env",
+  "files": {
+   "justfile": "[env('E','v')]\nfoo:\n  @echo {{env_var_or_default('E','none')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "export is not seen by env",
+  "files": {
+   "justfile": "export E := 'v'\nfoo:\n  @echo {{env_var_or_default('E','none')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "env in a backtick and the shell",
+  "files": {
+   "justfile": "foo:\n  @echo {{`echo $X`}} {{shell('echo $X')}} {{env_var('X')}}\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "seen"
+  }
+ },
+ {
+  "name": "env wrong arity",
+  "files": {
+   "justfile": "foo:\n  @echo {{env()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "env too many",
+  "files": {
+   "justfile": "foo:\n  @echo {{env('a','b','c')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "env_var too many",
+  "files": {
+   "justfile": "foo:\n  @echo {{env_var('a','b')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "env_var_or_default too few",
+  "files": {
+   "justfile": "foo:\n  @echo {{env_var_or_default('a')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "os()",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ os() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "os_family()",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ os_family() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "arch()",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ arch() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "num_cpus()",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ num_cpus() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "just_version()",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ just_version() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "os, arch in defaults",
+  "files": {
+   "justfile": "foo a=arch() o=os() f=os_family() n=num_cpus():\n  @echo {{a}} {{o}} {{f}} {{n}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "os in an assignment",
+  "files": {
+   "justfile": "a := os()\nfoo:\n  @echo {{a}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "os with an argument",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ os('x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "just_pid is a number",
+  "files": {
+   "justfile": "foo:\n  @echo {{ shell('case $1 in (*[!0-9]*|\"\") echo no;; (*) echo yes;; esac', just_pid()) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "just_executable is an executable",
+  "files": {
+   "justfile": "foo:\n  @test -x '{{ just_executable() }}' && echo yes\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "just_executable is absolute",
+  "files": {
+   "justfile": "foo:\n  @case '{{ just_executable() }}' in /*) echo yes;; *) echo no;; esac\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "num_jobs without lists",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ num_jobs() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "which without lists",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ which('ls') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in a body",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ error('boom') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in an assignment",
+  "files": {
+   "justfile": "a := error('boom')\nfoo:\n  @echo {{a}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error with a multi-line message",
+  "files": {
+   "justfile": "foo:\n  @echo {{error('one\\ntwo')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error with an empty message",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ error('') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error with a concatenated message",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ error('a' + 'b') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in a parameter default",
+  "files": {
+   "justfile": "foo x=error('no default'):\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error not reached",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'a' { 'ok' } else { error('no') } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error reached",
+  "files": {
+   "justfile": "foo:\n  @echo {{ if 'a' == 'b' { 'ok' } else { error('taken') } }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in a dependency argument",
+  "files": {
+   "justfile": "foo: (bar error('dep'))\nbar a:\n  @echo {{a}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in an unused assignment",
+  "files": {
+   "justfile": "a := error('boom')\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error in an env attribute",
+  "files": {
+   "justfile": "[env('E', error('attr'))]\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "error with the wrong arity",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ error() }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a body",
+  "files": {
+   "justfile": "foo: bar\n  @echo 'foo {{recipe_name()}}'\nbar:\n  @echo 'bar {{recipe_name()}}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a parameter default",
+  "files": {
+   "justfile": "foo x=recipe_name():\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a dependency argument",
+  "files": {
+   "justfile": "foo: (bar recipe_name())\nbar x:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in an assignment",
+  "files": {
+   "justfile": "x := recipe_name()\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in an unused assignment",
+  "files": {
+   "justfile": "x := recipe_name()\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in an env attribute",
+  "files": {
+   "justfile": "[env('E', recipe_name())]\nfoo:\n  @echo $E\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a subsequent argument",
+  "files": {
+   "justfile": "foo: && (bar recipe_name())\n  @echo foo\nbar x:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a backtick",
+  "files": {
+   "justfile": "foo:\n  @echo {{`echo $0`}} {{recipe_name()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a confirm",
+  "files": {
+   "justfile": "[confirm(recipe_name())]\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {}
+ },
+ {
+  "name": "recipe_name in a script",
+  "files": {
+   "justfile": "[script('sh')]\nfoo:\n  echo {{recipe_name()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a working-directory",
+  "files": {
+   "justfile": "[working-directory(recipe_name())]\nfoo:\n  @pwd\n",
+   "foo/x": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name in a shebang recipe",
+  "files": {
+   "justfile": "foo:\n  #!/bin/sh\n  echo {{recipe_name()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "recipe_name with an argument",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ recipe_name('x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency from alpha",
+  "files": {
+   "justfile": "alpha: beta\n  @echo 'alpha {{is_dependency()}}'\nbeta: && gamma\n  @echo 'beta {{is_dependency()}}'\ngamma:\n  @echo 'gamma {{is_dependency()}}'\n"
+  },
+  "args": [
+   "alpha"
+  ]
+ },
+ {
+  "name": "is_dependency from beta",
+  "files": {
+   "justfile": "alpha: beta\n  @echo 'alpha {{is_dependency()}}'\nbeta: && gamma\n  @echo 'beta {{is_dependency()}}'\ngamma:\n  @echo 'gamma {{is_dependency()}}'\n"
+  },
+  "args": [
+   "beta"
+  ]
+ },
+ {
+  "name": "is_dependency from gamma",
+  "files": {
+   "justfile": "alpha: beta\n  @echo 'alpha {{is_dependency()}}'\nbeta: && gamma\n  @echo 'beta {{is_dependency()}}'\ngamma:\n  @echo 'gamma {{is_dependency()}}'\n"
+  },
+  "args": [
+   "gamma"
+  ]
+ },
+ {
+  "name": "is_dependency on the command line twice",
+  "files": {
+   "justfile": "alpha: beta\n  @echo 'alpha {{is_dependency()}}'\nbeta: && gamma\n  @echo 'beta {{is_dependency()}}'\ngamma:\n  @echo 'gamma {{is_dependency()}}'\n"
+  },
+  "args": [
+   "gamma",
+   "alpha"
+  ]
+ },
+ {
+  "name": "is_dependency in a parameter default",
+  "files": {
+   "justfile": "foo: bar\n  @echo foo\nbar x=is_dependency():\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency in a parameter default, direct",
+  "files": {
+   "justfile": "foo x=is_dependency():\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency in a dependency argument",
+  "files": {
+   "justfile": "foo: bar\n  @echo foo\nbar: (baz is_dependency())\nbaz x:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency in an assignment",
+  "files": {
+   "justfile": "x := is_dependency()\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency in a script",
+  "files": {
+   "justfile": "foo: bar\nbar:\n  #!/bin/sh\n  echo {{is_dependency()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency in a confirm",
+  "files": {
+   "justfile": "foo: bar\nbar:\n  @echo bar\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "is_dependency with an argument",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ is_dependency('x') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: minimal",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo hello') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: args",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $@','justice','legs') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: indexed",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $1 $2','justice','legs') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: first arg",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $0') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: first arg with args",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $0','a') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: trailing newlines",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('printf \"a\\n\\n\\n\"') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: crlf",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('printf \"a\\r\\n\"') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: empty",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('true') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: only newline",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: stderr passes",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo err >&2; echo out') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: multi-line",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('printf \"a\\nb\\n\"') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: quoted",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo \"$1\"', 'a b  c') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: empty arg",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo [$1]', '') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: unicode",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $1','é日本') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: many args",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $#','a','b','c','d','e') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: nested",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $1', shell('echo inner')) }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: with a variable",
+  "files": {
+   "justfile": "x := 'var'\nfoo:\n  @echo '{{ shell('echo $1', x) }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: pwd",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('pwd') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: exit 1",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('exit 1') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: exit 7",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('exit 7') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: exit 255",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('exit 255') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: failing with output",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo before; exit 3') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: killed by a signal",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('kill -9 $$') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: terminated",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('kill -15 $$') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: invalid utf-8",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('printf \"\\\\377\"') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: truncated utf-8",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('printf \"a\\\\342\\\\202\"') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: missing command",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('nonexistent-command-xyz') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: syntax error",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('if') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: reads stdin",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('cat') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: exported global",
+  "files": {
+   "justfile": "export G := 'g'\nfoo:\n  @echo '{{ shell('echo $G') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: unexported global",
+  "files": {
+   "justfile": "G := 'g'\nfoo:\n  @echo '{{ shell('echo [$G]') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: set export",
+  "files": {
+   "justfile": "set export\nG := 'g'\nfoo:\n  @echo '{{ shell('echo $G') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: env var of the run",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ shell('echo $X') }}'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "X": "xv"
+  }
+ },
+ {
+  "name": "shell: in an assignment",
+  "files": {
+   "justfile": "x := shell('echo asg')\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: failing assignment, unused",
+  "files": {
+   "justfile": "x := shell('exit 2')\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: in a parameter default",
+  "files": {
+   "justfile": "foo x=shell('echo dflt'):\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: in a dependency argument",
+  "files": {
+   "justfile": "foo: (bar shell('echo dep'))\nbar x:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: sees the env attribute",
+  "files": {
+   "justfile": "[env('FOO','bar')]\nfoo:\n  @echo {{ `echo backtick-$FOO` }} {{ shell('echo shell-$FOO') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: sees an exported parameter",
+  "files": {
+   "justfile": "foo $P='p':\n  @echo {{ shell('echo $P') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: sees an exported parameter given",
+  "files": {
+   "justfile": "foo $P:\n  @echo {{ shell('echo [$P]') }}\n"
+  },
+  "args": [
+   "foo",
+   "given"
+  ]
+ },
+ {
+  "name": "shell: does not see an unexported parameter",
+  "files": {
+   "justfile": "foo P='p':\n  @echo {{ shell('echo [$P]') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: set shell",
+  "files": {
+   "justfile": "set shell := ['bash','-c']\nfoo:\n  @echo {{ shell('echo $0 $1', 'x') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: set shell with -u",
+  "files": {
+   "justfile": "set shell := ['sh','-eu','-c']\nfoo:\n  @echo {{ shell('echo ${NOPE:-unset}') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: set shell with a name",
+  "files": {
+   "justfile": "set shell := ['bash','-c']\nfoo:\n  @echo {{ shell('echo $0') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: set shell missing",
+  "files": {
+   "justfile": "set shell := ['nonexistent-shell-xyz','-c']\nfoo:\n  @echo {{ shell('echo hi') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: working-directory setting",
+  "files": {
+   "justfile": "set working-directory := 'sub'\nx := shell('cat file.txt')\nfoo:\n  @echo {{x}}\n",
+   "sub/file.txt": "FILE"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: [working-directory] attribute is not used",
+  "files": {
+   "justfile": "[working-directory('sub')]\nfoo:\n  @echo {{ shell('ls') }}\n",
+   "sub/file.txt": "FILE",
+   "top.txt": ""
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: no-cd",
+  "files": {
+   "justfile": "set no-cd\nfoo:\n  @echo {{ shell('pwd') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: arguments needing evaluation",
+  "files": {
+   "justfile": "foo:\n  @echo {{ shell('echo $1$2', 'a' + 'b', if 'x' == 'x' { 'c' } else { 'd' }) }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: no arguments",
+  "files": {
+   "justfile": "foo:\n  @echo {{shell()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: shell failing in a body line",
+  "files": {
+   "justfile": "foo:\n  @echo before\n  @echo {{shell('exit 4')}}\n  @echo after\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: in a quiet recipe",
+  "files": {
+   "justfile": "set quiet\nfoo:\n  echo {{shell('echo err >&2; echo out')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: quiet flag",
+  "files": {
+   "justfile": "foo:\n  @echo {{shell('echo err >&2; echo out')}}\n"
+  },
+  "args": [
+   "--quiet",
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: script recipe",
+  "files": {
+   "justfile": "[script('sh')]\nfoo:\n  echo {{shell('echo scripted')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: shebang recipe",
+  "files": {
+   "justfile": "foo:\n  #!/bin/sh\n  echo {{shell('echo shebang')}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "shell: in a confirm prompt",
+  "files": {
+   "justfile": "[confirm(shell('echo really?'))]\nfoo:\n  @echo hi\n"
+  },
+  "args": [
+   "--yes",
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('10', '')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('10', '') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('0', '')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('0', '') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('foo', 'xyz')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('foo', 'xyz') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('3', 'aa')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('3', 'aa') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('3', 'abca')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('3', 'abca') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('x', 'abca')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('x', 'abca') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('-1', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('-1', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('+', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('+', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('1.5', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('1.5', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('18446744073709551616', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('18446744073709551616', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('99999999999999999999x', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('99999999999999999999x', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('3', 'é日é')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('3', 'é日é') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose( ' 3', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose( ' 3', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('3 ', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('3 ', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose('0x10', 'ab')",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('0x10', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose zero",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('0', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose zero with plus",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('+0', 'ab') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose a plus count has that many",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ trim(shell('printf %s \"$1\" | wc -c', choose('+4', 'ab'))) }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose length",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ trim(shell('printf %s \"$1\" | wc -c', choose('12', 'xyz'))) }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose alphabet",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ trim(shell('printf %s \"$1\" | tr -d xyz | wc -c', choose('40', 'xyz'))) }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose single character alphabet",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('5', 'q') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose unicode alphabet",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('4', '日') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose leading zeros",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ trim(shell('printf %s \"$1\" | wc -c', choose('007', 'ab'))) }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose in an assignment",
+  "files": {
+   "justfile": "x := choose('4','a')\nfoo:\n  @echo {{x}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose wrong arity",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ choose('4') }}'\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "choose with a variable",
+  "files": {
+   "justfile": "n := '3'\nfoo:\n  @echo {{ choose(n, 'z') }}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "require('tool') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('plain') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('plain') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('second') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('second') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('nothing') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('nothing') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('/') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('/') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('.') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('.') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('..') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('..') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('//') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('//') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('./prog') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('./prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir/prog') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir/prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('./dir/prog') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('./dir/prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir/../prog') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir/../prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir//prog') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir//prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir/./prog') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir/./prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('sub/dir/deep') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('sub/dir/deep') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir/missing') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir/missing') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir/') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir/') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('dir') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require(justfile_directory() + '/bin/tool') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require(justfile_directory() + '/bin/tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('/bin/sh') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('/bin/sh') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('sh') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('sh') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool ') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool ') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require(' tool') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require(' tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool/') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool/') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('bin/tool') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('bin/tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('./bin/tool') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('./bin/tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('../bin/tool') PATH set",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('../bin/tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') no PATH",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": null
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') empty PATH",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": ""
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') PATH of colons",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "::"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') PATH leading colon",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": ":/usr/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') PATH relative",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "bin:other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') PATH relative dot",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": ".:bin:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') PATH with a missing directory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/missing:$D/bin:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') no PATH",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": null
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') empty PATH",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": ""
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') PATH of colons",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "::"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') PATH leading colon",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": ":/usr/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') PATH relative",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "bin:other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') PATH relative dot",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": ".:bin:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('ls') PATH with a missing directory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('ls') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/missing:$D/bin:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require('tool') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "../bin:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  },
+  "cwd": "sub"
+ },
+ {
+  "name": "require('tool') PATH relative from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "bin:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  },
+  "cwd": "sub"
+ },
+ {
+  "name": "require('./prog') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('./prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  },
+  "cwd": "sub"
+ },
+ {
+  "name": "require('../prog') from a subdirectory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('../prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  },
+  "cwd": "sub"
+ },
+ {
+  "name": "require('dir/prog') with set working-directory",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ require('dir/prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require with set working-directory",
+  "files": {
+   "justfile": "set working-directory := 'sub'\nfoo:\n  @echo {{ require('dir/deep') }}\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require with set working-directory and relative PATH",
+  "files": {
+   "justfile": "set working-directory := 'sub'\nfoo:\n  @echo {{ require('deep') }}\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "dir:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require in an assignment",
+  "files": {
+   "justfile": "p := require('tool')\nfoo:\n  @echo {{p}}\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require missing in an assignment",
+  "files": {
+   "justfile": "p := require('nothing')\nfoo:\n  @echo hi\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require with a symlinked directory is not modelled",
+  "files": {
+   "justfile": "foo:\n  @echo hi\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "require wrong arity",
+  "files": {
+   "justfile": "foo:\n  @echo {{require()}}\n"
+  },
+  "args": [
+   "foo"
+  ]
+ },
+ {
+  "name": "require path of a directory",
+  "files": {
+   "justfile": "foo:\n  @echo {{require('sub')}}\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "require unreadable directory entry",
+  "files": {
+   "justfile": "foo:\n  @echo {{require('tool')}}\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin/tool:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('tool') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('plain') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('plain') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('nothing') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('nothing') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('./prog') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('./prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('dir/prog') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('dir/prog') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which(justfile_directory() + '/bin/tool') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which(justfile_directory() + '/bin/tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('second') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('second') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which('sh') with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('sh') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which concatenated",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('tool') + '+' + which('second') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which with no PATH",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": null
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which gated",
+  "files": {
+   "justfile": "foo:\n  @echo '{{ which('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1",
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "which unstable gate",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '{{ which('tool') }}'\n",
+   "bin/tool": "#!/bin/sh\necho tool\n",
+   "bin/plain": "text\n",
+   "other/tool": "#!/bin/sh\necho other\n",
+   "other/second": "#!/bin/sh\n",
+   "dir/prog": "#!/bin/sh\n",
+   "prog": "#!/bin/sh\n",
+   "sub/dir/deep": "#!/bin/sh\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "PATH": "$D/bin:$D/other:/usr/bin:/bin"
+  },
+  "modes": {
+   "bin/tool": "0755",
+   "bin/plain": "0644",
+   "other/tool": "0755",
+   "other/second": "0755",
+   "dir/prog": "0755",
+   "prog": "0755",
+   "sub/dir/deep": "0755"
+  }
+ },
+ {
+  "name": "num_jobs with lists",
+  "files": {
+   "justfile": "set lists\nfoo:\n  @echo '[{{ num_jobs() }}]'\n"
+  },
+  "args": [
+   "foo"
+  ],
+  "env": {
+   "JUST_UNSTABLE": "1"
+  }
+ }
+]

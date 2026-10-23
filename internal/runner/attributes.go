@@ -83,7 +83,7 @@ func (inv *invocation) confirm(r *ast.Recipe, f frame) (int, error) {
 	prompt := fmt.Sprintf("Run recipe `%s`?", r.Name)
 	if len(a.Args) == 1 {
 		var err error
-		if prompt, err = eval.EvaluateWith(a.Args[0], f.scope, inv.commander(f.exported, nil)); err != nil {
+		if prompt, err = eval.EvaluateWith(a.Args[0], f.scope, inv.commander(f.exported, nil, f.at)); err != nil {
 			return 0, locate(err, inv.plan.Justfile.File, a.Line)
 		}
 	}
@@ -140,14 +140,15 @@ const defaultTimestampFormat = "%H:%M:%S"
 // attributeEnv evaluates the `[env]` attributes of r, whose key and value are
 // evaluated in the global scope. Each is evaluated with the ones before it,
 // and the exported globals, base, visible to its backticks. A later attribute
-// with the same key wins. It is nil when r has none. Impure: it runs backticks.
-func (inv *invocation) attributeEnv(r *ast.Recipe, base map[string]string) (map[string]string, error) {
+// with the same key wins. The call is made at at. It is nil when r has none.
+// Impure: it runs backticks.
+func (inv *invocation) attributeEnv(r *ast.Recipe, base map[string]string, at site) (map[string]string, error) {
 	var env map[string]string
 	for _, a := range r.Attributes {
 		if a.Name != ast.AttrEnv {
 			continue
 		}
-		values, err := eval.EvaluateAllWith(a.Args, inv.globals, inv.commander(base, env))
+		values, err := eval.EvaluateAllWith(a.Args, inv.globals, inv.commander(base, env, at))
 		if err != nil {
 			return nil, locate(err, inv.plan.Justfile.File, a.Line)
 		}

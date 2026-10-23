@@ -125,12 +125,12 @@ class ExpressionTextTest(unittest.TestCase):
     recipe header line, which these tests pin instead."""
 
     def test_dependency_arguments_are_expression_text(self):
-        text = triage.expression_text("a: (b os())\n  echo\n")
-        self.assertIn("os()", text)
-        self.assertEqual(triage.builtin_group(text)[0], "builtin:system")
+        text = triage.expression_text("a: (b sha256('x'))\n  echo\n")
+        self.assertIn("sha256(", text)
+        self.assertEqual(triage.builtin_group(text)[0], "builtin:hash")
 
     def test_body_text_is_not_expression_text(self):
-        self.assertNotIn("os()", triage.expression_text("a:\n  os()\n"))
+        self.assertNotIn("sha256(", triage.expression_text("a:\n  sha256('x')\n"))
 
     def test_interpolation_is_expression_text(self):
         self.assertEqual(
@@ -173,6 +173,21 @@ class ClassifyPrecedenceTest(unittest.TestCase):
     def test_list_of_submodule(self):
         self.assertEqual(
             group("", args=["--list", "sub"]), "cli:list")
+
+    def test_recipe_runs_just_with_an_unsupported_flag(self):
+        self.assertEqual(
+            group("@foo:\n  '{{just_executable()}}' --request '{}'\n"),
+            "cli:request")
+
+    def test_recipe_runs_just_with_a_directory_path(self):
+        self.assertEqual(
+            group("say ARG:\n '{{just_executable()}}' ../say {{ARG}}\n"),
+            "cli:search-directory")
+
+    def test_recipe_runs_just_with_nothing_unsupported(self):
+        self.assertEqual(
+            group("a:\n  {{just_executable()}} --list b\n",
+                  actual="stdout differs"), "other")
 
     def test_module_beats_dotenv(self):
         self.assertEqual(
@@ -253,6 +268,27 @@ class ClassifyPrecedenceTest(unittest.TestCase):
 
     def test_other_output(self):
         self.assertEqual(group("a:\n", actual="stdout differs"), "other")
+
+
+class NestedCliGroupTest(unittest.TestCase):
+    def test_no_nested_command(self):
+        self.assertIsNone(triage.nested_cli_group(["a:\n  echo hi\n"]))
+
+    def test_nested_command_without_arguments(self):
+        self.assertIsNone(triage.nested_cli_group(
+            ["a:\n  echo {{just_executable()}}\n"]))
+
+    def test_unsupported_flag_of_the_nested_command(self):
+        self.assertEqual(
+            triage.nested_cli_group(
+                ["a:\n  @'{{just_executable()}}' --evaluate x\n"]),
+            ("cli:evaluate", "runs just with --evaluate"))
+
+    def test_the_first_source_with_a_nested_command_decides(self):
+        self.assertEqual(
+            triage.nested_cli_group(
+                ["a:\n  echo\n", "b:\n  {{just_executable()}} --dump\n"])[0],
+            "cli:dump")
 
 
 class SourceHelpersTest(unittest.TestCase):

@@ -40,7 +40,7 @@ func (inv *invocation) main(pre prepared) (int, error) {
 func (inv *invocation) evaluateGlobals(only map[string]bool) (eval.Scope, error) {
 	jf := inv.plan.Justfile
 	scope := make(eval.Scope, len(jf.Assignments))
-	cmd := inv.commander(nil, nil)
+	cmd := inv.commander(nil, nil, site{})
 	for _, a := range evaluationOrder(wanted(jf.UniqueAssignments(), only)) {
 		v, err := eval.EvaluateWith(a.Value, scope, cmd)
 		if err != nil {
@@ -81,6 +81,8 @@ func settle(g *gate, code int, err error) (int, error) {
 
 // frame is what a recipe's call is evaluated into before its commands run.
 type frame struct {
+	// at is where the call's expressions are evaluated.
+	at site
 	// scope holds the globals and the parameters.
 	scope eval.Scope
 	// positional is the value of each parameter, in order.
@@ -96,7 +98,7 @@ type frame struct {
 // dependencies run, its commands run, and its subsequents run. Impure: it
 // runs commands.
 func (inv *invocation) execute(r *ast.Recipe, args []string, shared *ran, chain *callChain) (int, error) {
-	f, err := inv.begin(r, args)
+	f, err := inv.begin(r, args, site{recipe: r.Name, dependency: chain.up != nil})
 	if err != nil {
 		return 0, err
 	}
@@ -129,14 +131,15 @@ func (inv *invocation) subsequents(r *ast.Recipe, f frame, chain *callChain) (in
 // begin checks that r is given a number of arguments it takes, evaluates its
 // `[env]` attributes, and binds its parameters: each takes the next argument,
 // or else its default, which may refer to the parameters before it, and
-// whose backticks see the `[env]` attributes. Impure: it runs backticks.
-func (inv *invocation) begin(r *ast.Recipe, args []string) (frame, error) {
+// whose backticks see the `[env]` attributes. The call is made at at. Impure:
+// it runs backticks.
+func (inv *invocation) begin(r *ast.Recipe, args []string, at site) (frame, error) {
 	if err := checkArgCount(r, len(args)); err != nil {
 		return frame{}, err
 	}
 	jf := inv.plan.Justfile
 	base := globalEnv(inv.exported, inv.globals, len(r.Params))
-	attr, err := inv.attributeEnv(r, base)
+	attr, err := inv.attributeEnv(r, base, at)
 	if err != nil {
 		return frame{}, err
 	}
@@ -147,7 +150,7 @@ func (inv *invocation) begin(r *ast.Recipe, args []string) (frame, error) {
 	positional := make([]string, len(r.Params))
 	var cmd eval.Commander
 	if len(args) < len(r.Params) {
-		cmd = inv.commander(base, attr)
+		cmd = inv.commander(base, attr, at)
 	}
 	for i, p := range r.Params {
 		v := ""
@@ -158,7 +161,7 @@ func (inv *invocation) begin(r *ast.Recipe, args []string) (frame, error) {
 		}
 		scope[p.Name], positional[i] = v, v
 	}
-	return frame{scope: scope, positional: positional, exported: paramEnv(jf, r, scope, base), attr: attr}, nil
+	return frame{at: at, scope: scope, positional: positional, exported: paramEnv(jf, r, scope, base), attr: attr}, nil
 }
 
 // stepOf makes the step that runs the commands of r: it evaluates the
@@ -167,7 +170,7 @@ func (inv *invocation) begin(r *ast.Recipe, args []string) (frame, error) {
 // attributes. A script evaluates its `[working-directory]` later, after its
 // lines (see script). Impure: it runs backticks.
 func (inv *invocation) stepOf(r *ast.Recipe, f frame) (step, error) {
-	cmd := inv.commander(f.exported, f.attr)
+	cmd := inv.commander(f.exported, f.attr, f.at)
 	var workdir *string
 	if !r.IsScript(inv.plan.Justfile.Settings) {
 		var err error
@@ -242,7 +245,7 @@ func (inv *invocation) resolve(from *ast.Recipe, deps []ast.Dependency, f frame)
 				Msg: fmt.Sprintf("recipe `%s` has unknown dependency `%s`", from.Name, d.Name)}
 		}
 		if cmd == nil && len(d.Args) > 0 {
-			cmd = inv.commander(f.exported, nil)
+			cmd = inv.commander(f.exported, nil, f.at)
 		}
 		args, err := eval.EvaluateAllWith(d.Args, f.scope, cmd)
 		if err != nil {
@@ -253,19 +256,29 @@ func (inv *invocation) resolve(from *ast.Recipe, deps []ast.Dependency, f frame)
 	return calls, nil
 }
 
-// commander returns the Commander that runs backticks through the shell, with
-// the plan's environment changed by the variables of under and then by those
-// of over. It is pure: it only builds a value.
-func (inv *invocation) commander(under, over map[string]string) eval.Commander {
-	return backtickRunner{inv: inv, under: under, over: over}
+// site is where an expression is evaluated: the recipe whose call it is part
+// of, and whether that call is a dependency of another. The zero site is
+// outside any recipe, where the assignments are evaluated.
+type site struct {
+	recipe     string
+	dependency bool
 }
 
-// backtickRunner runs the commands of backticks through the shell of the invocation.
-// under and over are the variables that change the plan's environment for
-// them, over taking the place of under.
+// commander returns the Commander that runs backticks through the shell, with
+// the plan's environment changed by the variables of under and then by those
+// of over. The functions it hosts see at. It is pure: it only builds a value.
+func (inv *invocation) commander(under, over map[string]string, at site) eval.Commander {
+	return backtickRunner{inv: inv, under: under, over: over, at: at}
+}
+
+// backtickRunner runs the commands of backticks, and of the shell function,
+// through the shell of the invocation. under and over are the variables that
+// change the plan's environment for them, over taking the place of under, and
+// at is where the expression that holds them is evaluated.
 type backtickRunner struct {
 	inv         *invocation
 	under, over map[string]string
+	at          site
 }
 
 // Backtick runs command through the shell the justfile or the plan asks for,
@@ -277,18 +290,7 @@ type backtickRunner struct {
 func (c backtickRunner) Backtick(command string) (string, error) {
 	inv := c.inv
 	p := inv.plan
-	var stderr io.Writer = inv.stderr
-	if p.Quiet {
-		stderr = io.Discard
-	}
-	env := mergeEnv(mergeEnv(p.Env, c.under), c.over)
-	got, err := sys.Capture(inv.ctx, inv.exec, sys.ProcessSpec{
-		Argv:   shellArgv(inv.shell, p.Shell, p.ShellArgs, command),
-		Dir:    inv.base,
-		Env:    exactEnv(env),
-		Stdin:  p.Stdin,
-		Stderr: stderr,
-	})
+	got, err := c.capture(shellArgv(inv.shell, p.Shell, p.ShellArgs, command))
 	if err != nil {
 		if ctxErr := inv.ctx.Err(); ctxErr != nil {
 			return "", ctxErr
@@ -299,6 +301,27 @@ func (c backtickRunner) Backtick(command string) (string, error) {
 		return "", failure
 	}
 	return trimLineBreak(string(got.Stdout)), nil
+}
+
+// capture runs argv in the base directory and returns what it wrote to its
+// standard output. Its environment is the plan's, changed by the variables of
+// under and then by those of over. It reads the plan's standard input, as the
+// command line's own is shared, and writes to the plan's standard error unless
+// the plan is quiet. Impure: it runs a command.
+func (c backtickRunner) capture(argv []string) (sys.Captured, error) {
+	inv := c.inv
+	p := inv.plan
+	var stderr io.Writer = inv.stderr
+	if p.Quiet {
+		stderr = io.Discard
+	}
+	return sys.Capture(inv.ctx, inv.exec, sys.ProcessSpec{
+		Argv:   argv,
+		Dir:    inv.base,
+		Env:    exactEnv(mergeEnv(mergeEnv(p.Env, c.under), c.over)),
+		Stdin:  p.Stdin,
+		Stderr: stderr,
+	})
 }
 
 // commandFailure is how the command that ended as got did not succeed, or nil

@@ -113,11 +113,15 @@ func TestAbsolutePathMatchesUpstream(t *testing.T) {
 	}
 }
 
-// host builds a Host that reads files, a file system of its own.
+// host builds a Host that reads files, a file system of its own, and holds an
+// empty environment, a machine of no particular kind, no chance and a shell
+// that writes nothing.
 func host(files sysfake.FakeFS) Host {
 	return Host{
 		FS: files, WorkDir: "/w", Justfile: "/w/justfile", SourceFile: "/w/inc/a.just",
 		ModuleFile: "/w/mod/justfile", ModulePath: "mod::sub", InvocationDir: "/w/here",
+		Env: sysfake.FakeEnv{}, Platform: sysfake.FakePlatform{}, Random: &sysfake.FakeRandom{},
+		Shell: func(string, []string) (string, error) { return "", nil },
 	}
 }
 

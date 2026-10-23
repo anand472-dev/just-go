@@ -4,18 +4,20 @@
 // Each builtin is a pure function of its arguments, which are already
 // evaluated strings, and returns a string or an error whose text is
 // upstream's. A builtin that needs the outside world is not pure: it also
-// takes the Host it is called from, whose filesystem is an internal/sys
-// interface, and it is kept apart in the table. The table also holds
-// the number of arguments each function takes, which the analyzer reads to
-// refuse a call that has the wrong number and the evaluator to dispatch a call.
-// A function whose implementation has not landed is in the table with no
-// implementation: the analyzer knows its name and arity, and the evaluator
-// reports it as not implemented.
+// takes the Host it is called from, whose filesystem, environment, platform and
+// source of chance are internal/sys interfaces, and it is kept apart in the
+// table. The table also holds the number of arguments each function takes,
+// which the analyzer reads to refuse a call that has the wrong number and the
+// evaluator to dispatch a call. A function whose implementation has not landed
+// is in the table with no implementation: the analyzer knows its name and
+// arity, and the evaluator reports it as not implemented.
 //
 // Without `set lists`, which is unstable and out of scope (R15), every value
 // is a string, which upstream treats as a list of one element. The functions
 // that exist for lists (bool, join_list, num_jobs, show, split, which) are
-// refused by the analyzer without the setting and are not implemented here.
+// refused by the analyzer without the setting. num_jobs and which are
+// implemented for a value of one element or none, which is the empty string;
+// bool, join_list, show and split are not implemented here.
 package builtins
 
 import "strings"
@@ -67,14 +69,14 @@ func Lookup(name string) (b Builtin, ok bool) {
 var table = map[string]Builtin{
 	"absolute_path":               {1, 1, nil, absolutePath},
 	"append":                      {2, 2, binary(appendEach), nil},
-	"arch":                        {0, 0, nil, nil},
+	"arch":                        {0, 0, nil, arch},
 	"blake3":                      {1, 1, nil, nil},
 	"blake3_file":                 {1, 1, nil, nil},
 	"bool":                        {1, 1, nil, nil},
 	"cache_directory":             {0, 0, nil, nil},
 	"canonicalize":                {1, 1, nil, canonicalize},
 	"capitalize":                  {1, 1, unary(capitalize), nil},
-	"choose":                      {2, 2, nil, nil},
+	"choose":                      {2, 2, nil, choose},
 	"clean":                       {1, 1, unary(clean), nil},
 	"config_directory":            {0, 0, nil, nil},
 	"config_local_directory":      {0, 0, nil, nil},
@@ -83,10 +85,10 @@ var table = map[string]Builtin{
 	"datetime":                    {1, 1, nil, nil},
 	"datetime_utc":                {1, 1, nil, nil},
 	"encode_uri_component":        {1, 1, unary(encodeURIComponent), nil},
-	"env":                         {1, 2, nil, nil},
-	"env_var":                     {1, 1, nil, nil},
-	"env_var_or_default":          {2, 2, nil, nil},
-	"error":                       {1, 1, nil, nil},
+	"env":                         {1, 2, nil, envFunc},
+	"env_var":                     {1, 1, nil, envVar},
+	"env_var_or_default":          {2, 2, nil, envVarOrDefault},
+	"error":                       {1, 1, failWith, nil},
 	"executable_directory":        {0, 0, nil, nil},
 	"extension":                   {1, 1, failing(extension), nil},
 	"file_name":                   {1, 1, failing(fileName), nil},
@@ -94,12 +96,12 @@ var table = map[string]Builtin{
 	"home_directory":              {0, 0, nil, nil},
 	"invocation_directory":        {0, 0, nil, invocationDirectory},
 	"invocation_directory_native": {0, 0, nil, invocationDirectoryNative},
-	"is_dependency":               {0, 0, nil, nil},
+	"is_dependency":               {0, 0, nil, isDependency},
 	"join":                        {2, Unbounded, join, nil},
 	"join_list":                   {1, 2, nil, nil},
-	"just_executable":             {0, 0, nil, nil},
-	"just_pid":                    {0, 0, nil, nil},
-	"just_version":                {0, 0, nil, nil},
+	"just_executable":             {0, 0, nil, justExecutable},
+	"just_pid":                    {0, 0, nil, justPID},
+	"just_version":                {0, 0, nil, justVersion},
 	"justfile":                    {0, 0, nil, justfile},
 	"justfile_directory":          {0, 0, nil, justfileDirectory},
 	"kebabcase":                   {1, 1, unary(kebabcase), nil},
@@ -109,24 +111,24 @@ var table = map[string]Builtin{
 	"module_directory":            {0, 0, nil, moduleDirectory},
 	"module_file":                 {0, 0, nil, moduleFile},
 	"module_path":                 {0, 0, nil, modulePath},
-	"num_cpus":                    {0, 0, nil, nil},
-	"num_jobs":                    {0, 0, nil, nil},
-	"os":                          {0, 0, nil, nil},
-	"os_family":                   {0, 0, nil, nil},
+	"num_cpus":                    {0, 0, nil, numCPUs},
+	"num_jobs":                    {0, 0, nil, numJobs},
+	"os":                          {0, 0, nil, osName},
+	"os_family":                   {0, 0, nil, osFamily},
 	"parent_directory":            {1, 1, failing(parentDirectory), nil},
 	"path_exists":                 {1, 1, nil, pathExists},
 	"prepend":                     {2, 2, binary(prependEach), nil},
 	"quote":                       {1, 1, unary(quote), nil},
 	"read":                        {1, 1, nil, read},
-	"recipe_name":                 {0, 0, nil, nil},
+	"recipe_name":                 {0, 0, nil, recipeName},
 	"replace":                     {3, 3, ternary(strings.ReplaceAll), nil},
 	"replace_regex":               {3, 3, replaceRegex, nil},
-	"require":                     {1, 1, nil, nil},
+	"require":                     {1, 1, nil, require},
 	"runtime_directory":           {0, 0, nil, nil},
 	"semver_matches":              {2, 2, nil, nil},
 	"sha256":                      {1, 1, nil, nil},
 	"sha256_file":                 {1, 1, nil, nil},
-	"shell":                       {1, Unbounded, nil, nil},
+	"shell":                       {1, Unbounded, nil, shell},
 	"shoutykebabcase":             {1, 1, unary(shoutykebabcase), nil},
 	"shoutysnakecase":             {1, 1, unary(shoutysnakecase), nil},
 	"show":                        {1, 1, nil, nil},
@@ -146,7 +148,7 @@ var table = map[string]Builtin{
 	"uppercamelcase":              {1, 1, unary(uppercamelcase), nil},
 	"uppercase":                   {1, 1, unary(uppercase), nil},
 	"uuid":                        {0, 0, nil, nil},
-	"which":                       {1, 1, nil, nil},
+	"which":                       {1, 1, nil, which},
 	"without_extension":           {1, 1, failing(withoutExtension), nil},
 }
 

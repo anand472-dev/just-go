@@ -86,6 +86,16 @@ type Plan struct {
 	// non-nil, empty ShellArgs means no arguments.
 	Shell     string
 	ShellArgs []string
+	// Platform answers the questions of os(), arch(), num_cpus(), just_pid()
+	// and just_executable(), and says what `which` can run. Nil uses the system
+	// the program runs on, named by OS when that is set.
+	Platform sys.Platform
+	// Random is where choose() draws its characters from. Nil uses the
+	// system's source of randomness.
+	Random sys.Random
+	// Jobs is what num_jobs() reports: how many recipes may run at once. Zero
+	// means no limit was set.
+	Jobs int
 }
 
 // Call is one requested recipe with the positional arguments for its own
@@ -630,12 +640,16 @@ func usage(format string, args ...any) *diag.Error {
 // invocation is the impure state of one Run: the context, the process
 // runner and the plan's streams with nil replaced by io.Discard.
 type invocation struct {
-	ctx    context.Context
-	plan   Plan
-	exec   sys.Process
-	fs     sys.FS
-	clock  sys.Clock
-	stderr io.Writer
+	ctx   context.Context
+	plan  Plan
+	exec  sys.Process
+	fs    sys.FS
+	clock sys.Clock
+	// platform and random are what the builtins that ask the machine and
+	// chance are given.
+	platform sys.Platform
+	random   sys.Random
+	stderr   io.Writer
 	// held, when not nil, is where the failure message of a branch of a fork
 	// waits, so that only the first failing branch reports (see fork).
 	held *[]string
@@ -681,6 +695,7 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared, goos string) *i
 	jf := plan.Justfile
 	inv := &invocation{
 		ctx: ctx, plan: plan, exec: plan.Exec, fs: plan.FS, clock: plan.Clock, stderr: plan.Stderr,
+		platform: plan.Platform, random: plan.Random,
 		shell: justfileShell(jf.Settings, pre.set, goos), dir: workingDirectory(plan, pre.set),
 		base: baseDirectory(plan, pre.set), here: invocationDirectory(plan), goos: goos,
 		scriptInterpreter: pre.set.ScriptInterpreter, tempdir: pre.set.Tempdir,
@@ -698,6 +713,7 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared, goos string) *i
 	if inv.clock == nil {
 		inv.clock = sys.OSClock{}
 	}
+	inv.useSystemMachine()
 	if inv.stderr == nil {
 		inv.stderr = io.Discard
 	}
@@ -706,6 +722,19 @@ func newInvocation(ctx context.Context, plan Plan, pre prepared, goos string) *i
 		inv.prompt = inv.stderr
 	}
 	return inv
+}
+
+// useSystemMachine fills in the platform and the source of chance that the plan
+// left out with those of the system the program runs on, the platform under the
+// name of the operating system the plan runs for. It is pure: it only builds
+// values.
+func (inv *invocation) useSystemMachine() {
+	if inv.platform == nil {
+		inv.platform = sys.OSPlatform{GOOS: inv.plan.OS}
+	}
+	if inv.random == nil {
+		inv.random = sys.OSRandom{}
+	}
 }
 
 // recipe runs the lines of s in order, or, for a script recipe, the script

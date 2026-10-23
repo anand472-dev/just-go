@@ -1,19 +1,15 @@
 {
   "counts": {
-    "pass": 515,
-    "fail": 1480,
-    "skip": 16,
+    "pass": 533,
+    "fail": 1459,
+    "skip": 19,
     "total": 2011
   },
   "group_sizes": {
     "attribute": 112,
     "builtin:constants": 3,
-    "builtin:env": 8,
-    "builtin:external": 1,
-    "builtin:invocation": 13,
     "builtin:semver": 1,
     "builtin:style": 4,
-    "builtin:system": 3,
     "cli:alias-style": 3,
     "cli:allow-missing": 5,
     "cli:ceiling": 8,
@@ -50,7 +46,8 @@
     "cli:no-deps": 3,
     "cli:no-dotenv": 1,
     "cli:one": 2,
-    "cli:search-directory": 24,
+    "cli:request": 3,
+    "cli:search-directory": 25,
     "cli:set": 30,
     "cli:shell-command": 1,
     "cli:show": 23,
@@ -65,12 +62,12 @@
     "cli:working-directory": 7,
     "completions": 40,
     "dotenv": 21,
-    "grammar": 75,
+    "grammar": 76,
     "module": 157,
     "setting:fallback": 6,
     "shebang": 2,
     "unstable:cached-recipes": 85,
-    "unstable:lists": 262,
+    "unstable:lists": 261,
     "unstable:user-defined-functions": 32
   },
   "groups": {
@@ -193,34 +190,6 @@
       "constants::constants_are_defined_in_recipe_parameters#1": "uses the constant HEX",
       "settings::built_in_constant#1": "uses the constant HEX"
     },
-    "builtin:env": {
-      "attributes::env_attribute_is_visible_to_shell_function#1": "calls env()",
-      "attributes::env_attribute_not_in_env_function#1": "calls env()",
-      "functions::env_var_failure#1": "calls env_var()",
-      "misc::dependency_argument_function#1": "calls env_var_or_default()",
-      "misc::env_function_as_env_var#1": "calls env()",
-      "misc::env_function_as_env_var_or_default#1": "calls env()",
-      "misc::env_function_as_env_var_or_default_with_existing_env_var#1": "calls env()",
-      "misc::env_function_as_env_var_with_existing_env_var#1": "calls env()"
-    },
-    "builtin:external": {
-      "working_directory::working_dir_applies_to_shell_function#1": "calls shell()"
-    },
-    "builtin:invocation": {
-      "confirm::confirm_expression_is_dependency_is_false_for_direct_invocation#1": "calls is_dependency()",
-      "confirm::confirm_expression_is_dependency_is_true_for_dependency_invocation#1": "calls is_dependency()",
-      "constants::constants_are_not_exported#1": "calls just_executable()",
-      "functions::is_dependency#1": "calls is_dependency()",
-      "functions::is_dependency#2": "calls is_dependency()",
-      "functions::recipe_name#1": "calls recipe_name()",
-      "functions::recipe_name_ignores_alias#1": "calls recipe_name()",
-      "functions::recipe_name_in_dependency_argument#1": "calls recipe_name()",
-      "functions::recipe_name_in_parameter_default#1": "calls recipe_name()",
-      "functions::test_just_executable_function#1": "calls just_executable()",
-      "request::environment_variable_missing#1": "calls just_executable()",
-      "request::environment_variable_set#1": "calls just_executable()",
-      "search_arguments::passing_dot_as_argument_is_allowed#1": "calls just_executable()"
-    },
     "builtin:semver": {
       "functions::semver_matches#1": "calls semver_matches()"
     },
@@ -229,11 +198,6 @@
       "style::style_error#1": "calls style()",
       "style::style_unknown#1": "calls style()",
       "style::style_warning#1": "calls style()"
-    },
-    "builtin:system": {
-      "functions::test_os_arch_functions_in_default#1": "calls arch()",
-      "functions::test_os_arch_functions_in_expression#1": "calls arch()",
-      "functions::test_os_arch_functions_in_interpolation#1": "calls arch()"
     },
     "cli:alias-style": {
       "alias_style::left#1": "passes --alias-style",
@@ -829,6 +793,11 @@
       "run::one_flag_only_allows_one_invocation#1": "passes --one",
       "run::one_flag_only_allows_one_invocation#2": "passes --one"
     },
+    "cli:request": {
+      "constants::constants_are_not_exported#1": "runs just with --request",
+      "request::environment_variable_missing#1": "runs just with --request",
+      "request::environment_variable_set#1": "runs just with --request"
+    },
     "cli:search-directory": {
       "dotenv::dotenv#1": "names a recipe by a directory path",
       "fallback::fallback_from_subdir_bugfix#1": "names a recipe by a directory path",
@@ -853,7 +822,8 @@
       "search::test_upwards_multiple_path_argument#2": "names a recipe by a directory path",
       "search::test_upwards_path_argument#1": "names a recipe by a directory path",
       "search::test_upwards_path_argument#2": "names a recipe by a directory path",
-      "search_arguments::argument_with_different_path_prefix_is_allowed#1": "names a recipe by a directory path"
+      "search_arguments::argument_with_different_path_prefix_is_allowed#1": "names a recipe by a directory path",
+      "search_arguments::passing_dot_as_argument_is_allowed#1": "runs just with a recipe named by a directory path"
     },
     "cli:set": {
       "assignment::variables_shadowing_constants_can_be_overridden#1": "passes --set",
@@ -1074,6 +1044,7 @@
       "format_string::undefined_variable_error#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unmatched_close_is_ignored#1": "just-go reports a parse error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '",
       "format_string::unterminated_format_string_error#1": "just-go reports a parse error: unterminated string",
+      "functions::recipe_name_ignores_alias#1": "uses `alias`",
       "lists::dependency_arguments_join_lists_without_lists_setting#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "lists::quote_of_empty_variadic_is_empty_string_without_lists_setting#1": "just-go reports a parse error: expected '*', ':', '$', identifier, or '+', but found '*'",
       "markdown::code_blocks_are_concatenated#1": "just-go reports a parse error: expected '@', '[', comment, end of file, end of line, or identifier, but found backtick",
@@ -1534,7 +1505,6 @@
       "lists::env_returns_default_when_no_variable_present#1": "uses `set lists`",
       "lists::env_returns_first_present_variable#1": "uses `set lists`",
       "lists::env_returns_list_default#1": "uses `set lists`",
-      "lists::env_single_missing_key_keeps_singular_message#1": "uses `set lists`",
       "lists::env_stops_at_first_present_variable_including_empty#1": "uses `set lists`",
       "lists::env_var_accepts_list_of_keys#1": "uses `set lists`",
       "lists::env_var_or_default_accepts_list_of_keys#1": "uses `set lists`",
