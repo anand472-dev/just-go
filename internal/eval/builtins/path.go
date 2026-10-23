@@ -104,7 +104,11 @@ func pathExists(h Host, args []string) (string, error) {
 // the path, as upstream words it. Impure: it looks at the filesystem through
 // h.FS.
 func canonicalize(h Host, args []string) (string, error) {
-	got, err := h.FS.Canonicalize(resolve(h.WorkDir, args[0]))
+	path := resolve(h.WorkDir, args[0])
+	if err := h.checkPath(path); err != nil {
+		return "", err
+	}
+	got, err := h.FS.Canonicalize(path)
 	if err != nil {
 		return "", fmt.Errorf("I/O error canonicalizing `%s`: %s", args[0], sys.ErrorText(err))
 	}
@@ -115,7 +119,11 @@ func canonicalize(h Host, args []string) (string, error) {
 // A file that cannot be read, or that is not UTF-8, is an error. Impure: it
 // reads the file through h.FS.
 func read(h Host, args []string) (string, error) {
-	data, err := h.FS.ReadFile(resolve(h.WorkDir, args[0]))
+	path := resolve(h.WorkDir, args[0])
+	if err := h.checkPath(path); err != nil {
+		return "", err
+	}
+	data, err := h.FS.ReadFile(path)
 	if err != nil {
 		return "", readFailure(args[0], sys.ErrorText(err))
 	}

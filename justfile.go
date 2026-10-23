@@ -39,14 +39,17 @@ type Options struct {
 	// InvocationDir is the directory the command was run from, where recipes
 	// run under set no-cd. Empty means WorkDir.
 	InvocationDir string
-	Env           []string  // exact environment, "KEY=VALUE"; nil means empty, never the process environment; env(), env_var() and which() read it too
-	Stdin         io.Reader // nil means no input; commands, and the commands of backticks, read it
-	Stdout        io.Writer // nil discards
-	Stderr        io.Writer // nil discards; receives echoed commands and failure messages
-	Recipes       []string  // recipes to run; empty means the first recipe in the file
-	Args          []string  // positional arguments for the single requested recipe
-	Calls         []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
-	Quiet         bool      // suppress command echo, as if `set quiet` held
+	Env           []string // exact environment, "KEY=VALUE"; nil means empty, never the process environment; env(), env_var() and which() read it too
+	// AllowOutsidePaths lifts the strict path rule: an import, module or dotenv file
+	// may lie outside the root justfile's directory. Off, such a file is refused.
+	AllowOutsidePaths bool
+	Stdin             io.Reader // nil means no input; commands, and the commands of backticks, read it
+	Stdout            io.Writer // nil discards
+	Stderr            io.Writer // nil discards; receives echoed commands and failure messages
+	Recipes           []string  // recipes to run; empty means the first recipe in the file
+	Args              []string  // positional arguments for the single requested recipe
+	Calls             []Call    // recipes to run, each with its own arguments; when set, Recipes and Args are ignored
+	Quiet             bool      // suppress command echo, as if `set quiet` held
 	// Yes answers yes to every `[confirm]` prompt without asking, as
 	// upstream's --yes does. Without it a prompt is written to Prompt and the
 	// answer is read, one line, from Stdin; no Stdin means no.
@@ -143,7 +146,7 @@ func Load(opts Options) (*Justfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	tree, err := loader.LoadHome(fsys, path, homeOf(opts.Env))
+	tree, err := loader.LoadWith(fsys, path, loader.Options{Home: homeOf(opts.Env), AllowOutsidePaths: opts.AllowOutsidePaths})
 	if err != nil {
 		return nil, err
 	}
@@ -255,27 +258,28 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, usage("no working directory: set Options.WorkDir for a justfile parsed from memory")
 	}
 	res, err := runner.Run(ctx, runner.Plan{
-		Justfile:      j.tree,
-		Recipes:       opts.Recipes,
-		Args:          opts.Args,
-		Calls:         runnerCalls(opts.Calls),
-		Env:           opts.Env,
-		WorkDir:       dir,
-		InvocationDir: opts.InvocationDir,
-		Stdin:         opts.Stdin,
-		Stdout:        opts.Stdout,
-		Stderr:        opts.Stderr,
-		Quiet:         opts.Quiet,
-		Yes:           opts.Yes,
-		Prompt:        opts.Prompt,
-		Exec:          opts.Exec,
-		FS:            opts.FS,
-		Clock:         opts.Clock,
-		Shell:         opts.Shell,
-		ShellArgs:     opts.ShellArgs,
-		Platform:      opts.Platform,
-		Random:        opts.Random,
-		Jobs:          opts.Jobs,
+		Justfile:          j.tree,
+		Recipes:           opts.Recipes,
+		AllowOutsidePaths: opts.AllowOutsidePaths,
+		Args:              opts.Args,
+		Calls:             runnerCalls(opts.Calls),
+		Env:               opts.Env,
+		WorkDir:           dir,
+		InvocationDir:     opts.InvocationDir,
+		Stdin:             opts.Stdin,
+		Stdout:            opts.Stdout,
+		Stderr:            opts.Stderr,
+		Quiet:             opts.Quiet,
+		Yes:               opts.Yes,
+		Prompt:            opts.Prompt,
+		Exec:              opts.Exec,
+		FS:                opts.FS,
+		Clock:             opts.Clock,
+		Shell:             opts.Shell,
+		ShellArgs:         opts.ShellArgs,
+		Platform:          opts.Platform,
+		Random:            opts.Random,
+		Jobs:              opts.Jobs,
 	})
 	return Result{ExitCode: res.ExitCode}, err
 }

@@ -175,13 +175,22 @@ func findIn(fsys sys.FS, dir string) (string, error) {
 // the line it is on. The tree keeps the text it was read from, so that a
 // failure while a recipe runs can quote its line. Impure: it reads fsys.
 func Load(fsys sys.FS, path string) (*ast.Justfile, error) {
-	return LoadHome(fsys, path, "")
+	return LoadWith(fsys, path, Options{})
 }
 
-// LoadHome is Load with home, the directory that an import beginning with `~/`
-// starts from. The library never reads the environment, so the caller passes
-// the home directory it has; with home empty, such an import is not found.
-func LoadHome(fsys sys.FS, path, home string) (*ast.Justfile, error) {
+// Options are what loading a justfile takes beyond the file system and the path.
+type Options struct {
+	// Home is the directory an import beginning with `~/` starts from. With
+	// Home empty, such an import is not found.
+	Home string
+	// AllowOutsidePaths lifts the strict path rule: an import, module or dotenv
+	// file may lie outside the root justfile's directory.
+	AllowOutsidePaths bool
+}
+
+// LoadWith is Load with the options given.
+func LoadWith(fsys sys.FS, path string, opts Options) (*ast.Justfile, error) {
+	e := &loadEnv{fsys: fsys, home: opts.Home, root: filepath.Dir(path), allow: opts.AllowOutsidePaths}
 	src, err := fsys.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read justfile: %w", err)
@@ -190,13 +199,13 @@ func LoadHome(fsys sys.FS, path, home string) (*ast.Justfile, error) {
 	if err != nil {
 		return nil, diag.WithSource(err, src)
 	}
-	if err := expandImports(fsys, jf, src, home); err != nil {
+	if err := expandImports(e, jf, src); err != nil {
 		return nil, err
 	}
 	if err := checkModuleNames(jf); err != nil {
 		return nil, diag.WithSource(err, src)
 	}
-	if err := expandModules(fsys, jf, src, home, nil); err != nil {
+	if err := expandModules(e, jf, src, nil); err != nil {
 		return nil, err
 	}
 	if err := analyzer.Analyze(jf); err != nil {
@@ -222,7 +231,7 @@ type pendingImport struct {
 // is merged once. An import that names a file which imports it back, directly
 // or through others, is a circular import. An optional import that is missing
 // is skipped; a required one that is missing is an error at its string.
-func expandImports(fsys sys.FS, root *ast.Justfile, src []byte, home string) error {
+func expandImports(e *loadEnv, root *ast.Justfile, src []byte) error {
 	seen := map[string]bool{}
 	stack := []pendingImport{{file: root.File, src: src, jf: root}}
 	for len(stack) > 0 {
@@ -232,7 +241,7 @@ func expandImports(fsys sys.FS, root *ast.Justfile, src []byte, home string) err
 			mergeUnit(root, cur.jf)
 		}
 		for _, imp := range cur.jf.Imports {
-			next, found, err := nextImport(fsys, seen, cur, imp, home)
+			next, found, err := nextImport(e, seen, cur, imp)
 			if err != nil {
 				return err
 			}
@@ -247,8 +256,9 @@ func expandImports(fsys sys.FS, root *ast.Justfile, src []byte, home string) err
 // nextImport checks one import of cur and returns the file it names, ready to
 // merge, when it is a file that is not merged yet. found is false for an
 // optional import that is missing and for a file already merged.
-func nextImport(fsys sys.FS, seen map[string]bool, cur pendingImport, imp ast.Import, home string) (pendingImport, bool, error) {
-	path := importPath(cur.file, imp.Path, home)
+func nextImport(e *loadEnv, seen map[string]bool, cur pendingImport, imp ast.Import) (pendingImport, bool, error) {
+	fsys := e.fsys
+	path := importPath(cur.file, imp.Path, e.home)
 	ok, err := fsys.IsFile(path)
 	if err != nil {
 		return pendingImport{}, false, fmt.Errorf("import %s: %w", path, err)
@@ -258,6 +268,9 @@ func nextImport(fsys sys.FS, seen map[string]bool, cur pendingImport, imp ast.Im
 			return pendingImport{}, false, nil
 		}
 		return pendingImport{}, false, diag.WithSource(missingImport(cur.file, imp), cur.src)
+	}
+	if err := e.check(path); err != nil {
+		return pendingImport{}, false, diag.WithSource(outsideError(cur.file, imp, err), cur.src)
 	}
 	chain := append(append([]string(nil), cur.parent...), cur.file)
 	if contains(chain, path) {
@@ -271,7 +284,7 @@ func nextImport(fsys sys.FS, seen map[string]bool, cur pendingImport, imp ast.Im
 	if err != nil {
 		return pendingImport{}, false, err
 	}
-	if err := expandModules(fsys, next.jf, next.src, home, chain); err != nil {
+	if err := expandModules(e, next.jf, next.src, chain); err != nil {
 		return pendingImport{}, false, err
 	}
 	next.parent = chain
@@ -352,6 +365,14 @@ func missingImport(file string, imp ast.Import) *diag.Error {
 	return &diag.Error{
 		Kind: diag.KindAnalysis, File: file, Line: imp.Line, Col: imp.Col, Width: imp.Width,
 		Msg: "could not find source file for import",
+	}
+}
+
+// outsideError is the strict path rule's error for an import, at its string.
+func outsideError(file string, imp ast.Import, err error) *diag.Error {
+	return &diag.Error{
+		Kind: diag.KindAnalysis, File: file, Line: imp.Line, Col: imp.Col, Width: imp.Width,
+		Msg: err.Error(),
 	}
 }
 

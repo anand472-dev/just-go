@@ -42,3 +42,14 @@ func TestHasRecipeAnswersForNames(t *testing.T) {
 		t.Error("hasRecipe did not answer for the names in params")
 	}
 }
+
+// --allow-outside-project-paths is a switch that lifts the strict path rule.
+func TestAllowOutsideProjectPathsIsASwitch(t *testing.T) {
+	cfg, err := parseArgs([]string{"--allow-outside-project-paths", "a"})
+	if err != nil || !cfg.allowOutside || len(cfg.words) != 1 {
+		t.Errorf("parseArgs = %+v, %v; want the switch set and a as the word", cfg, err)
+	}
+	if cfg, _ := parseArgs([]string{"a"}); cfg.allowOutside {
+		t.Error("the switch is set without the flag")
+	}
+}

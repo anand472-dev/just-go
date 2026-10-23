@@ -66,21 +66,22 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		childOut, childErr = io.Discard, io.Discard
 	}
 	opts := just.Options{
-		Unstable:      cfg.isUnstable(env),
-		Justfile:      resolve(workDir, cfg.justfile),
-		SearchFrom:    workDir,
-		Env:           env,
-		InvocationDir: workDir,
-		Stdin:         stdin,
-		Stdout:        childOut,
-		Stderr:        childErr,
-		Quiet:         cfg.quiet,
-		Yes:           cfg.yes,
-		Prompt:        stderr,
-		Shell:         cfg.shell,
-		ShellArgs:     cfg.shellArgs,
-		FS:            fsys,
-		Exec:          exec,
+		Unstable:          cfg.isUnstable(env),
+		Justfile:          resolve(workDir, cfg.justfile),
+		SearchFrom:        workDir,
+		Env:               env,
+		InvocationDir:     workDir,
+		Stdin:             stdin,
+		Stdout:            childOut,
+		Stderr:            childErr,
+		Quiet:             cfg.quiet,
+		Yes:               cfg.yes,
+		AllowOutsidePaths: cfg.allowOutside,
+		Prompt:            stderr,
+		Shell:             cfg.shell,
+		ShellArgs:         cfg.shellArgs,
+		FS:                fsys,
+		Exec:              exec,
 	}
 	jf, err := just.Load(opts)
 	if err != nil {
@@ -247,6 +248,9 @@ type config struct {
 	shell      string
 	shellGiven bool
 	shellArgs  []string // --shell-arg, in order; it may repeat; nil when absent
+	// allowOutside is --allow-outside-project-paths, which lifts the strict path
+	// rule for imports, modules and dotenv files.
+	allowOutside bool
 }
 
 // parseArgs parses -f/--justfile PATH, -l/--list, -q/--quiet, --unstable,
@@ -355,7 +359,7 @@ func valueName(long string) string {
 // is also its canonical name. Pure.
 func longFlagName(name string) (string, bool) {
 	switch name {
-	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes":
+	case "justfile", "list", "quiet", "shell", "shell-arg", "unstable", "yes", "allow-outside-project-paths":
 		return name, true
 	}
 	return "", false
@@ -395,6 +399,8 @@ func setSwitch(cfg *config, long string) {
 		cfg.unstable = true
 	case "yes":
 		cfg.yes = true
+	case "allow-outside-project-paths":
+		cfg.allowOutside = true
 	}
 }
 

@@ -69,8 +69,11 @@ type Plan struct {
 	Quiet  bool // overrides set quiet when true; also silences the failure message
 	// Yes answers every `[confirm]` prompt with yes without asking, as
 	// upstream's --yes does.
-	Yes  bool
-	Exec sys.Process // nil uses the OS implementation from internal/sys
+	Yes bool
+	// AllowOutsidePaths lifts the strict path rule for dotenv files, which may lie
+	// outside the justfile's directory.
+	AllowOutsidePaths bool
+	Exec              sys.Process // nil uses the OS implementation from internal/sys
 	// FS is where script recipes write their scripts, in a directory it makes
 	// and removes again. Nil uses the OS implementation from internal/sys.
 	FS sys.FS

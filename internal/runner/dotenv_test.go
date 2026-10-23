@@ -34,7 +34,7 @@ func TestDotenvIsNotLoadedWithoutASetting(t *testing.T) {
 // dotenv-load finds .env beside the justfile, or above it, and adds its values
 // without changing those already set.
 func TestDotenvLoadFindsTheFileAndKeepsTheEnvironment(t *testing.T) {
-	fsys := sysfake.FakeFS{"/root/.env": "A=file\nB=file", "/root/proj/justfile": ""}
+	fsys := sysfake.FakeFS{"/root/proj/.env": "A=file\nB=file", "/root/proj/justfile": ""}
 	plan := dotenvPlan(ast.Settings{DotenvLoad: true}, "B=env")
 	plan.Justfile.File = "/root/proj/justfile"
 	got, err := loadDotenv(context.Background(), plan, fsys, &sysfake.FakeProcess{}, settings.Resolved{})
@@ -206,4 +206,46 @@ func TestRunFailsWhenARequiredDotenvFileIsMissing(t *testing.T) {
 	if _, err := Run(context.Background(), plan); err == nil || err.Error() != "dotenv file not found" {
 		t.Errorf("Run = %v; want dotenv file not found", err)
 	}
+}
+
+// A dotenv file outside the justfile's directory is refused unless the strict
+// path rule is lifted; the same check answers the builtins' reads.
+func TestDotenvFileOutsideTheProjectIsRefusedUnlessAllowed(t *testing.T) {
+	fsys := sysfake.FakeFS{"/elsewhere/.env": "A=1", "/proj/sub/justfile": ""}
+	plan := dotenvPlan(ast.Settings{DotenvLoad: true})
+	plan.Justfile.File = "/proj/sub/justfile"
+	if _, err := loadDotenvFile(fsys, plan, "/elsewhere/.env"); err == nil {
+		t.Error("a dotenv file outside the project was loaded")
+	}
+	plan.AllowOutsidePaths = true
+	if got, err := loadDotenvFile(fsys, plan, "/elsewhere/.env"); err != nil || !hasEntry(got, "A=1") {
+		t.Errorf("allowed: %v, %v", got, err)
+	}
+}
+
+// The check a builtin uses answers for the justfile's directory, and lifts with
+// the opt-out.
+func TestStrictPathOfAnInvocationIsTheProjectDirectory(t *testing.T) {
+	inv := &invocation{plan: Plan{Justfile: &ast.Justfile{File: "/proj/justfile"}},
+		fs: sysfake.FakeFS{"/proj/justfile": "", "/proj/x": "", "/elsewhere/y": ""}}
+	if err := inv.strictPath("/proj/x"); err != nil {
+		t.Errorf("a path inside refused: %v", err)
+	}
+	if err := inv.strictPath("/elsewhere/y"); err == nil {
+		t.Error("a path outside was allowed")
+	}
+	inv.plan.AllowOutsidePaths = true
+	if err := inv.strictPath("/elsewhere/y"); err != nil {
+		t.Errorf("allowed outside refused: %v", err)
+	}
+}
+
+// hasEntry reports whether env holds the entry kv.
+func hasEntry(env []string, kv string) bool {
+	for _, e := range env {
+		if e == kv {
+			return true
+		}
+	}
+	return false
 }

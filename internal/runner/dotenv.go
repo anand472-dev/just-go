@@ -10,6 +10,7 @@ import (
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/dotenv"
+	"gitea.com/wimwian/just-go/internal/loader"
 	"gitea.com/wimwian/just-go/internal/settings"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
@@ -57,6 +58,11 @@ func wantsDotenv(s ast.Settings, set settings.Resolved) bool {
 // loadDotenvFile reads the dotenv file at path and merges it into plan's
 // environment.
 func loadDotenvFile(fsys sys.FS, plan Plan, path string) ([]string, error) {
+	if !plan.AllowOutsidePaths {
+		if err := loader.CheckPath(filepath.Dir(plan.Justfile.File), path, fsys.Canonicalize); err != nil {
+			return nil, err
+		}
+	}
 	src, err := fsys.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load environment file from `%s`: %s", path, sys.ErrorText(err))

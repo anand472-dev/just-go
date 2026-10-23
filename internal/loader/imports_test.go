@@ -81,11 +81,13 @@ func TestTildeImportUsesTheHomeDirectoryGiven(t *testing.T) {
 		"/proj/justfile":   "import '~/mod.just'\n",
 		"/home/u/mod.just": "foo:\n  echo\n",
 	}
-	jf, err := LoadHome(fsys, "/proj/justfile", "/home/u")
+	// The home directory is outside the project, so the strict path rule needs
+	// its opt-out for the file to be read.
+	jf, err := LoadWith(fsys, "/proj/justfile", Options{Home: "/home/u", AllowOutsidePaths: true})
 	if err != nil || len(jf.Recipes) != 1 || jf.Recipes[0].Name != "foo" {
-		t.Errorf("LoadHome = %v, %v; want the recipe foo from the home directory", jf, err)
+		t.Errorf("LoadWith = %v, %v; want the recipe foo from the home directory", jf, err)
 	}
-	if _, err := LoadHome(fsys, "/proj/justfile", ""); err == nil {
+	if _, err := LoadWith(fsys, "/proj/justfile", Options{AllowOutsidePaths: true}); err == nil {
 		t.Error("an import under ~/ with no home directory was found")
 	}
 }
@@ -134,9 +136,11 @@ func TestAbsoluteImportIsReadAsGiven(t *testing.T) {
 		"/proj/justfile":   "import '/lib/shared.just'\n",
 		"/lib/shared.just": "s:\n  echo\n",
 	}
-	got, err := loadNames(t, fsys, "/proj/justfile")
-	if err != nil || recipeNames(got) != "s" {
-		t.Errorf("recipes = %v, %v; want s", got, err)
+	// An absolute path outside the project is the strict rule's refusal unless
+	// the opt-out is given.
+	jf, err := LoadWith(fsys, "/proj/justfile", Options{AllowOutsidePaths: true})
+	if err != nil || recipeList(jf) != "s" {
+		t.Errorf("recipes = %v, %v; want s", recipeList(jf), err)
 	}
 }
 

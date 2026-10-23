@@ -20,35 +20,48 @@ import (
 // expandModules loads and merges the modules that jf declares. file is the file
 // jf was parsed from, the directory of which the modules are found in, and chain
 // the files that import or declare it, from the root down.
-func expandModules(fsys sys.FS, jf *ast.Justfile, src []byte, home string, chain []string) error {
+func expandModules(e *loadEnv, jf *ast.Justfile, src []byte, chain []string) error {
 	for _, m := range jf.Modules {
-		path, found, err := findModule(fsys, jf.File, m, home)
-		if err != nil {
+		if err := expandModule(e, jf, src, chain, m); err != nil {
 			return err
 		}
-		if !found {
-			if m.Optional {
-				jf.AbsentModules = append(jf.AbsentModules, m.Name)
-				continue
-			}
-			return diag.WithSource(missingModule(jf.File, m), src)
-		}
-		next := append(append([]string(nil), chain...), jf.File)
-		if contains(next, path) {
-			return diag.WithSource(circularImport(jf.File, path), src)
-		}
-		sub, err := readImport(fsys, path)
-		if err != nil {
-			return err
-		}
-		if err := expandImports(fsys, sub.jf, sub.src, home); err != nil {
-			return err
-		}
-		if err := expandModules(fsys, sub.jf, sub.src, home, next); err != nil {
-			return err
-		}
-		flattenModule(jf, m.Name+"::", sub.jf)
 	}
+	return nil
+}
+
+// expandModule loads the module m that jf declares, merges it under its name,
+// and returns the error if it cannot be loaded. chain is the files above jf.
+func expandModule(e *loadEnv, jf *ast.Justfile, src []byte, chain []string, m ast.Module) error {
+	fsys := e.fsys
+	path, found, err := findModule(e, jf.File, m)
+	if err != nil {
+		return err
+	}
+	if !found {
+		if m.Optional {
+			jf.AbsentModules = append(jf.AbsentModules, m.Name)
+			return nil
+		}
+		return diag.WithSource(missingModule(jf.File, m), src)
+	}
+	if err := e.check(path); err != nil {
+		return diag.WithSource(moduleOutside(jf.File, m, err), src)
+	}
+	next := append(append([]string(nil), chain...), jf.File)
+	if contains(next, path) {
+		return diag.WithSource(circularImport(jf.File, path), src)
+	}
+	sub, err := readImport(fsys, path)
+	if err != nil {
+		return err
+	}
+	if err := expandImports(e, sub.jf, sub.src); err != nil {
+		return err
+	}
+	if err := expandModules(e, sub.jf, sub.src, next); err != nil {
+		return err
+	}
+	flattenModule(jf, m.Name+"::", sub.jf)
 	return nil
 }
 
@@ -57,7 +70,8 @@ func expandModules(fsys sys.FS, jf *ast.Justfile, src []byte, home string, chain
 // the justfile names in that directory. Without one, `name.just`, `name/mod.just`
 // and the justfile names in `name/`. The justfile names match in any case. More
 // than one file is an error. found is false when none is there.
-func findModule(fsys sys.FS, file string, m ast.Module, home string) (string, bool, error) {
+func findModule(e *loadEnv, file string, m ast.Module) (string, bool, error) {
+	fsys, home := e.fsys, e.home
 	dir := filepath.Dir(file)
 	var exact []string
 	var dirs []string
@@ -131,6 +145,14 @@ func relativeTo(dir string, paths []string) []string {
 		}
 	}
 	return out
+}
+
+// moduleOutside is the strict path rule's error for a module, at its name.
+func moduleOutside(file string, m ast.Module, err error) *diag.Error {
+	return &diag.Error{
+		Kind: diag.KindAnalysis, File: file, Line: m.Line, Col: m.Col, Width: m.Width,
+		Msg: err.Error(),
+	}
 }
 
 // missingModule is the error for a required module whose file is not there, at

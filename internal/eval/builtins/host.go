@@ -50,6 +50,10 @@ type Host struct {
 	// Jobs is the number of recipes allowed to run at once, which num_jobs
 	// reports; zero means no limit was set.
 	Jobs int
+	// CheckPath applies the strict path rule to a file that a builtin reads:
+	// it returns an error for a path that lies outside the project. Nil lifts
+	// the rule, as the opt-out does.
+	CheckPath func(path string) error
 	// Shell runs command through the shell of the justfile, with args as the
 	// arguments of the command, and returns what it wrote to its standard
 	// output without the last line break. A failure is an error whose text is
@@ -70,4 +74,13 @@ func (h Host) unixInvocationDir() string {
 		return h.InvocationDir
 	}
 	return h.Unix(h.InvocationDir)
+}
+
+// checkPath applies the strict path rule to path, when the Host has one. It is
+// impure only if CheckPath is.
+func (h Host) checkPath(path string) error {
+	if h.CheckPath == nil {
+		return nil
+	}
+	return h.CheckPath(path)
 }

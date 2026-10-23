@@ -145,12 +145,15 @@ func loadExceptions(t *testing.T, fsys sys.FS) map[string]string {
 // comes from the recording machine. fifo: upstream feeds a named pipe from a
 // thread the corpus cannot record. Empty directories, symbolic links, and
 // file modes are recorded (R8) and materialized, so they are not excused.
-// Adding a category here widens what the oracle is excused from, so it
-// needs a controller ruling.
+// strict-path is the one category the oracle passes: upstream allows a path
+// that just-go's strict path rule refuses, the documented divergence that the
+// opt-out lifts. Adding a category here widens what the oracle is excused from,
+// so it needs a controller ruling.
 var exceptionCategories = map[string]bool{
 	"path-hash":   true,
 	"machine-env": true,
 	"fifo":        true,
+	"strict-path": true,
 }
 
 // parseExceptions maps case id to reason. Each entry line is an id, white
@@ -497,6 +500,13 @@ func TestOracleExceptionsStillFail(t *testing.T) {
 			t.Parallel()
 			if exceptionCategory(reason) == "machine-env" {
 				t.Skip("machine-env: the case fails only on a machine other than the recording one")
+			}
+			if exceptionCategory(reason) == "strict-path" {
+				// Upstream allows the path, so the oracle passes the case.
+				if err := h.check(t, byID[id]); err != nil {
+					t.Errorf("strict-path exception %q fails against the oracle: %v", id, err)
+				}
+				return
 			}
 			if err := h.check(t, byID[id]); err == nil {
 				t.Errorf("oracle exception %q now passes against the oracle; remove it from %s", id, exceptionsPath)

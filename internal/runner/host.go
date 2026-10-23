@@ -6,6 +6,7 @@ import (
 
 	"gitea.com/wimwian/just-go/internal/eval"
 	"gitea.com/wimwian/just-go/internal/eval/builtins"
+	"gitea.com/wimwian/just-go/internal/loader"
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
@@ -32,6 +33,7 @@ func (inv *invocation) host() builtins.Host {
 		FS: inv.fs, WorkDir: inv.base, Justfile: file, SourceFile: file, ModuleFile: file,
 		InvocationDir: inv.here, Env: sys.EnvList(inv.plan.Env), Platform: inv.platform,
 		Clock: inv.clock, Random: inv.random, Version: parser.UpstreamVersion, Jobs: inv.plan.Jobs,
+		CheckPath: inv.strictPath,
 	}
 	if inv.goos == "windows" {
 		h.Unix = inv.unixPath
@@ -106,4 +108,14 @@ func processFailure(failure *eval.CommandError) string {
 		return fmt.Sprintf("process succeeded but `just` was interrupted by signal %s", failure.Detail)
 	}
 	return "process experienced an unknown failure"
+}
+
+// strictPath applies the strict path rule to a file a builtin reads: it refuses
+// a path that lies outside the justfile's directory, unless the rule is lifted.
+// It is impure: it resolves symbolic links through the file system.
+func (inv *invocation) strictPath(path string) error {
+	if inv.plan.AllowOutsidePaths {
+		return nil
+	}
+	return loader.CheckPath(filepath.Dir(inv.plan.Justfile.File), path, inv.fs.Canonicalize)
 }
