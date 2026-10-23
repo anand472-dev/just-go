@@ -87,6 +87,11 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 		Dotenv:            dotenvOf(cfg),
 		NoDeps:            cfg.noDeps,
 		Verbose:           cfg.verbose,
+		DryRun:            cfg.dryRun,
+		Explain:           cfg.explain,
+		Time:              cfg.time,
+		Timestamp:         cfg.timestamp,
+		TimestampFormat:   cfg.timestampFormat,
 		Jobs:              cfg.jobs,
 		WorkDir:           runDir(cfg, workDir),
 		Env:               env,
@@ -524,8 +529,12 @@ type config struct {
 	// version, man, changelog and allowMissing are the switches of the same names.
 	// request is the --request JSON, and requestGiven records that it was given.
 	version, man, changelog, allowMissing bool
-	request                               string
-	requestGiven                          bool
+	// dryRun, explain, time and timestamp are the switches of the same names;
+	// timestampFormat is --timestamp-format.
+	dryRun, explain, time, timestamp bool
+	timestampFormat                  string
+	request                          string
+	requestGiven                     bool
 
 	// set holds the --set overrides of variables, by name.
 	set map[string]string
@@ -573,6 +582,9 @@ func parseArgs(args []string) (config, error) {
 func checkCombinations(cfg config) error {
 	if cfg.listSubmodules && !cfg.list {
 		return usage("the argument '--list-submodules' requires '--list'")
+	}
+	if cfg.dryRun && cfg.quiet {
+		return usage("the argument '--dry-run' cannot be used with '--quiet'")
 	}
 	return nil
 }
@@ -799,6 +811,11 @@ type flagSpec struct {
 // completions offer its names, so a flag added here is parsed and completed.
 var flags = []flagSpec{
 	{"allow-missing", switchFlag},
+	{"dry-run", switchFlag},
+	{"explain", switchFlag},
+	{"time", switchFlag},
+	{"timestamp", switchFlag},
+	{"timestamp-format", valueFlag},
 	{"allow-outside-project-paths", switchFlag},
 	{"changelog", switchFlag},
 	{"man", switchFlag},
@@ -876,15 +893,15 @@ func flagNames() []string {
 
 // shortFlagName maps a one-letter flag to its long name. Pure.
 func shortFlagName(letter string) (string, bool) {
-	switch letter {
-	case "f":
-		return "justfile", true
-	case "l":
-		return "list", true
-	case "q":
-		return "quiet", true
-	}
-	return "", false
+	long, ok := shortFlags[letter]
+	return long, ok
+}
+
+// shortFlags are the one-letter flags and the long flags they stand for.
+var shortFlags = map[string]string{
+	"E": "dotenv-path", "F": "dotenv-filename", "V": "version", "d": "working-directory",
+	"e": "edit", "f": "justfile", "l": "list", "n": "dry-run", "q": "quiet", "s": "show",
+	"u": "unsorted", "v": "verbose",
 }
 
 // takesValue reports whether the flag with this long name has a value. Pure.
@@ -900,6 +917,10 @@ var switches = map[string]func(*config){
 	"dump":                        func(c *config) { c.dump = true },
 	"no-deps":                     func(c *config) { c.noDeps = true },
 	"allow-missing":               func(c *config) { c.allowMissing = true },
+	"dry-run":                     func(c *config) { c.dryRun = true },
+	"explain":                     func(c *config) { c.explain = true },
+	"time":                        func(c *config) { c.time = true },
+	"timestamp":                   func(c *config) { c.timestamp = true },
 	"changelog":                   func(c *config) { c.changelog = true },
 	"man":                         func(c *config) { c.man = true },
 	"version":                     func(c *config) { c.version = true },
@@ -946,13 +967,14 @@ var setters = map[string]func(*config, string) error{
 		c.justfileNames = append(c.justfileNames, strings.Split(v, ",")...)
 		return nil
 	},
-	"list-heading": func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
-	"list-prefix":  func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
-	"shell":        setShell,
-	"shell-arg":    func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
-	"show":         func(c *config, v string) error { c.show = v; return nil },
-	"request":      func(c *config, v string) error { c.request, c.requestGiven = v, true; return nil },
-	"usage":        func(c *config, v string) error { c.usage = v; return nil },
+	"list-heading":     func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
+	"list-prefix":      func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
+	"shell":            setShell,
+	"shell-arg":        func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
+	"show":             func(c *config, v string) error { c.show = v; return nil },
+	"request":          func(c *config, v string) error { c.request, c.requestGiven = v, true; return nil },
+	"timestamp-format": func(c *config, v string) error { c.timestampFormat = v; return nil },
+	"usage":            func(c *config, v string) error { c.usage = v; return nil },
 }
 
 // setJobs records --jobs, which takes a positive number: zero is refused with

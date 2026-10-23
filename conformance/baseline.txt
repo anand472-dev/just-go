@@ -190,6 +190,7 @@ dotenv::command_conflicts_with_dotenv_path_setting#1
 dotenv::command_conflicts_with_dotenv_required_setting#1
 dotenv::command_does_not_override_environment#1
 dotenv::command_failure#1
+dotenv::command_is_not_executed_in_dry_run#1
 dotenv::command_option#1
 dotenv::command_option_multiple#1
 dotenv::command_setting#1
@@ -246,6 +247,7 @@ evaluate::evaluate_variable_chosen_over_submodule#1
 evaluate::evaluate_variable_in_submodule#1
 evaluate::evaluate_width_ignores_private_variables#1
 evaluate::evaluate_with_suggestion#1
+explain::explain_recipe#1
 export::override_variable#1
 export::parameter#1
 export::parameter_not_visible_to_backtick#1
@@ -355,6 +357,8 @@ functions::choose_bad_alphabet_repeated#1
 functions::choose_bad_length#1
 functions::clean#1
 functions::dir_abbreviations_are_accepted#1
+functions::dry_run_does_not_execute_shell_function#1
+functions::dry_run_shell_function_output_is_escaped#1
 functions::encode_uri_component#1
 functions::env_var_failure#1
 functions::error_errors_with_message#1
@@ -592,6 +596,7 @@ misc::dependency_argument_string#1
 misc::dependency_takes_arguments_at_least#1
 misc::dependency_takes_arguments_at_most#1
 misc::dependency_takes_arguments_exact#1
+misc::dry_run#1
 misc::duplicate_dependency_argument#1
 misc::duplicate_dependency_no_args#1
 misc::duplicate_parameter#1
@@ -842,6 +847,7 @@ resolve::shell_on_custom_path#1
 run::dont_run_duplicate_recipes#1
 run::one_flag_only_allows_one_invocation#1
 run::one_flag_only_allows_one_invocation#2
+run::time_reports_time_when_specified#1
 scope::dependencies_in_submodules_run_with_submodule_scope#1
 scope::imported_recipes_run_in_correct_scope#1
 script::allowed_with_shebang#1
@@ -1058,6 +1064,11 @@ timestamps::attribute#1
 timestamps::attribute_format#1
 timestamps::attribute_format_expression#1
 timestamps::attribute_script#1
+timestamps::format_string#1
+timestamps::invalid_format_string_error#1
+timestamps::quiet#1
+timestamps::script#1
+timestamps::shell#1
 undefined_variables::conditional_reports_first_undefined_variable#1
 undefined_variables::parameter_default_unknown_variable_in_expression#1
 undefined_variables::undefined_variable_in_confirm_expression#1

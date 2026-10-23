@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 1102,
-    "fail": 885,
+    "pass": 1113,
+    "fail": 874,
     "skip": 24,
     "total": 2011
   },
@@ -15,10 +15,8 @@
     "cli:color": 12,
     "cli:command-color": 1,
     "cli:dotenv-command": 1,
-    "cli:dry-run": 4,
     "cli:dump": 104,
     "cli:evaluate": 31,
-    "cli:explain": 1,
     "cli:fmt": 24,
     "cli:global-justfile": 4,
     "cli:groups": 1,
@@ -35,8 +33,6 @@
     "cli:show": 9,
     "cli:summary": 1,
     "cli:tempdir": 1,
-    "cli:time": 1,
-    "cli:timestamp": 5,
     "cli:unsorted": 3,
     "cli:usage": 10,
     "cli:verbose": 1,
@@ -211,12 +207,6 @@
     "cli:dotenv-command": {
       "dotenv::command_only_runs_in_root_module#1": "passes --dotenv-command"
     },
-    "cli:dry-run": {
-      "dotenv::command_is_not_executed_in_dry_run#1": "passes --dry-run",
-      "functions::dry_run_does_not_execute_shell_function#1": "passes --dry-run",
-      "functions::dry_run_shell_function_output_is_escaped#1": "passes --dry-run",
-      "misc::dry_run#1": "passes --dry-run"
-    },
     "cli:dump": {
       "arg_attribute::dump#1": "passes --dump",
       "format::alias_fix_indent#1": "passes --dump",
@@ -356,9 +346,6 @@
       "slash_operator::once#1": "passes --evaluate",
       "slash_operator::twice#1": "passes --evaluate"
     },
-    "cli:explain": {
-      "explain::explain_recipe#1": "passes --explain"
-    },
     "cli:fmt": {
       "format::allow_empty_justfile#1": "passes --fmt",
       "format::already_formatted_from_stdin#1": "passes --fmt",
@@ -462,16 +449,6 @@
     },
     "cli:tempdir": {
       "tempdir::argument_overrides_setting#1": "passes --tempdir"
-    },
-    "cli:time": {
-      "run::time_reports_time_when_specified#1": "passes --time"
-    },
-    "cli:timestamp": {
-      "timestamps::format_string#1": "passes --timestamp",
-      "timestamps::invalid_format_string_error#1": "passes --timestamp",
-      "timestamps::quiet#1": "passes --timestamp",
-      "timestamps::script#1": "passes --timestamp",
-      "timestamps::shell#1": "passes --timestamp"
     },
     "cli:unsorted": {
       "list::modules_unsorted#1": "passes --unsorted",

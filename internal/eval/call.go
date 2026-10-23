@@ -32,6 +32,11 @@ func evaluateCall(c ast.Call, scope Scope, cmd Commander) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if d, ok := cmd.(Dry); ok {
+		if text, ok := d.Dry(c.Name, args); ok {
+			return text, nil
+		}
+	}
 	out, err := callBuiltin(c.Name, b, args, cmd)
 	switch {
 	case ended(err):

@@ -117,11 +117,12 @@ func (inv *invocation) execute(r *ast.Recipe, args []string, shared *ran, chain 
 		return code, err
 	}
 	inv.announce(r)
+	inv.explain(r)
 	s, err := inv.stepOf(r, f)
 	if err != nil {
 		return 0, err
 	}
-	if code, err := inv.recipe(s); err != nil || code != 0 {
+	if code, err := inv.timed(s); err != nil || code != 0 {
 		return code, err
 	}
 	return inv.subsequents(r, f, chain)
@@ -338,7 +339,11 @@ type site struct {
 // the plan's environment changed by the variables of under and then by those
 // of over. The functions it hosts see at. It is pure: it only builds a value.
 func (inv *invocation) commander(under, over map[string]string, at site) eval.Commander {
-	return backtickRunner{inv: inv, under: under, over: over, at: at}
+	b := backtickRunner{inv: inv, under: under, over: over, at: at}
+	if inv.plan.DryRun {
+		return dryRunner{b}
+	}
+	return b
 }
 
 // backtickRunner runs the commands of backticks, and of the shell function,

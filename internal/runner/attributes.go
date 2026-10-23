@@ -169,7 +169,14 @@ func (inv *invocation) attributeEnv(r *ast.Recipe, base map[string]string, at si
 func (inv *invocation) timestamp(r *ast.Recipe, scope eval.Scope, cmd eval.Commander) (*string, error) {
 	a := r.Attribute(ast.AttrTimestamp)
 	if a == nil {
-		return nil, nil
+		if !inv.plan.Timestamp {
+			return nil, nil
+		}
+		format := inv.plan.TimestampFormat
+		if format == "" {
+			format = defaultTimestampFormat
+		}
+		return &format, nil
 	}
 	format := defaultTimestampFormat
 	if len(a.Args) == 1 {

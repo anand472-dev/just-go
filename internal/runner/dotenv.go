@@ -78,6 +78,9 @@ func loadDotenvFile(fsys sys.FS, plan Plan, path string) ([]string, error) {
 // reads its output as a dotenv file.
 func loadDotenvCommand(ctx context.Context, plan Plan, exec sys.Process, dir string, set settings.Resolved) ([]string, error) {
 	env := plan.Env
+	if plan.DryRun {
+		return env, nil // a dry run runs no command, the dotenv one included
+	}
 	for _, command := range set.DotenvCommand {
 		argv := append(append([]string(nil), shellOf(set)...), command)
 		plan.Env = env

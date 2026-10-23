@@ -50,3 +50,28 @@ func TestRunAllowMissingWithOnlyAbsentRecipesSucceeds(t *testing.T) {
 		t.Errorf("run = %d, stderr %q, ran %d; want 0, silent, nothing run", got.code, got.stderr, len(got.proc.Specs))
 	}
 }
+
+// The short forms of the new flags, and the switches they set.
+func TestParseArgsShortFlagsOfTheRunModes(t *testing.T) {
+	got, err := parseArgs([]string{"-n", "-V", "-v", "-u", "-e", "-d", "dir", "-s", "x"})
+	if err != nil || !got.dryRun || !got.version || !got.verbose || !got.unsorted || !got.edit || got.workingDirectory != "dir" || got.show != "x" {
+		t.Errorf("parseArgs = %+v, %v", got, err)
+	}
+}
+
+// --dry-run and --quiet cannot be given together, as upstream refuses.
+func TestDryRunConflictsWithQuiet(t *testing.T) {
+	_, err := parseArgs([]string{"--dry-run", "--quiet"})
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Msg != "the argument '--dry-run' cannot be used with '--quiet'" {
+		t.Errorf("parseArgs(--dry-run --quiet) = %v", err)
+	}
+}
+
+// A dry run writes the recipe's lines and runs nothing.
+func TestRunDryRunWritesLinesAndRunsNothing(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "foo:\n  echo {{ `date` }}\n"}, nil, "--dry-run", "foo")
+	if got.code != 0 || got.stderr != "echo `date`\n" || len(got.proc.Specs) != 0 {
+		t.Errorf("run = %d, stderr %q, ran %d", got.code, got.stderr, len(got.proc.Specs))
+	}
+}

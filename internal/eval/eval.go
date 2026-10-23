@@ -32,6 +32,14 @@ type Commander interface {
 	Backtick(command string) (string, error)
 }
 
+// Dry is implemented by a Commander of a dry run, which renders a call that
+// would run a command as text, instead of running it. Dry returns the text of
+// the call of name with its evaluated args, and ok is false for a call that
+// runs as usual.
+type Dry interface {
+	Dry(name string, args []string) (text string, ok bool)
+}
+
 // FailureKind says how the command of a backtick failed.
 type FailureKind int
 

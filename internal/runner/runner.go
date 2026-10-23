@@ -80,6 +80,13 @@ type Plan struct {
 	// NoDeps is --no-deps: recipes run without their dependencies, before or
 	// after. Verbose is --verbose: each recipe announces itself on Stderr first.
 	NoDeps, Verbose bool
+	// DryRun is --dry-run: each line is written as it would run, with its
+	// interpolations as text, and nothing runs. Explain is --explain: a recipe
+	// with a doc comment writes it before it runs. Time is --time: each recipe
+	// writes how long it took. Timestamp is --timestamp: every recipe's commands
+	// are stamped, in TimestampFormat, or the default format when it is empty.
+	DryRun, Explain, Time, Timestamp bool
+	TimestampFormat                  string
 	// Dotenv holds the dotenv choices of the command line, which replace the
 	// justfile's settings; see DotenvFlags.
 	Dotenv DotenvFlags
@@ -902,6 +909,9 @@ func (inv *invocation) useSystemMachine() {
 // when a line failed. A comment is skipped under set ignore-comments, and a
 // guard that fails ends the recipe, quietly. Impure: it runs commands.
 func (inv *invocation) recipe(s step) (int, error) {
+	if inv.plan.DryRun {
+		return inv.dryLines(s)
+	}
 	if s.recipe.IsScript(inv.plan.Justfile.Settings) {
 		return inv.script(s)
 	}
