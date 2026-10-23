@@ -162,8 +162,7 @@ func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, std
 	case cfg.choose:
 		return chooseRecipes(cfg, env, jf, opts, stdout, stderr), true
 	case cfg.dump:
-		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
-		return 0, true
+		return dumpOf(cfg, env, jf, stdout, stderr), true
 	case cfg.list || (len(cfg.words) == 0 && (jf.DefaultList() || cfg.defaultList)):
 		return listRecipes(cfg, jf, stdout, stderr), true
 	}
@@ -250,6 +249,21 @@ func formatGroups(infos []just.RecipeInfo, unsorted bool, prefix string) string 
 		b.WriteString(prefix + g + "\n")
 	}
 	return b.String()
+}
+
+// dumpOf writes the justfile in the --dump-format asked for, or reports why it
+// cannot be written as JSON. Impure: it writes to stdout, or on failure to stderr.
+func dumpOf(cfg config, env []string, jf *just.Justfile, stdout, stderr io.Writer) int {
+	if cfg.dumpFormat != "json" {
+		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
+		return 0
+	}
+	text, err := jf.DumpJSON()
+	if err != nil {
+		return fail(stderr, cfg, err)
+	}
+	_, _ = io.WriteString(stdout, text)
+	return 0
 }
 
 // listRecipes prints the --list listing, limited to the --group values, which
@@ -529,7 +543,9 @@ type config struct {
 	allowOutside bool
 	// dump is --dump, and indentation the --indentation value, which
 	// indentationGiven records as present.
-	dump             bool
+	dump bool
+	// dumpFormat is --dump-format, "just" or "json"; --json is --dump with json.
+	dumpFormat       string
 	indentation      string
 	indentationGiven bool
 	// completions is the shell --completions asks a script for, if any.
@@ -867,6 +883,8 @@ var flags = []flagSpec{
 	{"chooser", valueFlag},
 	{"completions", valueFlag},
 	{"dump", switchFlag},
+	{"dump-format", valueFlag},
+	{"json", switchFlag},
 	{"evaluate", optionalFlag},
 	{"indentation", valueFlag},
 	{"justfile", valueFlag},
@@ -949,6 +967,7 @@ func takesValue(long string) bool {
 
 // switches sets the config field each switch flag names.
 var switches = map[string]func(*config){
+	"json":                        func(c *config) { c.dump, c.dumpFormat = true, "json" },
 	"allow-outside-project-paths": func(c *config) { c.allowOutside = true },
 	"choose":                      func(c *config) { c.choose = true },
 	"default-list":                func(c *config) { c.defaultList = true },
@@ -991,6 +1010,13 @@ func setSwitch(cfg *config, long string) {
 // setters records the value of each flag that takes one in the config field it
 // names. A second --shell is a usage error, checked by its setter.
 var setters = map[string]func(*config, string) error{
+	"dump-format": func(c *config, v string) error {
+		if v != "just" && v != "json" {
+			return usage("invalid value '%s' for '--dump-format <FORMAT>'", v)
+		}
+		c.dumpFormat = v
+		return nil
+	},
 	"completions":       func(c *config, v string) error { c.completions = v; return nil },
 	"indentation":       func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
 	"justfile":          func(c *config, v string) error { c.justfile = v; return nil },

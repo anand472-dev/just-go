@@ -1154,7 +1154,7 @@ func (p *parser) command(phys physical) ast.Line {
 	comment := isComment(phys.parts)
 	sg, parts := splitSigils(phys.parts, p.guards)
 	line := ast.Line{
-		Prefix: sg.prefix(), Guard: sg.guard, Parts: parts, Line: phys.line,
+		Prefix: sg.prefix(), Marks: sg.marks, Guard: sg.guard, Parts: parts, Line: phys.line,
 		Comment: comment, ExtraIndent: phys.extra,
 	}
 	if sg.guard && sg.dash {
@@ -1237,7 +1237,10 @@ func appendText(parts []ast.Expr, text string) []ast.Expr {
 
 // sigils is the set of sigils on the front of a command: `@`, `-` and, with
 // `set guards`, `?`.
-type sigils struct{ at, dash, guard bool }
+type sigils struct {
+	at, dash, guard bool
+	marks           string // the sigils as written, in order
+}
 
 // prefix is the `@` and `-` of g as an ast.Prefix.
 func (g sigils) prefix() ast.Prefix {
@@ -1291,6 +1294,7 @@ func cutSigils(s string, guards bool) (sigils, string) {
 		default:
 			return found, s
 		}
+		found.marks += s[:1]
 		s = s[1:]
 	}
 	return found, s

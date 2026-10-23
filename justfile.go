@@ -514,6 +514,13 @@ func (j *Justfile) Dump(indent string) string {
 	return dump.Justfile(j.tree, indent)
 }
 
+// DumpJSON is the justfile as JSON, as --dump-format json writes it: its source
+// is the path it was loaded from, and it is an error for a construct the JSON
+// does not cover yet (see dump.JSON).
+func (j *Justfile) DumpJSON() (string, error) {
+	return dump.JSON(j.tree, j.tree.File)
+}
+
 // Binding is an assignment and its value, as Evaluate returns it.
 type Binding = runner.Binding
 

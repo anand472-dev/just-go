@@ -152,7 +152,7 @@ func TestParseLinePrefixes(t *testing.T) {
 	}
 	for _, c := range cases {
 		jf := mustParse(t, "r:\n  "+c.line+"\n")
-		got := jf.Recipes[0].Lines
+		got := withoutMarks(jf.Recipes[0].Lines)
 		want := []ast.Line{{Prefix: c.prefix, Parts: []ast.Expr{txt(c.text)}, Line: 2}}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("line %q = %+v, want %+v", c.line, got, want)
@@ -167,8 +167,35 @@ func TestParsePrefixAloneAndBeforeInterpolation(t *testing.T) {
 		{Prefix: ast.PrefixDash, Parts: []ast.Expr{ref("x")}, Line: 3},
 		{Prefix: ast.PrefixNone, Parts: []ast.Expr{ref("x")}, Line: 4},
 	}
-	if got := jf.Recipes[0].Lines; !reflect.DeepEqual(got, want) {
+	if got := withoutMarks(jf.Recipes[0].Lines); !reflect.DeepEqual(got, want) {
 		t.Errorf("lines = %+v, want %+v", got, want)
+	}
+}
+
+// withoutMarks is lines with each line's Marks cleared, which the prefix tests do
+// not compare; TestParseRecordsSigilsInOrder does.
+func withoutMarks(lines []ast.Line) []ast.Line {
+	out := append([]ast.Line(nil), lines...)
+	for i := range out {
+		out[i].Marks = ""
+	}
+	return out
+}
+
+// Marks are the sigils the line was written with, in order; a line without a
+// sigil has none, and a sigil is recorded once.
+func TestParseRecordsSigilsInOrder(t *testing.T) {
+	for _, c := range []struct{ line, marks string }{
+		{"@-x", "@-"},
+		{"-@x", "-@"},
+		{"@x", "@"},
+		{"x", ""},
+		{"@-@x", "@-"},
+	} {
+		got := mustParse(t, "r:\n  "+c.line+"\n").Recipes[0].Lines[0].Marks
+		if got != c.marks {
+			t.Errorf("Marks of %q = %q, want %q", c.line, got, c.marks)
+		}
 	}
 }
 
@@ -483,7 +510,7 @@ func TestParseRecipeBodies(t *testing.T) {
 	}
 	for _, c := range cases {
 		jf := mustParse(t, c.src)
-		if got := jf.Recipes[0].Lines; !reflect.DeepEqual(got, c.lines) {
+		if got := withoutMarks(jf.Recipes[0].Lines); !reflect.DeepEqual(got, c.lines) {
 			t.Errorf("%s: Lines =\n %+v\nwant\n %+v", c.name, got, c.lines)
 		}
 	}
@@ -621,7 +648,7 @@ func TestParseLineContinuation(t *testing.T) {
 	}
 	for _, c := range cases {
 		jf := mustParse(t, c.src)
-		if got := jf.Recipes[0].Lines; !reflect.DeepEqual(got, c.lines) {
+		if got := withoutMarks(jf.Recipes[0].Lines); !reflect.DeepEqual(got, c.lines) {
 			t.Errorf("%s: Lines =\n %+v\nwant\n %+v", c.name, got, c.lines)
 		}
 	}

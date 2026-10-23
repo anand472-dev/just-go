@@ -168,3 +168,25 @@ func TestInitNameFollowsTheFlagsGiven(t *testing.T) {
 		}
 	}
 }
+
+// --dump-format json writes the justfile as JSON, and --json is the same; the
+// other formats are refused.
+func TestDumpFormatJSON(t *testing.T) {
+	for _, args := range [][]string{{"--dump", "--dump-format", "json"}, {"--json"}} {
+		got := runFake(t, map[string]string{"/w/justfile": "foo:\n"}, nil, args...)
+		if got.code != 0 || !strings.HasPrefix(got.stdout, `{"assignments":{},"first":"foo"`) || !strings.HasSuffix(got.stdout, "}\n") {
+			t.Errorf("%v: run = %d, stdout %q, stderr %q", args, got.code, got.stdout, got.stderr)
+		}
+	}
+	if _, err := parseArgs([]string{"--dump-format", "yaml"}); err == nil {
+		t.Errorf("--dump-format yaml was accepted")
+	}
+}
+
+// A justfile whose JSON form is not covered yet fails the dump, with the reason.
+func TestDumpFormatJSONRefusesWhatItDoesNotEncode(t *testing.T) {
+	got := runFake(t, map[string]string{"/w/justfile": "set lists\nx := [\"a\"]\n"}, nil, "--unstable", "--json")
+	if got.code != 1 || !strings.Contains(got.stderr, "does not encode this expression yet") {
+		t.Errorf("run = %d, stderr %q", got.code, got.stderr)
+	}
+}

@@ -571,6 +571,10 @@ type Span struct {
 // next physical line.
 type Line struct {
 	Prefix Prefix
+	// Marks are the sigils the line was written with, `@`, `-` and `?`, in the
+	// order they were written, which Prefix does not keep. A recipe's quiet `@`
+	// is not among them.
+	Marks string
 	// Parts holds the source text of the line (Text) and its interpolations
 	// (Var, Concat, or a StringLit written inside braces), in order.
 	Parts []Expr

@@ -52,7 +52,7 @@ func TestParseRawKeepsEveryPhysicalLine(t *testing.T) {
 func TestParseRawLeavesLinesAlone(t *testing.T) {
 	r := mustParse(t, "foo:\n  @-echo a \\\n    b\n").Recipes[0]
 	want := []ast.Line{{Prefix: ast.PrefixAtDash, Parts: []ast.Expr{txt("echo a "), txt("b")}, Line: 3}}
-	if len(r.Lines) != 1 || r.Lines[0].Prefix != want[0].Prefix || r.Lines[0].Line != 3 {
+	if len(r.Lines) != 1 || r.Lines[0].Prefix != want[0].Prefix || r.Lines[0].Line != 3 || r.Lines[0].Marks != "@-" {
 		t.Errorf("Lines = %+v, want %+v", r.Lines, want)
 	}
 	if got := rawOf(t, "foo:\n  @-echo a\n")[0].Parts[0]; got != txt("@-echo a") {
