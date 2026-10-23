@@ -108,6 +108,9 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 // recipes. done is false when none of these applies. Impure: it writes to stdout
 // and runs an --evaluate's backticks through opts.Exec.
 func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) (status int, done bool) {
+	if status, done := describeInfo(cfg, env, jf, stdout, stderr); done {
+		return status, true
+	}
 	switch {
 	case cfg.evaluate:
 		return evaluate(cfg, jf, opts, stdout, stderr), true
@@ -115,10 +118,103 @@ func inspect(cfg config, env []string, jf *just.Justfile, opts just.Options, std
 		_, _ = io.WriteString(stdout, jf.Dump(indentation(cfg, env)))
 		return 0, true
 	case cfg.list || (len(cfg.words) == 0 && jf.DefaultList()):
-		_, _ = io.WriteString(stdout, formatList(jf.Recipes()))
+		return listRecipes(cfg, jf, stdout, stderr), true
+	}
+	return 0, false
+}
+
+// describeInfo prints what --show, --variables or --groups asks for. done is false
+// when none of them was asked for. Impure: it writes to stdout or stderr.
+func describeInfo(cfg config, env []string, jf *just.Justfile, stdout, stderr io.Writer) (status int, done bool) {
+	switch {
+	case cfg.show != "":
+		text, err := jf.Show(cfg.show, indentation(cfg, env))
+		if err != nil {
+			return fail(stderr, cfg.quiet, err), true
+		}
+		_, _ = io.WriteString(stdout, text)
+		return 0, true
+	case cfg.usage != "":
+		text, err := jf.Usage(cfg.usage)
+		if err != nil {
+			return fail(stderr, cfg.quiet, err), true
+		}
+		_, _ = io.WriteString(stdout, text)
+		return 0, true
+	case cfg.variables:
+		_, _ = fmt.Fprintln(stdout, strings.Join(jf.Variables(), " "))
+		return 0, true
+	case cfg.summary:
+		return summarize(cfg, jf, stdout, stderr), true
+	case cfg.groups:
+		_, _ = io.WriteString(stdout, formatGroups(jf.Recipes(), cfg.unsorted, listPrefix(cfg)))
 		return 0, true
 	}
 	return 0, false
+}
+
+// summarize prints the recipe names of --summary on one line. A justfile with no
+// recipe prints an empty line, and a warning on stderr unless quiet. Impure.
+func summarize(cfg config, jf *just.Justfile, stdout, stderr io.Writer) int {
+	names := jf.Summary(!cfg.unsorted)
+	if len(names) == 0 {
+		if !cfg.quiet {
+			_, _ = fmt.Fprintln(stderr, "justfile contains no recipes")
+		}
+		_, _ = fmt.Fprintln(stdout)
+		return 0
+	}
+	_, _ = fmt.Fprintln(stdout, strings.Join(names, " "))
+	return 0
+}
+
+// listPrefix is the indent --groups and --list write before each group: the
+// --list-prefix value, else four spaces. Pure.
+func listPrefix(cfg config) string {
+	if cfg.listPrefixGiven {
+		return cfg.listPrefix
+	}
+	return "    "
+}
+
+// formatGroups is the --groups listing: the heading, then each group of a
+// public recipe, sorted by name unless unsorted, which keeps the order of first
+// appearance, each indented by prefix. Pure.
+func formatGroups(infos []just.RecipeInfo, unsorted bool, prefix string) string {
+	seen := map[string]bool{}
+	var groups []string
+	for _, info := range infos {
+		if info.Private {
+			continue
+		}
+		for _, g := range info.Groups {
+			if !seen[g] {
+				seen[g] = true
+				groups = append(groups, g)
+			}
+		}
+	}
+	if !unsorted {
+		sort.Strings(groups)
+	}
+	var b strings.Builder
+	b.WriteString("Recipe groups:\n")
+	for _, g := range groups {
+		b.WriteString(prefix + g + "\n")
+	}
+	return b.String()
+}
+
+// listRecipes prints the --list listing, limited to the --group values, which
+// must each name a group that a public recipe is in. Impure: it writes to stdout
+// or stderr.
+func listRecipes(cfg config, jf *just.Justfile, stdout, stderr io.Writer) int {
+	infos := jf.Recipes()
+	if missing, ok := missingGroup(infos, cfg.group); ok {
+		return fail(stderr, cfg.quiet, usage("justfile does not contain group `%s`", missing))
+	}
+	_, _ = io.WriteString(stdout, formatListWith(infos, listOptionsOf(cfg)))
+	return 0
 }
 
 // indentation is the indent that a dump writes recipe bodies with: the
@@ -327,6 +423,20 @@ type config struct {
 	indentationGiven bool
 	// completions is the shell --completions asks a script for, if any.
 	completions string
+	// show and usage name the recipes --show and --usage describe.
+	show, usage string
+	// groups, summary, variables, and list-submodules are the switches of the
+	// same names; unsorted keeps the listed groups in the order they appear.
+	groups, summary, variables, listSubmodules, unsorted bool
+	// listPrefix is the --list-prefix value, which indents each group; it
+	// defaults to four spaces when listPrefixGiven is false.
+	listPrefix      string
+	listPrefixGiven bool
+	// listHeading is the --list-heading value; the default heading is used when
+	// listHeadingGiven is false. group is each --group, which limits --list.
+	listHeading      string
+	listHeadingGiven bool
+	group            []string
 	// evaluate is --evaluate, and evaluateName the name it was given, if any:
 	// the value is optional, so it may be attached or the next argument.
 	evaluate     bool
@@ -342,6 +452,25 @@ type config struct {
 // may be clustered (-lq) and a value may be attached (-fPATH,
 // --justfile=PATH). Pure.
 func parseArgs(args []string) (config, error) {
+	cfg, err := parseWords(args)
+	if err != nil {
+		return cfg, err
+	}
+	return cfg, checkCombinations(cfg)
+}
+
+// checkCombinations is the usage error for flags that need another: the
+// --list-submodules flag lists submodules only within --list. Pure.
+func checkCombinations(cfg config) error {
+	if cfg.listSubmodules && !cfg.list {
+		return usage("the argument '--list-submodules' requires '--list'")
+	}
+	return nil
+}
+
+// parseWords is the flag and word parsing of parseArgs, before the checks that
+// flags need one another.
+func parseWords(args []string) (config, error) {
 	var cfg config
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -480,9 +609,19 @@ var flags = []flagSpec{
 	{"justfile", valueFlag},
 	{"list", switchFlag},
 	{"quiet", switchFlag},
+	{"group", valueFlag},
+	{"groups", switchFlag},
+	{"list-heading", valueFlag},
+	{"list-prefix", valueFlag},
+	{"list-submodules", switchFlag},
 	{"shell", valueFlag},
 	{"shell-arg", valueFlag},
+	{"show", valueFlag},
+	{"summary", switchFlag},
+	{"unsorted", switchFlag},
 	{"unstable", switchFlag},
+	{"usage", valueFlag},
+	{"variables", switchFlag},
 	{"yes", switchFlag},
 }
 
@@ -534,43 +673,58 @@ func takesValue(long string) bool {
 	return kindOf(long) == valueFlag
 }
 
+// switches sets the config field each switch flag names.
+var switches = map[string]func(*config){
+	"allow-outside-project-paths": func(c *config) { c.allowOutside = true },
+	"dump":                        func(c *config) { c.dump = true },
+	"groups":                      func(c *config) { c.groups = true },
+	"list":                        func(c *config) { c.list = true },
+	"list-submodules":             func(c *config) { c.listSubmodules = true },
+	"quiet":                       func(c *config) { c.quiet = true },
+	"summary":                     func(c *config) { c.summary = true },
+	"unsorted":                    func(c *config) { c.unsorted = true },
+	"unstable":                    func(c *config) { c.unstable = true },
+	"variables":                   func(c *config) { c.variables = true },
+	"yes":                         func(c *config) { c.yes = true },
+}
+
 // setSwitch records the flag with this long name, which takes no value, in
 // cfg. Pure apart from updating cfg.
 func setSwitch(cfg *config, long string) {
-	switch long {
-	case "list":
-		cfg.list = true
-	case "quiet":
-		cfg.quiet = true
-	case "unstable":
-		cfg.unstable = true
-	case "yes":
-		cfg.yes = true
-	case "allow-outside-project-paths":
-		cfg.allowOutside = true
-	case "dump":
-		cfg.dump = true
+	if set, ok := switches[long]; ok {
+		set(cfg)
 	}
 }
 
+// setters records the value of each flag that takes one in the config field it
+// names. A second --shell is a usage error, checked by its setter.
+var setters = map[string]func(*config, string) error{
+	"completions":  func(c *config, v string) error { c.completions = v; return nil },
+	"indentation":  func(c *config, v string) error { c.indentation, c.indentationGiven = v, true; return nil },
+	"justfile":     func(c *config, v string) error { c.justfile = v; return nil },
+	"group":        func(c *config, v string) error { c.group = append(c.group, v); return nil },
+	"list-heading": func(c *config, v string) error { c.listHeading, c.listHeadingGiven = v, true; return nil },
+	"list-prefix":  func(c *config, v string) error { c.listPrefix, c.listPrefixGiven = v, true; return nil },
+	"shell":        setShell,
+	"shell-arg":    func(c *config, v string) error { c.shellArgs = append(c.shellArgs, v); return nil },
+	"show":         func(c *config, v string) error { c.show = v; return nil },
+	"usage":        func(c *config, v string) error { c.usage = v; return nil },
+}
+
+// setShell records --shell, which may not be given twice, as upstream's.
+func setShell(cfg *config, value string) error {
+	if cfg.shellGiven {
+		return usage("the argument '--shell <SHELL>' cannot be used multiple times")
+	}
+	cfg.shell, cfg.shellGiven = value, true
+	return nil
+}
+
 // setFlag records the flag with this long name, which takes a value, in cfg.
-// A second --shell is a usage error, as upstream's; --shell-arg accumulates.
 // Pure apart from updating cfg.
 func setFlag(cfg *config, long, value string) error {
-	switch long {
-	case "justfile":
-		cfg.justfile = value
-	case "shell":
-		if cfg.shellGiven {
-			return usage("the argument '--shell <SHELL>' cannot be used multiple times")
-		}
-		cfg.shell, cfg.shellGiven = value, true
-	case "shell-arg":
-		cfg.shellArgs = append(cfg.shellArgs, value)
-	case "indentation":
-		cfg.indentation, cfg.indentationGiven = value, true
-	case "completions":
-		cfg.completions = value
+	if set, ok := setters[long]; ok {
+		return set(cfg, value)
 	}
 	return nil
 }
@@ -716,28 +870,75 @@ func anyGrouped(entries []listEntry) bool {
 // over all sections; a signature wider than 50 columns, or a multi-line doc,
 // puts the doc on comment lines above it. Pure.
 func formatList(infos []just.RecipeInfo) string {
-	entries := listEntries(infos)
+	return formatListWith(infos, listOptions{heading: listHeading, prefix: listIndent})
+}
+
+// listOptions are the choices --list makes: whether the recipes keep the order
+// of the source, the heading, the indent of each line, and the groups the
+// listing is limited to, if any.
+type listOptions struct {
+	unsorted bool
+	heading  string
+	prefix   string
+	groups   []string
+}
+
+// listOptionsOf are the listing options the command line asks for. Pure.
+func listOptionsOf(cfg config) listOptions {
+	heading := listHeading
+	if cfg.listHeadingGiven {
+		heading = cfg.listHeading
+	}
+	return listOptions{unsorted: cfg.unsorted, heading: heading, prefix: listPrefix(cfg), groups: cfg.group}
+}
+
+// formatListWith is the --list listing of infos under opts. Pure.
+func formatListWith(infos []just.RecipeInfo, opts listOptions) string {
+	entries := listEntries(infos, opts.unsorted)
 	column := alignWidth(entries)
 	var b strings.Builder
-	b.WriteString(listHeading)
-	for i, section := range listSections(entries) {
+	b.WriteString(opts.heading)
+	for i, section := range listSections(entries, opts.unsorted, opts.groups) {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
 		if section.grouped {
-			b.WriteString(listIndent + "[" + section.group + "]\n")
+			b.WriteString(opts.prefix + "[" + section.group + "]\n")
 		}
 		for _, e := range section.entries {
-			writeEntry(&b, e, column)
+			writeEntry(&b, e, column, opts.prefix)
 		}
 	}
 	return b.String()
 }
 
-// listEntries returns the public recipes of infos, sorted by name. Pure.
-func listEntries(infos []just.RecipeInfo) []listEntry {
+// missingGroup is the first group in groups that no public recipe of infos is
+// in, and whether there is one. Pure.
+func missingGroup(infos []just.RecipeInfo, groups []string) (string, bool) {
+	have := map[string]bool{}
+	for _, info := range infos {
+		if info.Private {
+			continue
+		}
+		for _, g := range info.Groups {
+			have[g] = true
+		}
+	}
+	for _, g := range groups {
+		if !have[g] {
+			return g, true
+		}
+	}
+	return "", false
+}
+
+// listEntries returns the public recipes of infos, sorted by name unless
+// unsorted, which keeps the order of the source. Pure.
+func listEntries(infos []just.RecipeInfo, unsorted bool) []listEntry {
 	sorted := append([]just.RecipeInfo(nil), infos...)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	if !unsorted {
+		sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	}
 	entries := make([]listEntry, 0, len(sorted))
 	for _, info := range sorted {
 		if info.Private {
@@ -750,38 +951,50 @@ func listEntries(infos []just.RecipeInfo) []listEntry {
 }
 
 // listSections divides entries, which are in order, into the sections of the
-// listing: the entries in no group, if there are any, then one section for
-// each group in byte order. Pure.
-func listSections(entries []listEntry) []listSection {
-	if !anyGrouped(entries) {
+// listing: the entries in no group, if there are any, then one section for each
+// group in byte order, or in order of first appearance when unsorted. When only
+// names are given, the sections are those groups alone. Pure.
+func listSections(entries []listEntry, unsorted bool, only []string) []listSection {
+	if len(only) == 0 && !anyGrouped(entries) {
 		if len(entries) == 0 {
 			return nil
 		}
 		return []listSection{{entries: entries}}
 	}
+	ungrouped, byGroup, order := groupMembers(entries)
 	var sections []listSection
-	var ungrouped []listEntry
-	byGroup := make(map[string][]listEntry)
+	if ungrouped != nil && len(only) == 0 {
+		sections = append(sections, listSection{entries: ungrouped})
+	}
+	names := append([]string(nil), order...)
+	if len(only) > 0 {
+		names = append([]string(nil), only...)
+	}
+	if !unsorted {
+		sort.Strings(names)
+	}
+	for _, g := range names {
+		sections = append(sections, listSection{group: g, grouped: true, entries: byGroup[g]})
+	}
+	return sections
+}
+
+// groupMembers are the entries in no group, the entries of each group, and the
+// groups in the order each first appears. Pure.
+func groupMembers(entries []listEntry) (ungrouped []listEntry, byGroup map[string][]listEntry, order []string) {
+	byGroup = make(map[string][]listEntry)
 	for _, e := range entries {
 		if len(e.groups) == 0 {
 			ungrouped = append(ungrouped, e)
 		}
 		for _, g := range e.groups {
+			if _, seen := byGroup[g]; !seen {
+				order = append(order, g)
+			}
 			byGroup[g] = append(byGroup[g], e)
 		}
 	}
-	if ungrouped != nil {
-		sections = append(sections, listSection{entries: ungrouped})
-	}
-	names := make([]string, 0, len(byGroup))
-	for g := range byGroup {
-		names = append(names, g)
-	}
-	sort.Strings(names)
-	for _, g := range names {
-		sections = append(sections, listSection{group: g, grouped: true, entries: byGroup[g]})
-	}
-	return sections
+	return ungrouped, byGroup, order
 }
 
 // signature is the recipe's name followed by its parameters, each with its
@@ -813,16 +1026,17 @@ func alignWidth(entries []listEntry) int {
 	return widest
 }
 
-// writeEntry writes one recipe of --list output, with its "#" in the column
-// that follows a signature of width column. Pure apart from writing to b.
-func writeEntry(b *strings.Builder, e listEntry, column int) {
+// writeEntry writes one recipe of --list output, indented by prefix, with its
+// "#" in the column that follows a signature of width column. Pure apart from
+// writing to b.
+func writeEntry(b *strings.Builder, e listEntry, column int, prefix string) {
 	inline := e.width <= maxSignatureWidth && !strings.Contains(e.doc, "\n")
 	if e.doc != "" && !inline {
 		for _, line := range strings.Split(e.doc, "\n") {
-			b.WriteString(listIndent + "# " + line + "\n")
+			b.WriteString(prefix + "# " + line + "\n")
 		}
 	}
-	b.WriteString(listIndent + e.signature)
+	b.WriteString(prefix + e.signature)
 	if e.doc != "" && inline {
 		b.WriteString(strings.Repeat(" ", column-e.width+1) + "# " + e.doc)
 	}

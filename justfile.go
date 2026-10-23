@@ -16,8 +16,10 @@ package just
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -29,6 +31,7 @@ import (
 	"gitea.com/wimwian/just-go/internal/parser"
 	"gitea.com/wimwian/just-go/internal/runner"
 	"gitea.com/wimwian/just-go/internal/settings"
+	"gitea.com/wimwian/just-go/internal/suggest"
 	"gitea.com/wimwian/just-go/internal/sys"
 )
 
@@ -271,6 +274,177 @@ func (j *Justfile) Run(ctx context.Context, opts Options) (Result, error) {
 	}
 	res, err := runner.Run(ctx, plan)
 	return Result{ExitCode: res.ExitCode}, err
+}
+
+// Show returns the recipe named name as --show prints it, with the body indented
+// by indent. The words of name are joined with `::`, so `foo bar` names foo::bar,
+// and a recipe in a module is written under its own name. A path that is not a
+// module path is an error; so is a name that is no recipe, which is suggested a
+// near one, and a recipe in an absent optional module, as upstream's.
+func (j *Justfile) Show(name, indent string) (string, error) {
+	path, r, err := j.recipe(name)
+	if err != nil {
+		return "", err
+	}
+	r.Name = lastSegment(path)
+	return dump.Recipe(r, indent), nil
+}
+
+// Usage returns the usage of the recipe named name as --usage prints it: the
+// line that runs it, and the arguments it takes. The name is found as Show finds
+// it, and the errors are Show's.
+func (j *Justfile) Usage(name string) (string, error) {
+	path, r, err := j.recipe(name)
+	if err != nil {
+		return "", err
+	}
+	return usageOf(path, r), nil
+}
+
+// recipe is the recipe that name, a module path (its words joined with `::`),
+// names, with the path as it was written. An invalid path, a recipe in an absent
+// optional module, and a name that is no recipe are errors; the last is given a
+// near recipe's name when there is one.
+func (j *Justfile) recipe(name string) (string, ast.Recipe, error) {
+	path := strings.Join(strings.Fields(name), "::")
+	if !validPath(path) {
+		return "", ast.Recipe{}, usage(fmt.Sprintf("invalid module path `%s`", name))
+	}
+	if m := absentModuleOf(j.tree, path); m != "" {
+		return "", ast.Recipe{}, usage(fmt.Sprintf("optional module `%s` is absent", m))
+	}
+	for _, r := range j.tree.UniqueRecipes() {
+		if r.Name == path {
+			return path, r, nil
+		}
+	}
+	msg := fmt.Sprintf("justfile does not contain recipe `%s`", name)
+	if suggestion, ok := suggest.Closest(path, publicRecipeNames(j.tree)); ok {
+		msg += fmt.Sprintf("\nDid you mean `%s`?", suggestion)
+	}
+	return "", ast.Recipe{}, usage(msg)
+}
+
+// usageOf is the usage text of the recipe r, run as path: the line that runs it,
+// then an Arguments section listing its parameters when it has any. Pure.
+func usageOf(path string, r ast.Recipe) string {
+	words := []string{"Usage: just", path}
+	for _, p := range r.Params {
+		name := p.Name
+		if p.Kind != ast.ParamSingle {
+			name += "..."
+		}
+		if p.Default != nil {
+			name = "[" + name + "]"
+		}
+		words = append(words, name)
+	}
+	var b strings.Builder
+	b.WriteString(strings.Join(words, " ") + "\n")
+	if len(r.Params) > 0 {
+		b.WriteString("\nArguments:\n")
+		for _, p := range r.Params {
+			b.WriteString("  " + p.Name + "\n")
+		}
+	}
+	return b.String()
+}
+
+// validPath reports whether p is a module path: identifiers joined by `::`. Pure.
+func validPath(p string) bool {
+	for _, seg := range strings.Split(p, "::") {
+		if seg == "" || !isIdent(seg) {
+			return false
+		}
+	}
+	return true
+}
+
+// identPattern is a name a justfile may give a recipe or module: a letter or
+// underscore, then letters, digits, underscores or dashes.
+var identPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+
+// isIdent reports whether s is such a name. Pure.
+func isIdent(s string) bool {
+	return identPattern.MatchString(s)
+}
+
+// lastSegment is the part of a module path after its last `::`. Pure.
+func lastSegment(path string) string {
+	if i := strings.LastIndex(path, "::"); i >= 0 {
+		return path[i+2:]
+	}
+	return path
+}
+
+// publicRecipeNames are the names of the recipes that are not private. Pure.
+func publicRecipeNames(jf *ast.Justfile) []string {
+	var names []string
+	for _, r := range jf.UniqueRecipes() {
+		if !r.Private() {
+			names = append(names, r.Name)
+		}
+	}
+	return names
+}
+
+// absentModuleOf is the absent optional module that name is, or is inside, or
+// "" when none is. Pure.
+func absentModuleOf(jf *ast.Justfile, name string) string {
+	if m := jf.AbsentModuleOf(name); m != "" {
+		return m
+	}
+	for _, m := range jf.AbsentModules {
+		if m == name {
+			return m
+		}
+	}
+	return ""
+}
+
+// Summary returns the names of the justfile's public recipes, module recipes
+// under their paths, in the order --summary writes them: the recipes of a level
+// before its submodules, each level sorted unless sorted is false, which keeps
+// the order of the source. It is pure.
+func (j *Justfile) Summary(sorted bool) []string {
+	return summaryOrder(publicRecipeNames(j.tree), sorted)
+}
+
+// summaryOrder orders recipe names as Summary does: at each level of modules,
+// the recipes of that level, then each submodule's levels in turn. A name's
+// module path is its parts before the last `::`. It is pure.
+func summaryOrder(names []string, sorted bool) []string {
+	return level("", names, sorted)
+}
+
+// level is the names under the module path prefix, in summaryOrder's order.
+func level(prefix string, names []string, sorted bool) []string {
+	var recipes, modules []string
+	seen := map[string]bool{}
+	for _, n := range names {
+		rest, ok := strings.CutPrefix(n, prefix)
+		if !ok {
+			continue
+		}
+		i := strings.Index(rest, "::")
+		if i < 0 {
+			recipes = append(recipes, n)
+			continue
+		}
+		if m := rest[:i]; !seen[m] {
+			seen[m] = true
+			modules = append(modules, m)
+		}
+	}
+	if sorted {
+		sort.Strings(recipes)
+		sort.Strings(modules)
+	}
+	out := recipes
+	for _, m := range modules {
+		out = append(out, level(prefix+m+"::", names, sorted)...)
+	}
+	return out
 }
 
 // Variables returns the names of the justfile's public assignments, sorted. It

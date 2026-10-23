@@ -99,6 +99,12 @@ func assignment(a ast.Assignment) string {
 	return b.String()
 }
 
+// Recipe is the text of one recipe, as --show prints it: its doc comment,
+// attributes, header and body, with the body indented by indent. It is pure.
+func Recipe(r ast.Recipe, indent string) string {
+	return recipe(r, indent, nil)
+}
+
 // recipe is the text of a recipe: its doc comment, attributes, header and body.
 // A body line is indented, after its prefix is written; a blank body line is
 // written as it is. It is pure.

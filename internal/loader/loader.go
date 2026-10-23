@@ -240,8 +240,10 @@ func expandImports(e *loadEnv, root *ast.Justfile, src []byte) error {
 		if cur.jf != root {
 			mergeUnit(root, cur.jf)
 		}
-		for _, imp := range cur.jf.Imports {
-			next, found, err := nextImport(e, seen, cur, imp)
+		// Pushed last to first, so that the imports are merged in the order
+		// they are written: upstream lists them so with --unsorted.
+		for i := len(cur.jf.Imports) - 1; i >= 0; i-- {
+			next, found, err := nextImport(e, seen, cur, cur.jf.Imports[i])
 			if err != nil {
 				return err
 			}

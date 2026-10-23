@@ -1,7 +1,7 @@
 {
   "counts": {
-    "pass": 926,
-    "fail": 1062,
+    "pass": 974,
+    "fail": 1014,
     "skip": 23,
     "total": 2011
   },
@@ -27,16 +27,13 @@
     "cli:explain": 1,
     "cli:fmt": 24,
     "cli:global-justfile": 4,
-    "cli:group": 4,
-    "cli:groups": 7,
+    "cli:groups": 1,
     "cli:init": 12,
     "cli:jobs": 1,
     "cli:json": 1,
     "cli:justfile": 2,
     "cli:justfile-name": 5,
     "cli:list": 8,
-    "cli:list-heading": 2,
-    "cli:list-prefix": 1,
     "cli:list-submodules": 8,
     "cli:man": 1,
     "cli:no-aliases": 1,
@@ -47,14 +44,13 @@
     "cli:search-directory": 25,
     "cli:set": 30,
     "cli:shell-command": 1,
-    "cli:show": 23,
-    "cli:summary": 12,
+    "cli:show": 11,
+    "cli:summary": 1,
     "cli:tempdir": 1,
     "cli:time": 1,
     "cli:timestamp": 5,
-    "cli:unsorted": 10,
-    "cli:usage": 14,
-    "cli:variables": 2,
+    "cli:unsorted": 3,
+    "cli:usage": 11,
     "cli:verbose": 3,
     "cli:working-directory": 7,
     "completions": 12,
@@ -462,19 +458,7 @@
       "global::unix#1": "passes --global-justfile",
       "global::unix#2": "passes --global-justfile"
     },
-    "cli:group": {
-      "groups::list_group#1": "passes --group",
-      "groups::list_group_unknown#1": "passes --group",
-      "groups::list_group_with_submodules#1": "passes --group",
-      "groups::list_multiple_groups#1": "passes --group"
-    },
     "cli:groups": {
-      "groups::list_groups#1": "passes --groups",
-      "groups::list_groups_private#1": "passes --groups",
-      "groups::list_groups_private_unsorted#1": "passes --groups",
-      "groups::list_groups_unsorted#1": "passes --groups",
-      "groups::list_groups_with_custom_prefix#1": "passes --groups",
-      "groups::list_groups_with_shorthand_syntax#1": "passes --groups",
       "groups::reject_extra_arguments#1": "passes --groups"
     },
     "cli:init": {
@@ -517,13 +501,6 @@
       "list::list_submodule#1": "lists a submodule",
       "list::list_unknown_submodule#1": "lists a submodule",
       "modules::list_absent_optional_module_is_error#1": "lists a submodule"
-    },
-    "cli:list-heading": {
-      "misc::list_empty_prefix_and_heading#1": "passes --list-heading",
-      "misc::list_heading#1": "passes --list-heading"
-    },
-    "cli:list-prefix": {
-      "misc::list_prefix#1": "passes --list-prefix"
     },
     "cli:list-submodules": {
       "list::list_displays_recipes_in_submodules#1": "passes --list-submodules",
@@ -622,42 +599,19 @@
     },
     "cli:show": {
       "alias::module_alias_resolves_in_show#1": "passes --show",
-      "modules::show_absent_optional_module_is_error#1": "passes --show",
-      "modules::show_recipe_in_absent_optional_module_is_error#1": "passes --show",
-      "quiet::show_missing#1": "passes --show",
       "show::alias_show#1": "passes --show",
       "show::alias_show_missing_target#1": "passes --show",
       "show::search_directory_without_recipe#1": "passes --show",
-      "show::show#1": "passes --show",
       "show::show_alias_disabled_by_absent_module#1": "passes --show",
       "show::show_alias_suggestion#1": "passes --show",
-      "show::show_cross_module_dependencies#1": "passes --show",
       "show::show_invalid_path#1": "passes --show",
       "show::show_no_alias_suggestion#1": "passes --show",
-      "show::show_no_suggestion#1": "passes --show",
-      "show::show_prints_bare_dependency_on_parameterized_recipe_without_parentheses#1": "passes --show",
-      "show::show_prints_doc_attribute_without_doc_comment#1": "passes --show",
-      "show::show_prints_doc_comment_and_attributes#1": "passes --show",
       "show::show_prints_full_recipe_path_for_cross_module_alias#1": "passes --show",
-      "show::show_recipe_at_path#1": "passes --show",
       "show::show_recipe_disabled_by_absent_module#1": "passes --show",
-      "show::show_recipe_in_search_directory#1": "passes --show",
-      "show::show_space_separated_path#1": "passes --show",
-      "show::show_suggestion#1": "passes --show"
+      "show::show_recipe_in_search_directory#1": "passes --show"
     },
     "cli:summary": {
-      "default::duplicate_default_attribute_blames_source_later_recipe#1": "passes --summary",
-      "modules::disabled_recipes_are_hidden_from_summary#1": "passes --summary",
-      "modules::modules_outside_justfile_directory_require_unambiguous_file#1": "passes --summary",
-      "settings::all_settings_allow_expressions#1": "passes --summary",
-      "summary::depth_first_pre_order#1": "passes --summary",
-      "summary::no_recipes#1": "passes --summary",
-      "summary::submodule_recipes#1": "passes --summary",
-      "summary::summary#1": "passes --summary",
-      "summary::summary_implies_unstable#1": "passes --summary",
-      "summary::summary_none#1": "passes --summary",
-      "summary::summary_sorted#1": "passes --summary",
-      "summary::summary_unsorted#1": "passes --summary"
+      "modules::disabled_recipes_are_hidden_from_summary#1": "passes --summary"
     },
     "cli:tempdir": {
       "tempdir::argument_overrides_setting#1": "passes --tempdir"
@@ -673,36 +627,22 @@
       "timestamps::shell#1": "passes --timestamp"
     },
     "cli:unsorted": {
-      "groups::list_with_groups_unsorted#1": "passes --unsorted",
-      "groups::list_with_groups_unsorted_group_order#1": "passes --unsorted",
-      "imports::listed_recipes_in_imports_are_in_load_order#1": "passes --unsorted",
       "list::modules_unsorted#1": "passes --unsorted",
-      "list::unsorted_list_order#1": "passes --unsorted",
-      "list::unsorted_list_order#2": "passes --unsorted",
-      "list::unsorted_list_order#3": "passes --unsorted",
-      "list::unsorted_list_order#4": "passes --unsorted",
       "misc::list_unsorted#1": "passes --unsorted",
       "modules::group_attribute_on_module_unsorted#1": "passes --unsorted"
     },
     "cli:usage": {
       "alias::module_alias_resolves_in_usage#1": "passes --usage",
       "arg_attribute::help_may_be_expression#1": "passes --usage",
-      "modules::usage_absent_optional_module_is_error#1": "passes --usage",
       "usage::arguments_and_options#1": "passes --usage",
-      "usage::arguments_only#1": "passes --usage",
       "usage::empty_module#1": "passes --usage",
       "usage::empty_module_quiet#1": "passes --usage",
       "usage::module_alias#1": "passes --usage",
       "usage::multi_line_doc#1": "passes --usage",
-      "usage::no_sections#1": "passes --usage",
       "usage::options_only#1": "passes --usage",
       "usage::root_module#1": "passes --usage",
       "usage::submodule#1": "passes --usage",
       "usage::usage_recipe_in_search_directory#1": "passes --usage"
-    },
-    "cli:variables": {
-      "misc::variables#1": "passes --variables",
-      "private::private_variables_are_not_listed#1": "passes --variables"
     },
     "cli:verbose": {
       "fallback::fallback_from_subdir_verbose_message#1": "passes --verbose",
