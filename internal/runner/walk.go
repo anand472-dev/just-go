@@ -163,6 +163,9 @@ func (inv *invocation) subsequents(r *ast.Recipe, f frame, chain *callChain) (in
 // it runs backticks.
 func (inv *invocation) begin(r *ast.Recipe, args []string, opts map[string][]string, at site) (frame, error) {
 	specs := specsOf(inv.plan.Justfile, r)
+	if at.dependency {
+		specs = asPositional(specs) // a dependency's arguments bind every parameter in order
+	}
 	if err := checkArgCount(r, specs, len(args)); err != nil {
 		return frame{}, err
 	}
@@ -187,7 +190,14 @@ func (inv *invocation) begin(r *ast.Recipe, args []string, opts map[string][]str
 		}
 		return v, nil
 	}
-	positional, err := bindArgs(r, specs, args, opts, scope, def)
+	value := func(e ast.Expr) (string, error) {
+		v, err := eval.EvaluateWith(e, scope, cmd)
+		if err != nil {
+			return "", locate(err, jf.File, r.Line)
+		}
+		return v, nil
+	}
+	positional, err := bindArgs(r, specs, args, opts, scope, def, value)
 	if err != nil {
 		return frame{}, err
 	}

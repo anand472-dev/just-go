@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/parser"
 )
@@ -33,17 +34,25 @@ func TestOfReadsTheKeys(t *testing.T) {
 	}
 }
 
-// A key with a value takes its value; a flag and a multiple take none.
+// A value is what a flag-less option takes; a flag and a multiple take none.
 func TestOfReadsFlagsAndValues(t *testing.T) {
-	got, err := specsOf(t, "[arg('bar', long='x', value='v', flag)]\n[arg('baz', long, multiple)]\nfoo bar baz:\n")
+	got, err := specsOf(t, "[arg('bar', long='x', value='v')]\n[arg('baz', long, multiple)]\nfoo bar baz:\n")
 	if err != nil || len(got) != 2 {
 		t.Fatalf("Of = %+v, %v", got, err)
 	}
-	if got[0].Long != "x" || !got[0].HasValue || got[0].Value != "v" || !got[0].Flag {
-		t.Errorf("flag spec = %+v", got[0])
+	if got[0].Long != "x" || !got[0].HasValue || got[0].Flag {
+		t.Errorf("value spec = %+v", got[0])
 	}
-	if !got[1].Multiple || got[1].Flag {
-		t.Errorf("multiple spec = %+v", got[1])
+	if lit, ok := got[0].ValueExpr.(ast.StringLit); !ok || lit.Value != "v" {
+		t.Errorf("value expression = %+v", got[0].ValueExpr)
+	}
+}
+
+// A multiple is an option that may be given more than once, and takes no value.
+func TestOfReadsMultiple(t *testing.T) {
+	got, err := specsOf(t, "[arg('baz', long, multiple)]\nfoo baz:\n")
+	if err != nil || len(got) != 1 || !got[0].Multiple || got[0].Flag {
+		t.Errorf("Of = %+v, %v", got, err)
 	}
 }
 
@@ -156,5 +165,52 @@ func TestOfRefusesUndefinedNamesAndBadPatterns(t *testing.T) {
 	}
 	if validPattern("(") {
 		t.Errorf("validPattern(() = true")
+	}
+}
+
+// The option names, flags, values and duplicate options of an arg attribute are
+// refused as upstream refuses them, each error at the key or value it is about.
+func TestOfRefusesOptionsAsUpstreamDoes(t *testing.T) {
+	for _, c := range []struct {
+		name, src, msg string
+		line, col      int
+	}{
+		{"an empty long name", "[arg('bar', long='')]\nfoo bar:\n", "option name for parameter `bar` is empty", 1, 18},
+		{"a long name starting with a dash", "[arg('bar', long='-')]\nfoo bar:\n", "option name for parameter `bar` starts with dash", 1, 18},
+		{"a long name with an equal sign", "[arg('bar', long='bar=baz')]\nfoo bar:\n", "option name for parameter `bar` contains equal sign", 1, 18},
+		{"an empty short name", "[arg('bar', short='')]\nfoo bar:\n", "option name for parameter `bar` is empty", 1, 19},
+		{"a short name starting with a dash", "[arg('bar', short='-')]\nfoo bar:\n", "option name for parameter `bar` starts with dash", 1, 19},
+		{"a short name with an equal sign", "[arg('bar', short='=')]\nfoo bar:\n", "option name for parameter `bar` contains equal sign", 1, 19},
+		{"a short name of several characters", "[arg('bar', short='abc')]\nfoo bar:\n",
+			"short option name for parameter `bar` contains multiple characters", 1, 19},
+		{"a flag with a value", "[arg('bar', long, flag='baz')]\nfoo bar:\n", "`flag` attribute for argument `bar` takes no value", 1, 19},
+		{"multiple with a value", "[arg('bar', long, multiple='baz')]\nfoo bar:\n", "attribute key `multiple` takes no value", 1, 19},
+		{"a flag without a long or short name", "[arg('bar', flag)]\nfoo bar:\n",
+			"argument attribute `flag` only valid with `long` or `short`", 1, 13},
+		{"a value without a long or short name", "[arg('bar', value='baz')]\nfoo bar:\n",
+			"argument attribute `value` only valid with `long` or `short`", 1, 13},
+		{"multiple without a long or short name", "[arg('bar', multiple)]\nfoo bar:\n",
+			"argument attribute `multiple` only valid with `long` or `short`", 1, 13},
+		{"a flag with a pattern", "[arg('bar', long, flag, pattern='yes|no')]\nfoo bar:\n",
+			"argument `bar` may not have both `flag` and `pattern` attributes", 1, 19},
+		{"a flag with a value key", "[arg('bar', long, flag, value='baz')]\nfoo bar:\n",
+			"argument `bar` may not have both `flag` and `value` attributes", 1, 19},
+		{"a flag with a default", "[arg('bar', long, flag)]\nfoo bar='baz':\n", "flag parameter `bar` may not have a default", 2, 5},
+		{"a long option named twice", "[arg('bar', long='bar')]\n[arg('baz', long='bar')]\nfoo bar baz:\n",
+			"recipe `foo` defines option `--bar` multiple times", 2, 18},
+		{"a short option named twice", "[arg('bar', short='b')]\n[arg('baz', short='b')]\nfoo bar baz:\n",
+			"recipe `foo` defines option `-b` multiple times", 2, 19},
+		{"a short option from a bare key, after a named one", "[arg('aaa', short='b')]\n[arg('bbb', short)]\nfoo aaa bbb:\n",
+			"recipe `foo` defines option `-b` multiple times", 2, 13},
+		{"a short option from a bare key, before a named one", "[arg('bbb', short)]\n[arg('aaa', short='b')]\nfoo aaa bbb:\n",
+			"recipe `foo` defines option `-b` multiple times", 1, 13},
+		{"a long option from a named key, before a bare one", "[arg('aaa', long='bar')]\n[arg('bar', long)]\nfoo aaa bar:\n",
+			"recipe `foo` defines option `--bar` multiple times", 1, 18},
+	} {
+		_, err := specsOf(t, c.src)
+		var de *diag.Error
+		if !errors.As(err, &de) || de.Msg != c.msg || de.Line != c.line || de.Col != c.col {
+			t.Errorf("%s: error = %v; want %q at %d:%d", c.name, err, c.msg, c.line, c.col)
+		}
 	}
 }

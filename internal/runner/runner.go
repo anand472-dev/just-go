@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"gitea.com/wimwian/just-go/internal/argspec"
 	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/eval"
@@ -253,7 +254,7 @@ func prepare(plan Plan) (prepared, error) {
 		}
 		// Every call's values are checked before any recipe runs, as upstream does;
 		// defaults are not evaluated for it.
-		if _, err := bindArgs(r, specs, c.Args, c.Options, eval.Scope{}, noDefault); err != nil {
+		if _, err := bindArgs(r, specs, c.Args, c.Options, eval.Scope{}, noDefault, nil); err != nil {
 			return prepared{}, err
 		}
 	}
@@ -531,11 +532,21 @@ func requiredParams(r *ast.Recipe) int {
 	return lo
 }
 
-// usageLine is upstream's short usage of r: "just", the recipe name, and its
-// parameters, each in brackets when it has a default. It is pure.
-func usageLine(r *ast.Recipe) string {
+// usageLine is upstream's short usage of r: "just", the recipe name, [OPTIONS] when
+// it has an option, and its positional parameters, each in brackets when it has a
+// default. Its options are not named. It is pure.
+func usageLine(r *ast.Recipe, specs []argspec.Spec) string {
 	words := []string{"just", r.Name}
+	for _, s := range specs {
+		if s.IsOption() {
+			words = append(words, "[OPTIONS]")
+			break
+		}
+	}
 	for _, p := range r.Params {
+		if s, ok := specNamed(specs, p.Name); ok && s.IsOption() {
+			continue
+		}
 		name := p.Name
 		if p.Kind != ast.ParamSingle {
 			name += "..."

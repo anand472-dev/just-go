@@ -429,13 +429,24 @@ var argKeys = map[string]bool{
 }
 
 // checkKeys checks the keyed arguments of an attribute: each key is one the
-// attribute takes, a key that needs a value has one, and the values that must be
-// string literals are. It reports the first problem, at the key it is about.
+// attribute takes, a key that needs a value has one, the values that must be
+// string literals are, no key is given twice, and no positional argument follows
+// a keyed one. It reports the first problem, at the argument it is about.
 func (p *parser) checkKeys(args []attributeArg) error {
+	seen := map[string]bool{}
+	keyed := false
 	for _, a := range args {
 		if a.key == nil {
+			if keyed {
+				return p.errAt(a.token, "positional attribute arguments cannot follow keyword attribute arguments")
+			}
 			continue
 		}
+		keyed = true
+		if seen[a.key.Name] {
+			return p.errSpan(a.key.At, fmt.Sprintf("duplicate key `%s` for `%s` attribute", a.key.Name, ast.AttrArg))
+		}
+		seen[a.key.Name] = true
 		if err := p.checkKey(a); err != nil {
 			return err
 		}
@@ -471,7 +482,7 @@ func tokenSpan(t lexer.Token) ast.Span {
 }
 
 // expressionKey reports whether an `arg` key may take an expression rather than a
-// string literal: `help` and `pattern` may, as upstream allows. It is pure.
+// string literal: `help`, `pattern` and `value` may, as upstream allows. It is pure.
 func expressionKey(name string) bool {
-	return name == "help" || name == "pattern"
+	return name == "help" || name == "pattern" || name == "value"
 }

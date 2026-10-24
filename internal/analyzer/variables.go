@@ -145,6 +145,9 @@ func undefinedInRecipe(jf *ast.Justfile, r *ast.Recipe, globals map[string]struc
 	if err := attributeExpressions(jf, r, globals, params); err != nil {
 		return err
 	}
+	if err := argumentReferences(r, check); err != nil {
+		return err
+	}
 	return bodyReferences(jf, r, check)
 }
 

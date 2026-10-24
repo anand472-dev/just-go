@@ -129,16 +129,20 @@ func run(args, env []string, workDir string, stdin io.Reader, stdout, stderr io.
 	if status, done := inspect(cfg, env, jf, opts, stdout, stderr); done {
 		return status
 	}
-	return runChosen(cfg, jf, opts, stderr)
+	return runChosen(cfg, jf, opts, stdout, stderr)
 }
 
 // runChosen runs the recipes the command line names and returns the status. When
 // --allow-missing skipped every recipe named, it runs nothing, rather than the
 // default recipe. Impure: it runs recipes.
-func runChosen(cfg config, jf *just.Justfile, opts just.Options, stderr io.Writer) int {
+func runChosen(cfg config, jf *just.Justfile, opts just.Options, stdout, stderr io.Writer) int {
 	calls, err := chooseCalls(cfg, jf)
 	if err != nil {
 		return fail(stderr, cfg, err)
+	}
+	if info, ok := helpRequested(jf.Recipes(), calls); ok {
+		fmt.Fprint(stdout, helpText(info))
+		return 0
 	}
 	if len(calls) == 0 && len(cfg.words) > 0 {
 		return 0
@@ -1152,6 +1156,9 @@ func selectRecipesWith(infos []just.RecipeInfo, words []string, allowMissing boo
 			options = parsed.Options
 		}
 		calls = append(calls, just.Call{Recipe: words[i], Args: parsed.Args, Options: options, Help: parsed.Help})
+		if parsed.Help {
+			break // a help request runs nothing, so the words after it are not read
+		}
 		i += 1 + parsed.Used
 	}
 	return calls, nil
@@ -1421,20 +1428,9 @@ func groupMembers(entries []listEntry) (ungrouped []listEntry, byGroup map[strin
 }
 
 // signature is the recipe's name followed by its parameters, each with its
-// default as written (`b='B'`). Pure.
+// default as written (`b='B'`), as styledSignature writes it without styling. Pure.
 func signature(info just.RecipeInfo) string {
-	words := make([]string, 0, 1+len(info.Params))
-	words = append(words, info.Name)
-	for i, name := range info.Params {
-		if i < len(info.Kinds) {
-			name = info.Kinds[i] + name
-		}
-		if i < len(info.Defaults) && info.Defaults[i] != "" {
-			name += "=" + info.Defaults[i]
-		}
-		words = append(words, name)
-	}
-	return strings.Join(words, " ")
+	return styledSignature(info, false)
 }
 
 // alignWidth is the widest signature that is not too wide to carry its doc

@@ -12,20 +12,20 @@ skip counts. It is allowed to fail.
 
 | | |
 |---|---|
-| Recorded | 2026-10-22, after the whole-branch review fixes, `bin/just-go` built from the commit that adds this file |
+| Recorded | 2026-10-24, `bin/just-go` built from the working tree that adds this row (Phase 4 and the `[arg]` work) |
 | Corpus cases | 2011 |
-| Cases in the baseline | 125 |
-| Full run: pass | 125 |
-| Full run: fail | 1870 |
-| Full run: skip (oracle exceptions) | 16 |
+| Cases in the baseline | 1320 |
+| Full run: pass | 1320 |
+| Full run: fail | 667 |
+| Full run: skip (oracle exceptions) | 24 |
 
-The gate proves only the 125 baseline cases, so the honest pass rate is 125
-of the 2011 cases. Of the 1870 failures, 790 pass a command-line flag before
-the first recipe name that Plan 1 does not implement (for example
-`--evaluate` or `--dump`). The other 1080 fail on other differences from
-upstream that are outside Plan 1's scope, such as syntax beyond the core
-subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
-`--shell` is in Plan 1's scope, and no case fails on it.
+The gate proves only the 1320 baseline cases, so the honest pass rate is 1320
+of the 2011 cases. Of the 667 failures, 339 are unstable features (roadmap
+item 6, out of scope by owner decision: `unstable:lists` 222,
+`unstable:cached-recipes` 85, `unstable:user-defined-functions` 32). The other
+328 are in plan scope and still fail. The largest groups are `module` 82,
+`grammar` 46, `cli:dump` 60, `cli:evaluate` 31, and `cli:fmt` 24. The groups
+are in `conformance/triage/groups.json`.
 
 ## History
 
@@ -51,6 +51,31 @@ subset or parse-error wording. Upstream adds `--shell bash` to 1949 cases.
 | Compat Task 16: environment, system, and runtime builtins | 533 | 533 | 1459 | 19 |
 | Compat Task 20: Phase 2 gate (builtins 17 to 19, style, constants; ratchet adds 8) | 541 | 541 | 1451 | 19 |
 | Compat Task 25: Phase 3 gate (imports, modules, dotenv, strict paths; ratchet adds 90) | 631 | 631 | 1359 | 21 |
+| Commit `93b0a71`: `--evaluate [NAME]` | 810 | — | — | — |
+| Commit `7e726dd`: basic `--dump` printer | 865 | — | — | — |
+| Commit `8709f42`: completions for bash, zsh, and PowerShell (Compat Task 31) | 891 | — | — | — |
+| Commit `68ec901`: variadic parameters | 926 | — | — | — |
+| Commit `0ddb001`: summary, show, usage, groups, variables, and list details | 974 | — | — | — |
+| Commit `fd3cdd4`: variable overrides with `--set` and `name=value` words | 996 | — | — | — |
+| Commit `9cc5698`: choose, init, and edit | 1019 | — | — | — |
+| Commit `2c897c1`: `--command` | 1030 | — | — | — |
+| Commit `ce22f89`: `--working-directory` and `--ceiling` | 1037 | — | — | — |
+| Commit `4bb7125`: search directories and `--justfile-name` | 1069 | — | — | — |
+| Commit `dd05df1`: dotenv flags on the command line | 1079 | — | — | — |
+| Commit `27a66bb`: `--no-deps`, `--verbose`, `--one`, `--default-list`, and `--jobs` | 1090 | — | — | — |
+| Commit `86a7a0f`: `--version`, `--man`, `--changelog`, `--request`, `--allow-missing`, and `JUST_CEILING` | 1102 | — | — | — |
+| Commit `a24e113`: `--dry-run`, `--time`, `--explain`, `--timestamp`, and short flags | 1113 | — | — | — |
+| Commit `b434d14`: markdown and stdin justfiles, private modules, and `--init` targets | 1129 | — | — | — |
+| Commit `0e1516f`: `--color`, `--highlight`, `--no-highlight`, and `--command-color` | 1141 | — | — | — |
+| Commit `9082bde`: `--dump-format json` and `--json` | 1170 | — | — | — |
+| Commit `ac744b4`: `--set` overrides reach settings and lazy evaluation | 1175 | — | — | — |
+| Commit `6115d17`: `--tempdir`, `--shell-command`, and `--groups` arguments | 1178 | — | — | — |
+| Commit `6db60ec`: `[arg]` attributes and per-recipe argument parsing | 1269 | — | — | — |
+| Working tree: `[arg]` follow-up and argument help (this commit) | 1320 | 1320 | 667 | 24 |
+
+Rows for commits from `93b0a71` on record the baseline size that each commit
+committed in `conformance/baseline.txt`. Their pass, fail, and skip counts were
+not measured, so they show `—`.
 
 The review fixes added 45 cases. Most are error cases: the command line now
 prints upstream's diagnostic format (the file's base name, `line:column`, the

@@ -123,16 +123,22 @@ func checkItems(jf *ast.Justfile) *diag.Error {
 	return nil
 }
 
-// parameters checks the parameters of r for checkItems. It is pure.
+// parameters checks the parameters of r for checkItems. An option is not a
+// positional parameter, so the order of positional parameters ignores it. It is
+// pure.
 func parameters(jf *ast.Justfile, r ast.Recipe) *diag.Error {
 	seen := make(map[string]struct{}, len(r.Params))
 	passedDefault, passedVariadic := false, false
+	options := optionNames(jf, r)
 	for _, p := range r.Params {
 		at := name(p.Line, p.Col, p.Name)
 		if _, ok := seen[p.Name]; ok {
 			return fail(jf, at, "recipe `%s` has duplicate parameter `%s`", r.Name, p.Name)
 		}
 		seen[p.Name] = struct{}{}
+		if options[p.Name] {
+			continue
+		}
 		if passedVariadic {
 			return fail(jf, at, "parameter `%s` follows variadic parameter", p.Name)
 		}
@@ -280,6 +286,20 @@ func checkRecipeItems(jf *ast.Justfile) error {
 		return err
 	}
 	return checkArgSpecs(jf)
+}
+
+// optionNames are the names of the parameters of r that are options. The [arg]
+// attributes are checked on their own, so an attribute that cannot be read gives
+// none. It is pure.
+func optionNames(jf *ast.Justfile, r ast.Recipe) map[string]bool {
+	specs, _ := argspec.Of(jf, &r)
+	out := make(map[string]bool, len(specs))
+	for _, s := range specs {
+		if s.IsOption() {
+			out[s.Param] = true
+		}
+	}
+	return out
 }
 
 // checkArgSpecs checks the [arg] attributes of every recipe, as upstream does once

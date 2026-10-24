@@ -41,17 +41,28 @@ func terminal(w io.Writer) bool {
 }
 
 // styledSignature is the signature of a recipe in a listing, styled when on: a
-// parameter's name in cyan, its `+` or `*` in purple, and its default in green.
-// Without styling it is the same text as signature. It is pure.
+// parameter's name in cyan, its `+` or `*` in purple, its default in green, and
+// [OPTIONS], for the recipe's options, in cyan. The options are not listed among
+// the parameters. It is pure.
 func styledSignature(info just.RecipeInfo, on bool) string {
+	params := helpParams(info)
 	words := []string{info.Name}
-	for i, name := range info.Params {
-		word := ansi.Paint(on, "36", name)
-		if i < len(info.Kinds) && info.Kinds[i] != "" {
-			word = ansi.Paint(on, "35", info.Kinds[i]) + word
+	for _, p := range params {
+		if p.option {
+			words = append(words, ansi.Paint(on, "36", "[OPTIONS]"))
+			break
 		}
-		if i < len(info.Defaults) && info.Defaults[i] != "" {
-			word += "=" + ansi.Paint(on, "32", info.Defaults[i])
+	}
+	for _, p := range params {
+		if p.option {
+			continue
+		}
+		word := ansi.Paint(on, "36", p.name)
+		if p.kind != "" {
+			word = ansi.Paint(on, "35", p.kind) + word
+		}
+		if p.def != "" {
+			word += "=" + ansi.Paint(on, "32", p.def)
 		}
 		words = append(words, word)
 	}

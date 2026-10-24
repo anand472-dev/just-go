@@ -19,6 +19,17 @@ func specsOf(jf *ast.Justfile, r *ast.Recipe) []argspec.Spec {
 	return specs
 }
 
+// asPositional are specs with their option names removed, so that every parameter
+// they describe takes a positional argument, and keeps its patterns. It is pure.
+func asPositional(specs []argspec.Spec) []argspec.Spec {
+	out := make([]argspec.Spec, len(specs))
+	for i, s := range specs {
+		s.Long, s.Short = "", ""
+		out[i] = s
+	}
+	return out
+}
+
 // specNamed is the spec of the parameter called name, and whether there is one.
 // It is pure.
 func specNamed(specs []argspec.Spec, name string) (argspec.Spec, bool) {
@@ -66,25 +77,28 @@ func checkArgCount(r *ast.Recipe, specs []argspec.Spec, found int) error {
 	default:
 		takes = fmt.Sprintf("takes at most %d", hi)
 	}
-	return usage("%s %s\nusage:\n    %s", got, takes, usageLine(r))
+	return usage("%s %s\nusage:\n    %s", got, takes, usageLine(r, specs))
 }
 
 // bindArgs sets each parameter of r in scope from the positional args and the
-// option values of the call, and returns the positional values in order. A
-// positional parameter takes the next argument, as before. An option takes its
-// values, or else its default, or else it is required (a flag is not, and is
-// empty). Each value is checked against the patterns of its parameter. def
-// evaluates a default. Impure only through def.
-func bindArgs(r *ast.Recipe, specs []argspec.Spec, args []string, opts map[string][]string, scope eval.Scope, def func(ast.Param) (string, error)) ([]string, error) {
+// option values of the call, and returns the values of its parameters in order,
+// options included. A positional parameter takes the next argument, as before. An
+// option takes its values, or else its default, or else it is required (a flag is
+// not, and is empty; a variadic one is empty too). Each value is checked against
+// the patterns of its parameter. def evaluates a default, and value, which may be
+// nil before anything runs, the value an option with a `value` key gives when it
+// is given. Impure only through them.
+func bindArgs(r *ast.Recipe, specs []argspec.Spec, args []string, opts map[string][]string, scope eval.Scope, def func(ast.Param) (string, error), value func(ast.Expr) (string, error)) ([]string, error) {
 	var positional []string
 	i := 0
 	for _, p := range r.Params {
 		if s, ok := specNamed(specs, p.Name); ok && s.IsOption() {
-			v, err := bindOption(r, p, s, opts[p.Name], def)
+			v, err := bindOption(r, p, s, opts[p.Name], def, value)
 			if err != nil {
 				return nil, err
 			}
 			scope[p.Name] = v
+			positional = append(positional, v)
 			continue
 		}
 		if p.Kind == ast.ParamSingle {
@@ -139,18 +153,30 @@ func bindRest(r *ast.Recipe, p ast.Param, specs []argspec.Spec, args []string, i
 }
 
 // bindOption is the value of the option parameter p from the values given for it:
-// a flag's value is "true" when it was given and empty when not; an option that
-// was not given takes its default, or is an error when it has none.
-func bindOption(r *ast.Recipe, p ast.Param, s argspec.Spec, given []string, def func(ast.Param) (string, error)) (string, error) {
+// a flag's value is "true" when it was given and empty when not; an option with a
+// `value` key takes that value, evaluated, when it is given, and a nil value means
+// the value is not evaluated yet, so none is checked. An option that was not given
+// takes its default; a variadic one is empty; otherwise it is an error.
+func bindOption(r *ast.Recipe, p ast.Param, s argspec.Spec, given []string, def func(ast.Param) (string, error), value func(ast.Expr) (string, error)) (string, error) {
 	if len(given) == 0 {
 		switch {
-		case s.Flag:
+		case s.Flag, p.Kind == ast.ParamStar:
 			return "", nil
 		case p.Default != nil:
 			return def(p)
 		}
 		return "", &diag.Error{Kind: diag.KindRuntime,
 			Msg: fmt.Sprintf("recipe `%s` requires option `%s`", r.Name, optionName(s))}
+	}
+	if s.HasValue && value == nil {
+		return "", nil
+	}
+	if s.HasValue {
+		v, err := value(s.ValueExpr)
+		if err != nil {
+			return "", err
+		}
+		given = []string{v}
 	}
 	if err := checkPatterns(r, p, []argspec.Spec{s}, given); err != nil {
 		return "", err

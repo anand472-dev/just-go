@@ -18,7 +18,7 @@ func defaultOf(p ast.Param) (string, error) {
 func TestBindArgsJoinsTheRestForAVariadicParameter(t *testing.T) {
 	r := &ast.Recipe{Params: []ast.Param{{Name: "x"}, {Name: "rest", Kind: ast.ParamStar}}}
 	scope := eval.Scope{}
-	positional, err := bindArgs(r, nil, []string{"a", "b", "c"}, nil, scope, defaultOf)
+	positional, err := bindArgs(r, nil, []string{"a", "b", "c"}, nil, scope, defaultOf, noValueFn)
 	if err != nil || scope["x"] != "a" || scope["rest"] != "b c" {
 		t.Errorf("scope = %v, %v; want x=a and rest=b c", scope, err)
 	}
@@ -32,13 +32,13 @@ func TestBindArgsJoinsTheRestForAVariadicParameter(t *testing.T) {
 func TestBindArgsUsesTheDefaultOfAnEmptyVariadicParameter(t *testing.T) {
 	withDefault := &ast.Recipe{Params: []ast.Param{{Name: "z", Kind: ast.ParamPlus, Default: ast.StringLit{Value: "HELLO"}}}}
 	scope := eval.Scope{}
-	positional, err := bindArgs(withDefault, nil, nil, nil, scope, defaultOf)
+	positional, err := bindArgs(withDefault, nil, nil, nil, scope, defaultOf, noValueFn)
 	if err != nil || scope["z"] != "HELLO" || !reflect.DeepEqual(positional, []string{"HELLO"}) {
 		t.Errorf("with default: scope %v, positional %q, %v", scope, positional, err)
 	}
 	bare := &ast.Recipe{Params: []ast.Param{{Name: "z", Kind: ast.ParamStar}}}
 	scope = eval.Scope{}
-	positional, err = bindArgs(bare, nil, nil, nil, scope, defaultOf)
+	positional, err = bindArgs(bare, nil, nil, nil, scope, defaultOf, noValueFn)
 	if err != nil || scope["z"] != "" || len(positional) != 0 {
 		t.Errorf("without default: scope %v, positional %q, %v", scope, positional, err)
 	}
@@ -49,16 +49,16 @@ func TestBindArgsUsesTheDefaultOfAnEmptyVariadicParameter(t *testing.T) {
 func TestBindArgsSinglesTakeTheirDefaults(t *testing.T) {
 	r := &ast.Recipe{Params: []ast.Param{{Name: "a"}, {Name: "b", Default: ast.StringLit{Value: "d"}}}}
 	scope := eval.Scope{}
-	positional, err := bindArgs(r, nil, []string{"1"}, nil, scope, defaultOf)
+	positional, err := bindArgs(r, nil, []string{"1"}, nil, scope, defaultOf, noValueFn)
 	if err != nil || scope["b"] != "d" || !reflect.DeepEqual(positional, []string{"1", "d"}) {
 		t.Errorf("scope %v, positional %q, %v", scope, positional, err)
 	}
 	boom := errors.New("boom")
 	failing := func(ast.Param) (string, error) { return "", boom }
-	if _, err := bindArgs(r, nil, []string{"1"}, nil, eval.Scope{}, failing); !errors.Is(err, boom) {
+	if _, err := bindArgs(r, nil, []string{"1"}, nil, eval.Scope{}, failing, noValueFn); !errors.Is(err, boom) {
 		t.Errorf("error = %v; want the default's error", err)
 	}
-	if _, err := bindArgs(&ast.Recipe{Params: []ast.Param{{Name: "z", Kind: ast.ParamStar, Default: ast.StringLit{Value: "d"}}}}, nil, nil, nil, eval.Scope{}, failing); !errors.Is(err, boom) {
+	if _, err := bindArgs(&ast.Recipe{Params: []ast.Param{{Name: "z", Kind: ast.ParamStar, Default: ast.StringLit{Value: "d"}}}}, nil, nil, nil, eval.Scope{}, failing, noValueFn); !errors.Is(err, boom) {
 		t.Errorf("variadic error = %v; want the default's error", err)
 	}
 }
@@ -80,7 +80,7 @@ func TestUsageLineMarksVariadicParameters(t *testing.T) {
 		{Name: "p", Kind: ast.ParamStar},
 		{Name: "q", Kind: ast.ParamPlus, Default: ast.StringLit{Value: "x"}},
 	}}
-	if got := usageLine(r); got != "just a p... [q...]" {
+	if got := usageLine(r, nil); got != "just a p... [q...]" {
 		t.Errorf("usageLine = %q", got)
 	}
 }

@@ -42,11 +42,11 @@ func TestBindOptionTakesWhatItsCallGives(t *testing.T) {
 	r, specs := argRecipe(t, "[arg('bar', long, flag)]\n[arg('baz', short)]\n[arg('qux', long)]\nfoo bar baz qux='d':\n")
 	scope := eval.Scope{}
 	def := func(p ast.Param) (string, error) { return "dflt", nil }
-	if _, err := bindArgs(r, specs, nil, nil, scope, def); msgOf(err) != "recipe `foo` requires option `-b`" {
+	if _, err := bindArgs(r, specs, nil, nil, scope, def, noValueFn); msgOf(err) != "recipe `foo` requires option `-b`" {
 		t.Errorf("bind without the short option = %v", err)
 	}
 	scope = eval.Scope{}
-	if _, err := bindArgs(r, specs, nil, map[string][]string{"baz": {"z"}}, scope, def); err != nil {
+	if _, err := bindArgs(r, specs, nil, map[string][]string{"baz": {"z"}}, scope, def, noValueFn); err != nil {
 		t.Fatalf("bind = %v", err)
 	}
 	if scope["bar"] != "" || scope["baz"] != "z" || scope["qux"] != "dflt" {
@@ -58,10 +58,10 @@ func TestBindOptionTakesWhatItsCallGives(t *testing.T) {
 func TestBindChecksPatternsAndNamesThemAll(t *testing.T) {
 	r, specs := argRecipe(t, "set lists\n[arg('bar', pattern=['A', 'B'])]\nfoo bar:\n")
 	noDefault := func(ast.Param) (string, error) { return "", nil }
-	if _, err := bindArgs(r, specs, []string{"A"}, nil, eval.Scope{}, noDefault); err != nil {
+	if _, err := bindArgs(r, specs, []string{"A"}, nil, eval.Scope{}, noDefault, noValueFn); err != nil {
 		t.Errorf("matching value = %v", err)
 	}
-	_, err := bindArgs(r, specs, []string{"C"}, nil, eval.Scope{}, noDefault)
+	_, err := bindArgs(r, specs, []string{"C"}, nil, eval.Scope{}, noDefault, noValueFn)
 	if msgOf(err) != "argument `C` passed to recipe `foo` parameter `bar` does not match pattern `A` or `B`" {
 		t.Errorf("mismatch = %v", err)
 	}
@@ -126,8 +126,33 @@ func TestRunRefusesAPatternMismatchBeforeRunning(t *testing.T) {
 func TestBindRefusesAnOptionValueThatDoesNotMatch(t *testing.T) {
 	r, specs := argRecipe(t, "[arg('bar', long, pattern='B')]\nfoo bar:\n")
 	noDefault := func(ast.Param) (string, error) { return "", nil }
-	_, err := bindArgs(r, specs, nil, map[string][]string{"bar": {"x"}}, eval.Scope{}, noDefault)
+	_, err := bindArgs(r, specs, nil, map[string][]string{"bar": {"x"}}, eval.Scope{}, noDefault, noValueFn)
 	if msgOf(err) != "argument `x` passed to recipe `foo` parameter `bar` does not match pattern `B`" {
 		t.Errorf("bind = %v", err)
+	}
+}
+
+// A mismatch shows the usage with [OPTIONS] and without the options' names, as
+// upstream does.
+func TestCheckArgCountUsageShowsOptionsAsOptions(t *testing.T) {
+	r := &ast.Recipe{Name: "foo", Params: []ast.Param{{Name: "bar", Kind: ast.ParamSingle}, {Name: "baz", Kind: ast.ParamSingle}}}
+	specs := []argspec.Spec{{Param: "bar", Long: "bar"}}
+	err := checkArgCount(r, specs, 0)
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Msg != "recipe `foo` got 0 positional arguments but takes 1\nusage:\n    just foo [OPTIONS] baz" {
+		t.Errorf("checkArgCount = %v", err)
+	}
+}
+
+// noValueFn evaluates nothing, for the tests that bind arguments without options'
+// values.
+func noValueFn(ast.Expr) (string, error) { return "", nil }
+
+// A dependency's arguments bind every parameter, so its options lose their names
+// and keep their patterns.
+func TestAsPositionalDropsOptionNames(t *testing.T) {
+	got := asPositional([]argspec.Spec{{Param: "bar", Long: "bar", Short: "b", Patterns: []string{"x"}}})
+	if len(got) != 1 || got[0].IsOption() || got[0].Param != "bar" || len(got[0].Patterns) != 1 {
+		t.Errorf("asPositional = %+v", got)
 	}
 }

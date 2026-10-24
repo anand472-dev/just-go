@@ -127,12 +127,17 @@ func recipeVariables(jf *ast.Justfile, r *ast.Recipe) []string {
 	return names
 }
 
-// attributeVariables returns the names that the arguments of a refer to. It is
-// pure.
+// attributeVariables returns the names that the arguments and keys of a refer to.
+// It is pure.
 func attributeVariables(a ast.Attribute) []string {
 	var names []string
 	for _, e := range a.Args {
 		names = ast.Variables(e, names)
+	}
+	for _, k := range a.Keys {
+		if k.Value != nil {
+			names = ast.Variables(k.Value, names)
+		}
 	}
 	return names
 }

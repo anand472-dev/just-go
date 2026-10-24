@@ -46,29 +46,54 @@ func Take(r Recipe, words []string) (Parsed, error) {
 	quota := r.quota()
 	i := 0
 	for i < len(words) {
-		full := quota >= 0 && len(out.Args) >= quota
-		if r.isOptionWord(words[i]) {
-			used, stop, err := r.option(words[i], words[i+1:], full, &out)
-			if err != nil {
-				return out, err
-			}
-			if stop {
-				break
-			}
-			i += 1 + used
-			if out.Help {
-				break
-			}
-			continue
+		next, done, err := r.takeWord(words, i, quota, &out)
+		if err != nil {
+			return out, err
 		}
-		if full {
+		i = next
+		if done {
 			break
 		}
-		out.Args = append(out.Args, words[i])
-		i++
 	}
 	out.Used = i
 	return out, nil
+}
+
+// takeWord takes the word at i of words: a double dash, which ends the options, an
+// option, which may take the words after it, or else a positional argument. It
+// returns the index of the next word, and whether the words end here: at a stop,
+// at a help option, or once the positional arguments are full.
+func (r Recipe) takeWord(words []string, i, quota int, out *Parsed) (int, bool, error) {
+	word := words[i]
+	if r.hasOptions() && word == "--" {
+		return i + 1 + out.takeAfterDash(words[i+1:], quota), true, nil
+	}
+	full := quota >= 0 && len(out.Args) >= quota
+	if !r.isOptionWord(word) {
+		if full {
+			return i, true, nil
+		}
+		out.Args = append(out.Args, word)
+		return i + 1, false, nil
+	}
+	// An unknown option ends the recipe only when it has positional arguments, all
+	// of them given; a recipe without any refuses it.
+	used, stop, err := r.option(word, words[i+1:], full && quota > 0, out)
+	if err != nil || stop {
+		return i, true, err
+	}
+	return i + 1 + used, out.Help, nil
+}
+
+// takeAfterDash takes the words after a double dash as positional arguments, up to
+// the quota, which is -1 for any number. It returns how many it took. A double dash
+// ends the options, so these words are arguments even when they begin with dashes.
+func (out *Parsed) takeAfterDash(words []string, quota int) int {
+	n := 0
+	for ; n < len(words) && (quota < 0 || len(out.Args) < quota); n++ {
+		out.Args = append(out.Args, words[n])
+	}
+	return n
 }
 
 // isOptionWord reports whether word is taken as an option, when the recipe has
@@ -143,27 +168,26 @@ func (r Recipe) helpOption(long bool) bool {
 // arguments are full. A help option sets out.Help.
 func (r Recipe) option(word string, rest []string, full bool, out *Parsed) (int, bool, error) {
 	if strings.HasPrefix(word, "--") {
-		return r.longOption(word[2:], rest, full, out)
+		return r.longOption(word, rest, full, out)
 	}
-	return r.shortOptions(word[1:], rest, full, out)
+	return r.shortOptions(word, rest, full, out)
 }
 
-// longOption parses `--name` or `--name=value`, which name is after the dashes.
-func (r Recipe) longOption(name string, rest []string, full bool, out *Parsed) (int, bool, error) {
-	name, value, hasValue := strings.Cut(name, "=")
+// longOption parses `--name` or `--name=value`, the word being the whole of it.
+func (r Recipe) longOption(word string, rest []string, full bool, out *Parsed) (int, bool, error) {
+	name, value, hasValue := strings.Cut(word[2:], "=")
+	if name == "" {
+		return 0, false, r.invalid(word)
+	}
 	s, ok := r.spec(name, true)
 	if !ok {
-		if name == "help" && r.helpOption(true) {
-			out.Help = true
-			return 0, false, nil
-		}
-		if full {
-			return 0, true, nil
-		}
-		return 0, false, r.refuse("does not have option `--%s`", name)
+		return r.unknownLong(name, hasValue, full, out)
 	}
 	if s.Flag || s.HasValue {
-		return 0, false, r.record(s, "--"+name, out, s.Value, true)
+		if hasValue {
+			return 0, false, r.refuse("flag `--%s` does not take value", name)
+		}
+		return 0, false, r.record(s, "--"+name, out, "", true)
 	}
 	if hasValue {
 		return 0, false, r.record(s, "--"+name, out, value, false)
@@ -174,33 +198,74 @@ func (r Recipe) longOption(name string, rest []string, full bool, out *Parsed) (
 	return 1, false, r.record(s, "--"+name, out, rest[0], false)
 }
 
+// unknownLong is the result of a long word that names no option of the recipe: the
+// help option, which sets out.Help, or else a stop when the positional arguments
+// are full, or else an error.
+func (r Recipe) unknownLong(name string, hasValue, full bool, out *Parsed) (int, bool, error) {
+	if name == "help" && r.helpOption(true) {
+		if hasValue {
+			return 0, false, r.refuse("flag `--%s` does not take value", name)
+		}
+		out.Help = true
+		return 0, false, nil
+	}
+	if full {
+		return 0, true, nil
+	}
+	return 0, false, r.refuse("does not have option `--%s`", name)
+}
+
 // shortOptions parses a cluster of short options, such as `-bh`, whose letters
 // are given. A value option is the last of the cluster, or else followed by `=`.
-func (r Recipe) shortOptions(letters string, rest []string, full bool, out *Parsed) (int, bool, error) {
+// A flag takes no value, so a flag followed by `=` is refused.
+func (r Recipe) shortOptions(word string, rest []string, full bool, out *Parsed) (int, bool, error) {
+	letters := word[1:]
+	if strings.HasPrefix(letters, "=") {
+		return 0, false, r.invalid(word)
+	}
 	used := 0
 	for j := 0; j < len(letters); j++ {
 		c := letters[j : j+1]
+		after := letters[j+1:]
 		s, ok := r.spec(c, false)
 		if !ok {
-			if c == "h" && r.helpOption(false) {
-				out.Help = true
-				return used, false, nil
-			}
-			if full {
-				return used, true, nil
-			}
-			return used, false, r.refuse("does not have option `-%s`", c)
+			return r.unknownShort(c, after, used, full, out)
 		}
 		if s.Flag || s.HasValue {
-			if err := r.record(s, "-"+c, out, s.Value, true); err != nil {
+			if strings.HasPrefix(after, "=") {
+				return used, false, r.refuse("flag `-%s` does not take value", c)
+			}
+			if err := r.record(s, "-"+c, out, "", true); err != nil {
 				return used, false, err
 			}
 			continue
 		}
-		n, err := r.shortValue(s, c, letters[j+1:], rest, out)
+		n, err := r.shortValue(s, c, after, rest, out)
 		return used + n, false, err
 	}
 	return used, false, nil
+}
+
+// unknownShort is the result of a letter that names no option of the recipe: the
+// help option, which sets out.Help, or else a stop when the positional arguments
+// are full, or else an error. used is the words of the cluster so far.
+func (r Recipe) unknownShort(c, after string, used int, full bool, out *Parsed) (int, bool, error) {
+	if c == "h" && r.helpOption(false) {
+		if strings.HasPrefix(after, "=") {
+			return used, false, r.refuse("flag `-h` does not take value")
+		}
+		out.Help = true
+		return used, false, nil
+	}
+	if full {
+		return used, true, nil
+	}
+	return used, false, r.refuse("does not have option `-%s`", c)
+}
+
+// invalid is the error for a word that begins with dashes but names no option.
+func (r Recipe) invalid(word string) *diag.Error {
+	return &diag.Error{Kind: diag.KindRuntime, Msg: fmt.Sprintf("argument `%s` is not a valid option", word)}
 }
 
 // shortValue records the value of the value option s, which the letter c names,

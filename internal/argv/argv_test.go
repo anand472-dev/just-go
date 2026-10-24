@@ -60,7 +60,8 @@ func TestTakeRefusesWhatUpstreamRefuses(t *testing.T) {
 	}
 }
 
-// A flag takes no value, and a value key gives its fixed value.
+// A flag takes no value, and an option with a value key is recorded as given, its
+// value left to the runner, which evaluates it.
 func TestTakeFlagsAndFixedValues(t *testing.T) {
 	r := Recipe{Name: "foo", Params: []Param{{Name: "bar", Kind: ast.ParamSingle}, {Name: "baz", Kind: ast.ParamSingle}},
 		Specs: []argspec.Spec{{Param: "bar", Long: "bar", Flag: true}}}
@@ -68,9 +69,9 @@ func TestTakeFlagsAndFixedValues(t *testing.T) {
 	if err != nil || got.Options["bar"][0] != "true" || !reflect.DeepEqual(got.Args, []string{"x"}) || got.Used != 2 {
 		t.Errorf("flag = %+v, %v", got, err)
 	}
-	r.Specs[0] = argspec.Spec{Param: "bar", Long: "bar", HasValue: true, Value: "fixed"}
+	r.Specs[0] = argspec.Spec{Param: "bar", Long: "bar", HasValue: true}
 	got, err = Take(r, []string{"--bar", "x"})
-	if err != nil || got.Options["bar"][0] != "fixed" || !reflect.DeepEqual(got.Args, []string{"x"}) {
+	if err != nil || got.Options["bar"][0] != "" || !reflect.DeepEqual(got.Args, []string{"x"}) {
 		t.Errorf("fixed value = %+v, %v", got, err)
 	}
 }
@@ -117,7 +118,7 @@ func TestTakeReadsClustersOfShortOptions(t *testing.T) {
 		{Name: "baz", Kind: ast.ParamSingle}, {Name: "pos", Kind: ast.ParamSingle}},
 		Specs: []argspec.Spec{
 			{Param: "bar", Short: "b", Flag: true},
-			{Param: "v", Short: "v", HasValue: true, Value: "fixed"},
+			{Param: "v", Short: "v", HasValue: true},
 			{Param: "baz", Short: "z"},
 		}}
 	for _, c := range []struct {
@@ -216,4 +217,68 @@ func TestTakeRefusesARepeatedFlagInACluster(t *testing.T) {
 	if _, err := Take(r, []string{"-bb"}); msgOf(err) != "recipe `foo` option `-b` cannot be passed more than once" {
 		t.Errorf("-bb = %v", err)
 	}
+}
+
+// An unknown option is an error when the recipe has no positional argument to
+// stop at, and a word that is not an option is never one.
+func TestTakeRefusesUnknownOptionsWithoutPositionals(t *testing.T) {
+	r := Recipe{Name: "foo", Params: []Param{{Name: "bar", Kind: ast.ParamSingle}},
+		Specs: []argspec.Spec{{Param: "bar", Long: "bar"}}}
+	_, err := Take(r, []string{"--baz", "BAZ"})
+	var de *diag.Error
+	if !errors.As(err, &de) || de.Msg != "recipe `foo` does not have option `--baz`" {
+		t.Errorf("unknown option = %v", err)
+	}
+}
+
+// A double dash ends the options, so that the words after it are arguments even
+// when they begin with dashes.
+func TestTakeDoubleDashEndsTheOptions(t *testing.T) {
+	r := Recipe{Name: "foo", Params: []Param{{Name: "bar", Kind: ast.ParamSingle}, {Name: "baz", Kind: ast.ParamStar}},
+		Specs: []argspec.Spec{{Param: "bar", Long: "bar"}}}
+	got, err := Take(r, []string{"--bar=x", "--", "--A", "--B"})
+	if err != nil || !reflect.DeepEqual(got.Args, []string{"--A", "--B"}) || got.Options["bar"][0] != "x" || got.Used != 4 {
+		t.Errorf("Take = %+v, %v", got, err)
+	}
+}
+
+// A word that is an option with no name is not a valid option, and its error gives
+// the word as it was written.
+func TestTakeRefusesOptionsWithoutNames(t *testing.T) {
+	for _, word := range []string{"--=qux", "-=qux"} {
+		_, err := Take(barRecipe(), []string{word})
+		var de *diag.Error
+		if !errors.As(err, &de) || de.Msg != "argument `"+word+"` is not a valid option" {
+			t.Errorf("Take(%q) = %v", word, err)
+		}
+	}
+}
+
+// A flag, or a value option given a fixed value, takes no value with `=`, and the
+// help option takes none either.
+func TestTakeRefusesValuesForFlags(t *testing.T) {
+	r := Recipe{Name: "foo", Params: []Param{{Name: "bar", Kind: ast.ParamSingle}},
+		Specs: []argspec.Spec{{Param: "bar", Short: "b", HasValue: true}}}
+	for _, c := range []struct {
+		r    Recipe
+		word string
+		msg  string
+	}{
+		{r, "-b=hello", "recipe `foo` flag `-b` does not take value"},
+		{barFlagRecipe(), "--bar=x", "recipe `foo` flag `--bar` does not take value"},
+		{barRecipe(), "--help=baz", "recipe `foo` flag `--help` does not take value"},
+		{barRecipe(), "-h=baz", "recipe `foo` flag `-h` does not take value"},
+	} {
+		_, err := Take(c.r, []string{c.word})
+		var de *diag.Error
+		if !errors.As(err, &de) || de.Msg != c.msg {
+			t.Errorf("Take(%q) = %v; want %q", c.word, err, c.msg)
+		}
+	}
+}
+
+// barFlagRecipe is a recipe whose option bar is a flag.
+func barFlagRecipe() Recipe {
+	return Recipe{Name: "foo", Params: []Param{{Name: "bar", Kind: ast.ParamSingle}},
+		Specs: []argspec.Spec{{Param: "bar", Long: "bar", Flag: true}}}
 }

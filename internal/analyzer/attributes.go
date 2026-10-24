@@ -42,6 +42,26 @@ func attributeExpressions(jf *ast.Justfile, r *ast.Recipe, globals, params map[s
 	return nil
 }
 
+// argumentReferences checks the variables in the keys of the arg attributes of r
+// with check. They may name the parameters, since a value is evaluated when its
+// option is given. It is pure.
+func argumentReferences(r *ast.Recipe, check func(ast.Expr) *diag.Error) *diag.Error {
+	for i := range r.Attributes {
+		if r.Attributes[i].Name != ast.AttrArg {
+			continue
+		}
+		for _, k := range r.Attributes[i].Keys {
+			if k.Value == nil {
+				continue
+			}
+			if err := references(k.Value, check); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // attributeReferences checks that the variables in the arguments of a are
 // defined, in globals or locals, and for a `[doc]` that its value is const.
 // It is pure.
