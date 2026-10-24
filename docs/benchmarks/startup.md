@@ -35,7 +35,7 @@ Two earlier runs of the script on the same machine, the same day, gave
 
 - Most of each number is process creation on macOS, not work in either
   binary. A comparison of parse, evaluation, and dispatch cost belongs to the
-  Go benchmarks in `docs/benchmarks/go-bench.txt` (`make bench`) and to the
+  Go benchmarks in `docs/benchmarks/go-bench.txt` (`just bench`) and to the
   end-to-end workloads of a later plan.
 - `just-go` implements only the core subset, so it does less work at startup
   than the oracle. The comparison becomes meaningful once the feature plans

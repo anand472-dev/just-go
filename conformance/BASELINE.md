@@ -1,13 +1,13 @@
 # Conformance baseline
 
-This file is written by hand at each milestone gate. `make corpus`
+This file is written by hand at each milestone gate. `just corpus`
 regenerates `conformance/corpus/README.md` and `cases.jsonl`, and does not
 touch this file.
 
 `conformance/baseline.txt` lists the cases `bin/just-go` passes. The
-ratchet (`make ratchet`) only adds to it, and `TestBaseline` (`make baseline`)
-fails if any of them stops passing. `make check` runs that gate.
-`make conformance-report` runs the full corpus and prints the pass, fail, and
+ratchet (`just ratchet`) only adds to it, and `TestBaseline` (`just baseline`)
+fails if any of them stops passing. `just check` runs that gate.
+`just conformance-report` runs the full corpus and prints the pass, fail, and
 skip counts. It is allowed to fail.
 
 | | |
@@ -119,6 +119,6 @@ This entry is not an oracle exception (the oracle passes it on macOS and
 fails it elsewhere, and the closed categories of R9 and R16 do not cover a
 recording-platform difference). Task 33 (the platform matrix and
 `docs/platforms.md`) owns it: before a Linux or Windows job gates on
-`make check`, that task must either skip this case off the recording
+`just check`, that task must either skip this case off the recording
 platform, with the reason printed, or record the per-platform result. Until
 then the gate is macOS-only.

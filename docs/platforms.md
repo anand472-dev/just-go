@@ -9,12 +9,12 @@ Windows shell parity included; BSD is best-effort.
 |---|---|---|---|
 | macOS (arm64) | yes, the recorded run | yes | The corpus was recorded on macOS; `machine-env` and `path-hash` exceptions come from there. |
 | Linux | not run in this repository yet | not checked here | Required by the spec. |
-| Windows (amd64) | not run; the Windows shell cases (`pwsh`, `powershell`, `cmd`) have not been exercised | `make cross` passes: vet and the `internal/sys` test binary compile | Required by the spec. Needs a Windows host to verify the shells. |
-| FreeBSD (amd64) | not run | `make cross` passes: vet | Best-effort. |
-| OpenBSD (amd64) | not run | `make cross` passes: vet | Best-effort. |
+| Windows (amd64) | not run; the Windows shell cases (`pwsh`, `powershell`, `cmd`) have not been exercised | `just cross` passes: vet and the `internal/sys` test binary compile | Required by the spec. Needs a Windows host to verify the shells. |
+| FreeBSD (amd64) | not run | `just cross` passes: vet | Best-effort. |
+| OpenBSD (amd64) | not run | `just cross` passes: vet | Best-effort. |
 
-`make cross` checks that the code builds and vets for the platforms above. It
-does not run a test, so a passing `make cross` says nothing about behavior.
+`just cross` checks that the code builds and vets for the platforms above. It
+does not run a test, so a passing `just cross` says nothing about behavior.
 
 ## Exception categories per platform
 

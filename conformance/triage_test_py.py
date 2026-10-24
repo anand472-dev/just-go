@@ -1,8 +1,8 @@
 """Unit tests for scripts/triage.py, the classifier behind
 conformance/triage/groups.json.
 
-Run with `make triage-test` (python3 -m unittest conformance.triage_test_py
-from the repository root). It is not part of `make check`.
+Run with `just triage-test` (python3 -m unittest conformance.triage_test_py
+from the repository root). It is not part of `just check`.
 """
 
 import os

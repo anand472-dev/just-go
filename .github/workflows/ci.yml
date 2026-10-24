@@ -24,10 +24,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: extractions/setup-just@v2
+        with:
+          just-version: "1.59.0"
       - name: Install gocyclo
-        run: make tools
+        run: just tools
       - name: Vet, test, baseline, coverage, complexity
-        run: make check cover cyclo
+        run: just check cover cyclo
 
   windows:
     name: gate (windows-latest)
@@ -50,5 +53,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: extractions/setup-just@v2
+        with:
+          just-version: "1.59.0"
       - name: Cross-compile and vet
-        run: make cross
+        run: just cross

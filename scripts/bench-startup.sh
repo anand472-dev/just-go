@@ -29,7 +29,7 @@ now() {
 bench() {
 	bin=$1
 	if [ ! -x "$bin" ]; then
-		echo "bench-startup: $bin is missing; run 'make oracle' and 'make build'" >&2
+		echo "bench-startup: $bin is missing; run 'just oracle' and 'just build'" >&2
 		exit 1
 	fi
 	"$bin" --justfile "$justfile" --list >/dev/null

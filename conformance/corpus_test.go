@@ -111,7 +111,7 @@ func TestCorpusIsNotEmpty(t *testing.T) {
 	}
 	lib := upstreamTest + "/lib.rs"
 	if ok, _ := fsys.IsFile(lib); !ok {
-		t.Skip("oracle/src is not present; run `make oracle` to compare against upstream's test files")
+		t.Skip("oracle/src is not present; run `just oracle` to compare against upstream's test files")
 	}
 	missing, err := modulesWithoutCases(fsys, upstreamTest, cases)
 	if err != nil {

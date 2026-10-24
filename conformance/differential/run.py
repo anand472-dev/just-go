@@ -16,7 +16,7 @@ is not the default, "cwd", the directory under the temporary one to run in,
 Usage: ORACLE=oracle/bin/just MINE=bin/just-go python3 conformance/differential/run.py
 Both default to the paths above, relative to the repository root. Exit status
 is 1 when a case differs that is not marked "known" in cases.json (a known
-case records a divergence a task report lists; it is printed, not failed). This is a developer check, not part of make check:
+case records a divergence a task report lists; it is printed, not failed). This is a developer check, not part of just check:
 it needs the oracle binary, which is built by scripts/build-oracle.sh.
 """
 import glob
