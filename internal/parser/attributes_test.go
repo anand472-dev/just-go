@@ -28,6 +28,7 @@ func attributesOf(t *testing.T, src string) []ast.Attribute {
 	var out []ast.Attribute
 	for _, a := range jf.Recipes[0].Attributes {
 		a.Line, a.Col = 0, 0
+		a.ArgAt = nil
 		for i := range a.Args {
 			a.Args[i] = stripExpr(a.Args[i])
 		}
@@ -188,7 +189,7 @@ func TestParseAttributeErrors(t *testing.T) {
 		{"an assignment takes only private", "[doc]\nx := 'a'\n", 2, 1, "assignment `x` has invalid attribute `doc`"},
 		{"the first invalid attribute is the one reported", "[private, no-cd, doc]\nx := 'a'\n", 2, 1,
 			"assignment `x` has invalid attribute `doc`"},
-		{"an attribute not implemented yet", "[arg('a')]\nfoo a:\n", 1, 2, "attribute `arg` is not implemented yet"},
+		{"an attribute not implemented yet", "[cache]\nfoo:\n", 1, 2, "attribute `cache` is not implemented yet"},
 	}
 	for _, c := range cases {
 		t.Run(c.id, func(t *testing.T) {

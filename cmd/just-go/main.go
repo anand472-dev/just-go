@@ -11,6 +11,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gitea.com/wimwian/just-go/internal/argv"
+	"gitea.com/wimwian/just-go/internal/ast"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,7 +23,6 @@ import (
 
 	just "gitea.com/wimwian/just-go"
 	"gitea.com/wimwian/just-go/internal/ansi"
-	"gitea.com/wimwian/just-go/internal/ast"
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/output"
 	"gitea.com/wimwian/just-go/internal/suggest"
@@ -1127,11 +1128,11 @@ func selectRecipes(infos []just.RecipeInfo, words []string) ([]just.Call, error)
 func selectRecipesWith(infos []just.RecipeInfo, words []string, allowMissing bool) ([]just.Call, error) {
 	params := make(map[string]int, len(infos))
 	for _, info := range infos {
-		params[info.Name] = argCount(info)
+		params[info.Name] = len(info.Params)
 	}
 	var calls []just.Call
 	for i := 0; i < len(words); {
-		n, ok := wordParams(words[i], params, infos)
+		info, ok := infoFor(words[i], infos)
 		if !ok {
 			if allowMissing {
 				i++
@@ -1142,40 +1143,55 @@ func selectRecipesWith(infos []just.RecipeInfo, words []string, allowMissing boo
 			}
 			return nil, missingRecipe(words[i], infos)
 		}
-		take := len(words) - i - 1
-		if n >= 0 {
-			take = min(n, take)
+		parsed, err := argv.Take(argvOf(info), words[i+1:])
+		if err != nil {
+			return nil, err
 		}
-		calls = append(calls, just.Call{Recipe: words[i], Args: append([]string(nil), words[i+1:i+1+take]...)})
-		i += 1 + take
+		var options map[string][]string
+		if len(parsed.Options) > 0 {
+			options = parsed.Options
+		}
+		calls = append(calls, just.Call{Recipe: words[i], Args: parsed.Args, Options: options, Help: parsed.Help})
+		i += 1 + parsed.Used
 	}
 	return calls, nil
 }
 
-// argCount is how many words a recipe takes after its name: its parameters, or
-// -1 when its last parameter is variadic, since that takes every word left. Pure.
-func argCount(info just.RecipeInfo) int {
-	if n := len(info.Kinds); n > 0 && info.Kinds[n-1] != "" {
-		return -1
-	}
-	return len(info.Params)
-}
-
-// wordParams is the number of parameters of the recipe a word runs. A word
-// that names a module runs the module's recipe, which the library chooses by its
-// own default; for grouping its arguments, the first of the module's recipes is
-// used. A word that is not a recipe or a module is not ok. It is pure.
-func wordParams(word string, params map[string]int, infos []just.RecipeInfo) (int, bool) {
-	if n, ok := params[word]; ok {
-		return n, true
+// infoFor is the recipe a word names, and whether there is one: the recipe whose
+// name it is, or else the first recipe of the module it names, whose arguments
+// it then takes. Pure.
+func infoFor(word string, infos []just.RecipeInfo) (just.RecipeInfo, bool) {
+	for _, info := range infos {
+		if info.Name == word {
+			return info, true
+		}
 	}
 	module := strings.TrimSuffix(word, "::")
 	for _, info := range infos {
 		if rest, ok := strings.CutPrefix(info.Name, module+"::"); ok && !strings.Contains(rest, "::") {
-			return argCount(info), true
+			return info, true
 		}
 	}
-	return 0, false
+	return just.RecipeInfo{}, false
+}
+
+// argvOf is the recipe of info as the splitting of command-line words needs it:
+// its parameters with their kinds, and their [arg] specs. Pure.
+func argvOf(info just.RecipeInfo) argv.Recipe {
+	r := argv.Recipe{Name: info.Name, Specs: info.Specs, Params: make([]argv.Param, len(info.Params))}
+	for i, name := range info.Params {
+		kind := ast.ParamSingle
+		if i < len(info.Kinds) {
+			switch info.Kinds[i] {
+			case "+":
+				kind = ast.ParamPlus
+			case "*":
+				kind = ast.ParamStar
+			}
+		}
+		r.Params[i] = argv.Param{Name: name, Kind: kind}
+	}
+	return r
 }
 
 // submoduleError is upstream's error for a path whose part before a `::` is a

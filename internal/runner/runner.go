@@ -134,6 +134,9 @@ type Plan struct {
 type Call struct {
 	Recipe string
 	Args   []string
+	// Options are the values of the recipe's options by parameter name; see
+	// the library's Call.
+	Options map[string][]string
 }
 
 // Result is the outcome of a run. ExitCode is meaningful only when Run
@@ -164,6 +167,10 @@ type step struct {
 	// command of the recipe, nil when it has no such attribute.
 	timestamp *string
 }
+
+// noDefault is the default function of a check that binds nothing: a default is
+// not evaluated for it, and is empty.
+func noDefault(ast.Param) (string, error) { return "", nil }
 
 // prepared is the outcome of prepare: what the plan asks for and the settings
 // it runs under, all known before anything runs.
@@ -239,7 +246,14 @@ func prepare(plan Plan) (prepared, error) {
 		return prepared{}, err
 	}
 	for _, c := range calls {
-		if err := checkArgCount(findRecipe(jf, c.Recipe), len(c.Args)); err != nil {
+		r := findRecipe(jf, c.Recipe)
+		specs := specsOf(jf, r)
+		if err := checkArgCount(r, specs, len(c.Args)); err != nil {
+			return prepared{}, err
+		}
+		// Every call's values are checked before any recipe runs, as upstream does;
+		// defaults are not evaluated for it.
+		if _, err := bindArgs(r, specs, c.Args, c.Options, eval.Scope{}, noDefault); err != nil {
 			return prepared{}, err
 		}
 	}
@@ -515,31 +529,6 @@ func callKey(name string, args []string) string {
 func requiredParams(r *ast.Recipe) int {
 	lo, _, _ := r.Arity()
 	return lo
-}
-
-// checkArgCount reports a usage error, worded as upstream's
-// PositionalArgumentCountMismatch, when found arguments do not fit r's
-// parameters. It is pure.
-func checkArgCount(r *ast.Recipe, found int) error {
-	lo, hi, unbounded := r.Arity()
-	if found >= lo && (unbounded || found <= hi) {
-		return nil
-	}
-	got := fmt.Sprintf("recipe `%s` got %s but", r.Name, count(found, "positional argument"))
-	var takes string
-	switch {
-	case unbounded:
-		takes = fmt.Sprintf("takes at least %d", lo)
-	case lo == hi && found > hi:
-		takes = fmt.Sprintf("only takes %d", hi)
-	case lo == hi:
-		takes = fmt.Sprintf("takes %d", lo)
-	case found < lo:
-		takes = fmt.Sprintf("takes at least %d", lo)
-	default:
-		takes = fmt.Sprintf("takes at most %d", hi)
-	}
-	return usage("%s %s\nusage:\n    %s", got, takes, usageLine(r))
 }
 
 // usageLine is upstream's short usage of r: "just", the recipe name, and its

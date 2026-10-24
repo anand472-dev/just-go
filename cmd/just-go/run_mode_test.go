@@ -3,8 +3,11 @@ package main
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
+
+	just "gitea.com/wimwian/just-go"
 
 	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/sys/sysfake"
@@ -204,5 +207,24 @@ func TestCommandWithShellCommandRunsItsWordsAsOneScript(t *testing.T) {
 	got := runFake(t, map[string]string{"/w/justfile": "set shell := ['printf']\n"}, nil, "--shell-command", "--command", "bar", "baz")
 	if got.code != 0 || len(got.proc.Specs) != 1 || strings.Join(got.proc.Specs[0].Argv, "|") != "printf|bar baz" {
 		t.Errorf("run = %d, argv %v", got.code, got.proc.Specs)
+	}
+}
+
+// A call's options are selected by the recipe's own specs: a recipe with an option
+// takes it wherever it is among its words.
+func TestSelectRecipesTakesOptionsOfTheRecipe(t *testing.T) {
+	infos := []just.RecipeInfo{{Name: "a", Params: []string{"bar", "x"}, Kinds: []string{"", ""},
+		Specs: []just.ArgSpec{{Param: "bar", Long: "bar"}}}}
+	got, err := selectRecipes(infos, []string{"a", "--bar=z", "q"})
+	if err != nil || len(got) != 1 || got[0].Options["bar"][0] != "z" || !reflect.DeepEqual(got[0].Args, []string{"q"}) {
+		t.Errorf("selectRecipes = %+v, %v", got, err)
+	}
+}
+
+// A recipe's option that is missing its value is refused by the selection.
+func TestSelectRecipesRefusesAnOptionMissingItsValue(t *testing.T) {
+	infos := []just.RecipeInfo{{Name: "a", Params: []string{"bar"}, Kinds: []string{""}, Specs: []just.ArgSpec{{Param: "bar", Long: "bar"}}}}
+	if _, err := selectRecipes(infos, []string{"a", "--bar"}); err == nil {
+		t.Errorf("an option with no value was accepted")
 	}
 }

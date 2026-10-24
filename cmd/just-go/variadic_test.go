@@ -5,19 +5,22 @@ import (
 	"testing"
 
 	just "gitea.com/wimwian/just-go"
+	"gitea.com/wimwian/just-go/internal/argv"
 )
 
-func TestArgCountOfAVariadicRecipeIsUnbounded(t *testing.T) {
+// A plain recipe takes as many words as it has parameters, and a variadic one
+// takes every word left.
+func TestArgvQuotaOfAVariadicRecipeIsUnbounded(t *testing.T) {
 	plain := just.RecipeInfo{Name: "a", Params: []string{"x", "y"}, Kinds: []string{"", ""}}
-	if got := argCount(plain); got != 2 {
-		t.Errorf("argCount(plain) = %d; want 2", got)
+	if got, err := argv.Take(argvOf(plain), []string{"1", "2", "3"}); err != nil || got.Used != 2 {
+		t.Errorf("plain Take used %d, %v; want 2", got.Used, err)
 	}
 	star := just.RecipeInfo{Name: "b", Params: []string{"x", "y"}, Kinds: []string{"", "*"}}
-	if got := argCount(star); got != -1 {
-		t.Errorf("argCount(star) = %d; want -1", got)
+	if got, err := argv.Take(argvOf(star), []string{"1", "2", "3"}); err != nil || got.Used != 3 {
+		t.Errorf("star Take used %d, %v; want 3", got.Used, err)
 	}
-	if got := argCount(just.RecipeInfo{Name: "c"}); got != 0 {
-		t.Errorf("argCount(no parameters) = %d; want 0", got)
+	if got, err := argv.Take(argvOf(just.RecipeInfo{Name: "c"}), []string{"1"}); err != nil || got.Used != 0 {
+		t.Errorf("no-parameter Take used %d, %v; want 0", got.Used, err)
 	}
 }
 

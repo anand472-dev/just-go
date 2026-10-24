@@ -194,10 +194,21 @@ func body(l ast.Line, indent string) string {
 // attribute is the line of an attribute: `[name]`, or `[name(args)]`. It is
 // pure.
 func attribute(a ast.Attribute) string {
-	if len(a.Args) == 0 {
+	var parts []string
+	if len(a.Args) > 0 {
+		parts = append(parts, exprs(a.Args, ", "))
+	}
+	for _, k := range a.Keys {
+		if k.Value == nil {
+			parts = append(parts, k.Name)
+			continue
+		}
+		parts = append(parts, k.Name+"="+exprs([]ast.Expr{k.Value}, ", "))
+	}
+	if len(parts) == 0 {
 		return fmt.Sprintf("[%s]\n", a.Name)
 	}
-	return fmt.Sprintf("[%s(%s)]\n", a.Name, exprs(a.Args, ", "))
+	return fmt.Sprintf("[%s(%s)]\n", a.Name, strings.Join(parts, ", "))
 }
 
 // param is a parameter with its default, if it has one: `$name=default`. It is

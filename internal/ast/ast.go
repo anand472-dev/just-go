@@ -317,6 +317,7 @@ type RawLine struct {
 // Attribute names. The parser knows every attribute upstream has; these are
 // the ones with an effect that the runner, analyzer or host reads.
 const (
+	AttrArg                 = "arg"
 	AttrConfirm             = "confirm"
 	AttrContinue            = "continue"
 	AttrDefault             = "default"
@@ -397,11 +398,24 @@ func Enabled(attrs []Attribute, goos string) bool {
 // cannot be compared with ==, because the arguments are a slice.
 type Attribute struct {
 	Name string
-	// Args are the arguments. An attribute that takes only string literals has
-	// ast.StringLit arguments; one that takes expressions may have any.
-	Args []Expr
-	Line int
-	Col  int
+	// Args are the positional arguments. An attribute that takes only string
+	// literals has ast.StringLit arguments; one that takes expressions may have
+	// any. ArgAt locates each of them. Keys are the keyed arguments of an
+	// attribute that takes them, such as `arg`, in the order written.
+	Args  []Expr
+	ArgAt []Span
+	Keys  []AttributeKey
+	Line  int
+	Col   int
+}
+
+// AttributeKey is a keyed argument of an attribute, `key` or `key = value`.
+// Value is nil when the key has none. At locates the key, and ValueAt the value.
+type AttributeKey struct {
+	Name    string
+	Value   Expr
+	At      Span
+	ValueAt Span
 }
 
 // Attribute returns the recipe's attribute called name, or nil. It is pure.

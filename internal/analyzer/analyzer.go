@@ -17,6 +17,7 @@ package analyzer
 
 import (
 	"fmt"
+	"gitea.com/wimwian/just-go/internal/argspec"
 	"sort"
 	"strings"
 
@@ -69,7 +70,7 @@ func AnalyzeWith(jf *ast.Justfile, overrides map[string]string) error {
 	if err := checkListFeatures(jf); err != nil {
 		return err
 	}
-	if err := checkRecipes(jf); err != nil {
+	if err := checkRecipeItems(jf); err != nil {
 		return err
 	}
 	if err := resolveRecipes(jf); err != nil {
@@ -270,4 +271,24 @@ func contains(names []string, name string) bool {
 		}
 	}
 	return false
+}
+
+// checkRecipeItems checks the recipes' own items: their attributes, parameters and
+// dependencies, then the [arg] attributes that name their parameters.
+func checkRecipeItems(jf *ast.Justfile) error {
+	if err := checkRecipes(jf); err != nil {
+		return err
+	}
+	return checkArgSpecs(jf)
+}
+
+// checkArgSpecs checks the [arg] attributes of every recipe, as upstream does once
+// the recipes are resolved. The first error is returned.
+func checkArgSpecs(jf *ast.Justfile) error {
+	for i := range jf.Recipes {
+		if _, err := argspec.Of(jf, &jf.Recipes[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }

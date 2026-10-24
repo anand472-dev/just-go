@@ -17,6 +17,7 @@ package just
 import (
 	"context"
 	"fmt"
+	"gitea.com/wimwian/just-go/internal/argspec"
 	"io"
 	"path/filepath"
 	"sort"
@@ -129,7 +130,15 @@ type Options struct {
 type Call struct {
 	Recipe string
 	Args   []string
+	// Options are the values of the recipe's options, by parameter name, as the
+	// command line gave them: a flag's value is "true". Help is set for a recipe
+	// whose help the command line asked for, which runs nothing.
+	Options map[string][]string
+	Help    bool
 }
+
+// ArgSpec is the [arg] attribute of a parameter, as the command line uses it.
+type ArgSpec = argspec.Spec
 
 // Result is the outcome of a run. ExitCode is the status of the command that
 // stopped the run, or 0 when every command succeeded. It is meaningless when
@@ -159,6 +168,8 @@ type RecipeInfo struct {
 	// Groups are the values of its `[group]` attributes, in byte order. Never
 	// shared with the Justfile; nil for a recipe in no group.
 	Groups []string
+	// Specs are the [arg] attributes of its parameters, in the order written.
+	Specs []ArgSpec
 }
 
 // Justfile is a parsed and analyzed justfile, ready to inspect or run. It is
@@ -259,9 +270,10 @@ func (j *Justfile) Recipes() []RecipeInfo {
 		for k, p := range r.Params {
 			params[k], defaults[k], kinds[k] = p.Name, p.DefaultText, kindMark(p.Kind)
 		}
+		specs, _ := argspec.Of(j.tree, &recipes[i]) // analysis has checked them
 		infos[i] = RecipeInfo{
 			Name: r.Name, Doc: j.doc(&recipes[i]), Params: params, Defaults: defaults, Kinds: kinds,
-			Private: r.Private(), Groups: r.Groups(),
+			Private: r.Private(), Groups: r.Groups(), Specs: specs,
 		}
 	}
 	return infos
@@ -620,7 +632,7 @@ func usage(msg string) *diag.Error {
 func runnerCalls(calls []Call) []runner.Call {
 	out := make([]runner.Call, len(calls))
 	for i, c := range calls {
-		out[i] = runner.Call{Recipe: c.Recipe, Args: c.Args}
+		out[i] = runner.Call{Recipe: c.Recipe, Args: c.Args, Options: c.Options}
 	}
 	return out
 }

@@ -155,7 +155,7 @@ func (inv *invocation) branch(c claimed, shared *ran, chain *callChain) (int, er
 	case !c.mine:
 		return inv.await(c.gate)
 	}
-	code, err := inv.execute(c.call.callee, c.call.args, shared, &callChain{key: c.key, up: chain})
+	code, err := inv.execute(c.call.callee, c.call.args, nil, shared, &callChain{key: c.key, up: chain})
 	return settle(c.gate, code, err)
 }
 

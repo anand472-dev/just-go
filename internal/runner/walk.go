@@ -26,7 +26,7 @@ func (inv *invocation) main(pre prepared) (int, error) {
 	inv.globals = globals
 	shared := newRan()
 	for _, c := range pre.calls {
-		if code, err := inv.call(inv.recipes[c.Recipe], c.Args, shared, nil); err != nil || code != 0 {
+		if code, err := inv.call(inv.recipes[c.Recipe], c.Args, c.Options, shared, nil); err != nil || code != 0 {
 			return code, err
 		}
 	}
@@ -63,8 +63,8 @@ func (inv *invocation) evaluateGlobals(only map[string]bool) (eval.Scope, error)
 // call runs the recipe r with args, as upstream's run_recipe does, unless the
 // call was made before in shared: it waits for the branch that is running it,
 // and then does not run it again. Impure: it runs commands.
-func (inv *invocation) call(r *ast.Recipe, args []string, shared *ran, chain *callChain) (int, error) {
-	key := callKey(r.Name, args)
+func (inv *invocation) call(r *ast.Recipe, args []string, opts map[string][]string, shared *ran, chain *callChain) (int, error) {
+	key := callKey(r.Name, args) + optionsKey(opts)
 	if chain.has(key) {
 		return 0, nil
 	}
@@ -72,7 +72,7 @@ func (inv *invocation) call(r *ast.Recipe, args []string, shared *ran, chain *ca
 	if !mine {
 		return inv.await(g)
 	}
-	code, err := inv.execute(r, args, shared, &callChain{key: key, up: chain})
+	code, err := inv.execute(r, args, opts, shared, &callChain{key: key, up: chain})
 	return settle(g, code, err)
 }
 
@@ -106,8 +106,8 @@ type frame struct {
 // attributes and the parameters are evaluated, the recipe is confirmed, its
 // dependencies run, its commands run, and its subsequents run. Impure: it
 // runs commands.
-func (inv *invocation) execute(r *ast.Recipe, args []string, shared *ran, chain *callChain) (int, error) {
-	f, err := inv.begin(r, args, site{recipe: r.Name, dependency: chain.up != nil})
+func (inv *invocation) execute(r *ast.Recipe, args []string, opts map[string][]string, shared *ran, chain *callChain) (int, error) {
+	f, err := inv.begin(r, args, opts, site{recipe: r.Name, dependency: chain.up != nil})
 	if err != nil {
 		return 0, err
 	}
@@ -161,8 +161,9 @@ func (inv *invocation) subsequents(r *ast.Recipe, f frame, chain *callChain) (in
 // or else its default, which may refer to the parameters before it, and
 // whose backticks see the `[env]` attributes. The call is made at at. Impure:
 // it runs backticks.
-func (inv *invocation) begin(r *ast.Recipe, args []string, at site) (frame, error) {
-	if err := checkArgCount(r, len(args)); err != nil {
+func (inv *invocation) begin(r *ast.Recipe, args []string, opts map[string][]string, at site) (frame, error) {
+	specs := specsOf(inv.plan.Justfile, r)
+	if err := checkArgCount(r, specs, len(args)); err != nil {
 		return frame{}, err
 	}
 	jf := inv.plan.Justfile
@@ -186,54 +187,11 @@ func (inv *invocation) begin(r *ast.Recipe, args []string, at site) (frame, erro
 		}
 		return v, nil
 	}
-	positional, err := bindArgs(r, args, scope, def)
+	positional, err := bindArgs(r, specs, args, opts, scope, def)
 	if err != nil {
 		return frame{}, err
 	}
 	return frame{at: at, scope: scope, positional: positional, exported: paramEnv(jf, r, scope, base), attr: attr}, nil
-}
-
-// bindArgs sets each parameter of r in scope from args, and returns the
-// positional values in order: one for each argument a single parameter takes,
-// and each argument a variadic parameter takes. A variadic parameter takes the
-// rest of the arguments, and in scope it is them joined with spaces. A parameter
-// with no argument left takes its default, through def, if it has one; a
-// variadic parameter with no default and no argument is empty. The arguments
-// have already been counted (see checkArgCount). Pure apart from def.
-func bindArgs(r *ast.Recipe, args []string, scope eval.Scope, def func(ast.Param) (string, error)) ([]string, error) {
-	var positional []string
-	for i, p := range r.Params {
-		if p.Kind == ast.ParamSingle {
-			v := ""
-			if i < len(args) {
-				v = args[i]
-			} else if p.Default != nil {
-				var err error
-				if v, err = def(p); err != nil {
-					return nil, err
-				}
-			}
-			scope[p.Name] = v
-			positional = append(positional, v)
-			continue
-		}
-		if i >= len(args) {
-			v := ""
-			if p.Default != nil {
-				var err error
-				if v, err = def(p); err != nil {
-					return nil, err
-				}
-				positional = append(positional, v)
-			}
-			scope[p.Name] = v
-			continue
-		}
-		rest := args[i:]
-		scope[p.Name] = strings.Join(rest, " ")
-		positional = append(positional, rest...)
-	}
-	return positional, nil
 }
 
 // stepOf makes the step that runs the commands of r: it evaluates the
@@ -293,7 +251,7 @@ func (inv *invocation) dependencies(from *ast.Recipe, deps []ast.Dependency, f f
 		return inv.fork(calls, shared, chain)
 	}
 	for _, c := range calls {
-		if code, err := inv.call(c.callee, c.args, shared, chain); err != nil || code != 0 {
+		if code, err := inv.call(c.callee, c.args, nil, shared, chain); err != nil || code != 0 {
 			return code, err
 		}
 	}

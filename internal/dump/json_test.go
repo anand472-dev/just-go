@@ -178,3 +178,18 @@ func TestJSONEncodesACall(t *testing.T) {
 		t.Errorf("JSON = %q, %v; want the call", got, err)
 	}
 }
+
+// An attribute's keys are written after its positional arguments, with a value
+// when it has one, as the justfile wrote them.
+func TestDumpWritesAttributeKeys(t *testing.T) {
+	jf, err := parser.Parse("justfile", []byte("[arg('bar', long, pattern='B')]\nfoo bar:\n"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got := Justfile(jf, ""); !strings.Contains(got, "[arg('bar', long, pattern='B')]\n") {
+		t.Errorf("Justfile = %q", got)
+	}
+	if got := attribute(ast.Attribute{Name: "private"}); got != "[private]\n" {
+		t.Errorf("attribute without arguments = %q", got)
+	}
+}

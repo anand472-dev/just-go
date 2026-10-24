@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"gitea.com/wimwian/just-go/internal/ast"
+	"gitea.com/wimwian/just-go/internal/diag"
 	"gitea.com/wimwian/just-go/internal/lexer"
 )
 
@@ -19,6 +20,7 @@ type attributeSpec struct {
 	min, max   int
 	expression bool
 	repeatable bool
+	keyed      bool // takes keyed arguments, `key` or `key = value`, as well
 	supported  bool
 }
 
@@ -30,7 +32,7 @@ const unbounded = math.MaxInt
 // order its checks meet them in (attribute.rs). It is read-only.
 var attributeSpecs = []attributeSpec{
 	{name: "android", supported: true},
-	{name: "arg", min: 1, max: 1, repeatable: true},
+	{name: ast.AttrArg, min: 1, max: 1, repeatable: true, keyed: true, supported: true},
 	{name: "cache"},
 	{name: ast.AttrConfirm, max: 1, expression: true, supported: true},
 	{name: ast.AttrContinue, max: unbounded, supported: true},
@@ -92,6 +94,7 @@ type attributeArg struct {
 	expr   ast.Expr
 	token  lexer.Token
 	tokens int
+	key    *ast.AttributeKey // set for a keyed argument, which has no expr
 }
 
 // attributes parses the attributes before an item, `[a, b(c)]` lines in a
@@ -152,7 +155,12 @@ func (p *parser) attribute(set *attributeSet) (ast.Attribute, error) {
 	}
 	a := ast.Attribute{Name: name.Text, Line: name.Line, Col: name.Col}
 	for _, arg := range args {
+		if arg.key != nil {
+			a.Keys = append(a.Keys, *arg.key)
+			continue
+		}
 		a.Args = append(a.Args, arg.expr)
+		a.ArgAt = append(a.ArgAt, tokenSpan(arg.token))
 	}
 	return a, nil
 }
@@ -177,7 +185,7 @@ func (p *parser) attributeSpec(name lexer.Token) (attributeSpec, error) {
 // allowed after the last. It returns none when there are neither.
 func (p *parser) attributeArgs(spec attributeSpec) ([]attributeArg, error) {
 	if p.accept(lexer.Colon) {
-		arg, err := p.attributeArg()
+		arg, err := p.attributeArgOf(spec)
 		return []attributeArg{arg}, err
 	}
 	if !p.accept(lexer.LParen) {
@@ -186,7 +194,7 @@ func (p *parser) attributeArgs(spec attributeSpec) ([]attributeArg, error) {
 	var args []attributeArg
 	if !p.is(lexer.RParen) {
 		for {
-			arg, err := p.attributeArg()
+			arg, err := p.attributeArgOf(spec)
 			if err != nil {
 				return nil, err
 			}
@@ -200,6 +208,34 @@ func (p *parser) attributeArgs(spec attributeSpec) ([]attributeArg, error) {
 	return args, err
 }
 
+// attributeArgOf parses one argument of the attribute spec: a keyed argument,
+// `key` or `key = value`, for an attribute that takes keys, else an expression.
+func (p *parser) attributeArgOf(spec attributeSpec) (attributeArg, error) {
+	if spec.keyed && p.peek().Kind == lexer.Ident && p.keyFollows(p.peekAt(1)) {
+		return p.keyedArg()
+	}
+	return p.attributeArg()
+}
+
+// keyFollows reports whether a token after an identifier in an attribute's
+// arguments makes the identifier a key: an `=`, or the end of the argument.
+func (p *parser) keyFollows(t lexer.Token) bool {
+	return t.Kind == lexer.Equals || t.Kind == lexer.Comma || t.Kind == lexer.RParen
+}
+
+// keyedArg parses `key` or `key = value`, the key being the current identifier.
+func (p *parser) keyedArg() (attributeArg, error) {
+	name := p.next()
+	key := &ast.AttributeKey{Name: name.Text, At: tokenSpan(name)}
+	if !p.accept(lexer.Equals) {
+		return attributeArg{token: name, tokens: 1, key: key}, nil
+	}
+	token, from := p.peek(), p.pos
+	value, err := p.expr()
+	key.Value, key.ValueAt = value, tokenSpan(token)
+	return attributeArg{token: token, tokens: p.pos - from, key: key}, err
+}
+
 // attributeArg parses one argument, an expression.
 func (p *parser) attributeArg() (attributeArg, error) {
 	token, from := p.peek(), p.pos
@@ -210,16 +246,15 @@ func (p *parser) attributeArg() (attributeArg, error) {
 // checkAttribute checks the arguments of an attribute called name against
 // spec, and the attribute against the attributes before it in set.
 func (p *parser) checkAttribute(spec attributeSpec, name lexer.Token, args []attributeArg, set *attributeSet) error {
-	if n := len(args); n < spec.min || n > spec.max {
+	positional := positionalArgs(args)
+	if n := len(positional); n < spec.min || n > spec.max {
 		return p.errAt(name, argumentCountMessage(spec, n))
 	}
-	if err := p.checkLiterals(spec, args); err != nil {
+	if err := p.checkLiterals(spec, positional); err != nil {
 		return err
 	}
-	if spec.name == ast.AttrContinue {
-		if err := p.checkSignals(args); err != nil {
-			return err
-		}
+	if err := p.checkArgsOf(spec, args); err != nil {
+		return err
 	}
 	if first := set.find(spec.name); first != nil && !spec.repeatable {
 		return p.errAt(name, fmt.Sprintf("attribute `%s` first used on line %d is duplicated on line %d",
@@ -227,6 +262,18 @@ func (p *parser) checkAttribute(spec attributeSpec, name lexer.Token, args []att
 	}
 	if spec.name == ast.AttrGroup {
 		return p.checkGroup(name, args[0], set)
+	}
+	return nil
+}
+
+// checkArgsOf checks the arguments of an attribute that have their own rules: the
+// keys of one that takes keys, and the signals of `continue`.
+func (p *parser) checkArgsOf(spec attributeSpec, args []attributeArg) error {
+	if spec.keyed {
+		return p.checkKeys(args)
+	}
+	if spec.name == ast.AttrContinue {
+		return p.checkSignals(args)
 	}
 	return nil
 }
@@ -361,4 +408,70 @@ func (p *parser) checkRecipeAttributes(set attributeSet, name lexer.Token) error
 		return p.errAt(name, fmt.Sprintf("recipe `%s` has both `[script]` and `[shell]` attributes", name.Text))
 	}
 	return nil
+}
+
+// positionalArgs are the arguments of an attribute that have no key. It is pure.
+func positionalArgs(args []attributeArg) []attributeArg {
+	var out []attributeArg
+	for _, a := range args {
+		if a.key == nil {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// argKeys are the keys an `arg` attribute takes, and whether each takes a
+// value: `long` and `short` may have one, and the rest need one.
+var argKeys = map[string]bool{
+	"long": false, "short": false, "value": true, "help": true, "pattern": true,
+	"min": true, "max": true, "multiple": false, "flag": false,
+}
+
+// checkKeys checks the keyed arguments of an attribute: each key is one the
+// attribute takes, a key that needs a value has one, and the values that must be
+// string literals are. It reports the first problem, at the key it is about.
+func (p *parser) checkKeys(args []attributeArg) error {
+	for _, a := range args {
+		if a.key == nil {
+			continue
+		}
+		if err := p.checkKey(a); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkKey checks one keyed argument a: the key is one `arg` takes, it has a value
+// when it needs one, and that value is a string literal unless the key takes an
+// expression.
+func (p *parser) checkKey(a attributeArg) error {
+	k := a.key
+	needsValue, known := argKeys[k.Name]
+	switch {
+	case !known:
+		return p.errSpan(k.At, fmt.Sprintf("unknown key `%s` for `%s` attribute", k.Name, ast.AttrArg))
+	case needsValue && k.Value == nil:
+		return p.errSpan(k.At, fmt.Sprintf("attribute key `%s` requires value", k.Name))
+	case k.Value != nil && !expressionKey(k.Name) && (a.token.Kind != lexer.String || a.tokens != 1):
+		return p.errSpan(k.At, fmt.Sprintf("attribute `%s` arguments must be string literals", ast.AttrArg))
+	}
+	return nil
+}
+
+// errSpan is an error of the parse at the span s, with msg.
+func (p *parser) errSpan(s ast.Span, msg string) error {
+	return &diag.Error{Kind: diag.KindParse, File: p.file, Line: s.Line, Col: s.Col, Width: s.Width, Msg: msg}
+}
+
+// tokenSpan is where token t is in the source.
+func tokenSpan(t lexer.Token) ast.Span {
+	return ast.Span{Line: t.Line, Col: t.Col, Width: tokenWidth(t)}
+}
+
+// expressionKey reports whether an `arg` key may take an expression rather than a
+// string literal: `help` and `pattern` may, as upstream allows. It is pure.
+func expressionKey(name string) bool {
+	return name == "help" || name == "pattern"
 }
